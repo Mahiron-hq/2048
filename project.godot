@@ -1,0 +1,45 @@
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="2048 Merge"
+config/name_localized={
+"ru": "2048 Слияние"
+}
+config/description="Offline number-merging puzzle."
+config/version="1.0.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://assets/icons/icon.png"
+config/quit_on_go_back=false
+boot_splash/bg_color=Color(0.0706, 0.0627, 0.098, 1)
+boot_splash/show_image=false
+run/low_processor_mode=true
+run/low_processor_mode_sleep_usec=8000
+
+[display]
+
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/size/window_width_override=540
+window/size/window_height_override=960
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
+window/vsync/vsync_mode=1
+window/energy_saving/keep_screen_on=false
+window/ios/allow_high_refresh_rate=true
+window/ios/hide_home_indicator=true
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.0706, 0.0627, 0.098, 1)
