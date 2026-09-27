@@ -18,13 +18,16 @@ func _initialize() -> void:
 		"test_ids_follow_tiles",
 		"test_game_over_detection",
 		"test_undo_single_step",
+		"test_undo_replays_the_move",
+		"test_undo_replay_survives_save",
+		"test_undo_of_legacy_save_rebuilds",
 		"test_milestones_fire_once",
 		"test_serialization_round_trip",
 		"test_rejects_malformed_state",
 		"test_store_survives_restart",
 		"test_store_ignores_corrupt_file",
 		"test_store_best_score_only_increases",
-		"test_music_loop_stays_in_bounds",
+		"test_music_loop_is_seamless",
 	]
 	for t in tests:
 		_current = t
@@ -176,9 +179,63 @@ func test_undo_single_step() -> void:
 	var before := b.values.duplicate()
 	b.move(Board.Dir.LEFT)
 	check(b.can_undo(), "undo available after move")
-	check(b.undo(), "undo succeeds")
+	check(b.undo() != null, "undo succeeds")
 	check(b.values == before and b.score == 0 and b.move_count == 0, "state restored")
-	check(not b.undo(), "only one undo step")
+	check(b.undo() == null, "only one undo step")
+
+
+func test_undo_replays_the_move() -> void:
+	var b := Board.new(21)
+	b.new_game()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4
+	for n in 400:
+		if not b.can_move():
+			b.new_game()
+		var values_before := b.values.duplicate()
+		var ids_before := b.ids.duplicate()
+		var dir: int = rng.randi_range(0, 3)
+		var r := b.move(dir)
+		if not r.moved:
+			continue
+		var u := b.undo()
+		if u == null or not u.moved or u.slides != r.slides or u.merges != r.merges or u.spawn != r.spawn:
+			check(false, "undo must return the same move (step %d)" % n)
+			return
+		if b.values != values_before or b.ids != ids_before:
+			check(false, "undo must restore values and tile ids (step %d)" % n)
+			return
+		b.move(dir)
+	check(true)
+
+
+func test_undo_replay_survives_save() -> void:
+	var b := board_from([[2, 2, 4, 0], [0, 4, 0, 4], [0, 0, 0, 0], [8, 0, 8, 0]])
+	var r := b.move(Board.Dir.LEFT)
+	var c := Board.new(1)
+	check(c.from_dict(JSON.parse_string(JSON.stringify(b.to_dict()))), "reloads")
+	check(c.ids == b.ids, "tile ids persist")
+	var u := c.undo()
+	check(u != null and u.moved and u.slides == r.slides and u.merges == r.merges and u.spawn == r.spawn, "undo after reload replays the move")
+	var fresh := c.move(Board.Dir.RIGHT)
+	var used := {}
+	for id in c.ids:
+		if id != 0 and used.has(id):
+			check(false, "ids stay unique after reload")
+		used[id] = true
+	check(fresh.moved, "board keeps playing after reload + undo")
+
+
+func test_undo_of_legacy_save_rebuilds() -> void:
+	var legacy := {
+		"size": 4, "values": [4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "score": 4, "moves": 1,
+		"undo": {"size": 4, "values": [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "score": 0, "moves": 0},
+	}
+	var b := Board.new(1)
+	check(b.from_dict(legacy), "1.0.0 save loads")
+	var u := b.undo()
+	check(u != null and not u.moved, "undo works but asks for a rebuild")
+	check(b.values[0] == 2 and b.values[1] == 2 and b.ids[0] != 0 and b.ids[0] != b.ids[1], "values restored with fresh ids")
 
 
 func test_milestones_fire_once() -> void:
@@ -262,10 +319,54 @@ func test_store_best_score_only_increases() -> void:
 	check(s.best_score == 100, "best kept")
 
 
-func test_music_loop_stays_in_bounds() -> void:
-	var wav := Sfx.build_music_stream()
-	var frames := wav.data.size() / 2
-	check(wav.loop_mode == AudioStreamWAV.LOOP_FORWARD, "music loops")
-	# The mixer reads loop_end inclusively; it must index an existing frame.
-	check(wav.loop_end >= 0 and wav.loop_end < frames, "loop_end %d within %d frames" % [wav.loop_end, frames])
-	check(wav.data.decode_s16(wav.loop_end * 2) == wav.data.decode_s16(wav.loop_begin * 2), "seam frame repeats the loop start")
+func test_music_loop_is_seamless() -> void:
+	var looped := Sfx.make_music_stream()
+	var linear := looped.duplicate() as AudioStreamMP3
+	linear.loop = false
+	linear.beat_count = 0
+	var rate := Sfx.MUSIC_RATE
+	var loop_end := Sfx.MUSIC_DELAY_FRAMES + Sfx.MUSIC_LOOP_FRAMES
+	var span := 22050
+
+	var seam := _render(looped, (loop_end - span + 0.5) / rate, span * 2)
+	var tail := _render(linear, (loop_end - span + 0.5) / rate, span)
+	var head := _render(linear, looped.loop_offset, span)
+	# The frames before the wrap are the music's end, the frames after it the music's start.
+	check(_max_abs_diff(seam, tail, 0, 0, span) < 1e-4, "loop plays the whole track up to the bar line")
+	# Godot crossfades 256 frames of post-loop padding into the restart; compare after that.
+	check(_max_abs_diff(seam, head, span + 256, 256, span - 256) < 1e-4, "loop restarts exactly at the first music frame")
+	var jump := 0.0
+	for i in range(span - 300, span + 300):
+		jump = maxf(jump, absf(seam[i].x - seam[i - 1].x))
+	check(jump < 0.01, "no click at the seam (max step %.4f)" % jump)
+
+	# Anchor to the lossless master: frames 60000.. of the FLAC (mono) must line up with zero lag,
+	# which pins MUSIC_DELAY_FRAMES to the exact frame.
+	var ref := FileAccess.get_file_as_bytes("res://tests/data/master_frames_60000.f32").to_float32_array()
+	var probe := _render(linear, (Sfx.MUSIC_DELAY_FRAMES + 60000 - 2 + 0.5) / rate, ref.size() + 4)
+	var errs := PackedFloat32Array()
+	for lag in 5:
+		var e := 0.0
+		for i in ref.size():
+			var v := probe[lag + i]
+			var d := (v.x + v.y) * 0.5 - ref[i]
+			e += d * d
+		errs.append(sqrt(e / ref.size()))
+	check(errs[2] < 0.7 * minf(errs[1], errs[3]), "music starts at the measured encoder delay (errors by lag -2..2: %s)" % errs)
+
+
+func _render(stream: AudioStream, from_sec: float, frames: int) -> PackedVector2Array:
+	var pb := stream.instantiate_playback()
+	pb.start(from_sec)
+	var out := PackedVector2Array()
+	while out.size() < frames:
+		out.append_array(pb.mix_audio(1.0, mini(4096, frames - out.size())))
+	return out
+
+
+func _max_abs_diff(a: PackedVector2Array, b: PackedVector2Array, a0: int, b0: int, n: int) -> float:
+	var m := 0.0
+	for i in n:
+		var d := a[a0 + i] - b[b0 + i]
+		m = maxf(m, maxf(absf(d.x), absf(d.y)))
+	return m
