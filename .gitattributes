@@ -3,3 +3,6 @@
 
 *.png binary
 *.gif binary
+*.mp3 binary
+*.flac binary
+*.f32 binary

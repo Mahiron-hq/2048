@@ -50,6 +50,24 @@ func _run() -> void:
 	await _wait(0.3)
 	check(board.move_count == count - 1, "undo reverts the move")
 
+	var consistent := true
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	for i in 60:
+		if not board.can_move():
+			app._game.start_new(false)
+		app._game.request_move(rng.randi_range(0, 3))
+		if i % 3 == 0:
+			await _frames(2)
+		app._game.undo()
+		if i % 2 == 0:
+			await _frames(3)
+		if not _view_matches(app._game):
+			consistent = false
+			break
+		app._game.request_move(rng.randi_range(0, 3))
+	check(consistent, "undo animation leaves the view identical to the board")
+
 	for i in 6:
 		for dir in [Board.Dir.LEFT, Board.Dir.DOWN, Board.Dir.RIGHT, Board.Dir.UP]:
 			app._game.request_move(dir)
@@ -65,7 +83,22 @@ func _run() -> void:
 
 	app._open_settings()
 	await _wait(0.3)
+	var sfx := app.sfx
+	check(sfx.music_enabled and sfx._music.playing, "music is on by default")
+	app._settings._music.button_pressed = false
+	await _wait(0.5)
+	var mid_out := sfx.music_level()
+	await _wait(1.3)
+	check(mid_out > 0.05 and mid_out < 0.95, "music fades out gradually (level %.2f mid-fade)" % mid_out)
+	check(sfx.music_level() == 0.0 and sfx._music.stream_paused, "music is paused once faded out")
+	var paused_at := sfx._music.get_playback_position()
 	app._settings._music.button_pressed = true
+	await _wait(0.8)
+	var mid_in := sfx.music_level()
+	check(mid_in > 0.05 and mid_in < 0.95, "music fades in gradually (level %.2f mid-fade)" % mid_in)
+	check(sfx._music.get_playback_position() >= paused_at, "music resumes where it paused")
+	await _wait(1.8)
+	check(is_equal_approx(sfx.music_level(), 1.0), "music reaches full level")
 	app._settings._haptics.button_pressed = false
 	app.set_theme_mode(SaveStore.ThemeMode.LIGHT)
 	app.set_language("ru")
@@ -84,6 +117,7 @@ func _run() -> void:
 	await _frames(5)
 	check(app.store.best_score == score, "best score survives restart")
 	check(app.store.music_on and not app.store.haptics_on, "settings survive restart")
+	check(app.sfx._music.playing, "music starts on launch when enabled")
 	check(app.store.theme == SaveStore.ThemeMode.LIGHT and app.store.language == "ru", "theme/language survive restart")
 	check(app._menu._subtitle.text == I18n.STRINGS.ru.SUBTITLE, "labels use the saved language at startup")
 	app._menu._continue.pressed.emit()
@@ -118,6 +152,25 @@ func _run() -> void:
 	DirAccess.remove_absolute(SAVE)
 	print("\nui smoke: %d failed" % _failed)
 	quit(_failed)
+
+
+func _view_matches(g: GameScreen) -> bool:
+	var view := g._board_view
+	view.complete_animations()
+	var shown := 0
+	for c in view._layer.get_children():
+		if c.visible:
+			shown += 1
+	var expected := 0
+	for i in Board.CELL_COUNT:
+		if g.board.values[i] == 0:
+			continue
+		expected += 1
+		var t: TileView = view._tiles.get(g.board.ids[i])
+		if t == null or not t.visible or t.value != g.board.values[i] or t.position != view.cell_position(i) or t.scale != Vector2.ONE:
+			printerr("view mismatch at cell %d" % i)
+			return false
+	return shown == expected
 
 
 func _spawn_app() -> App:

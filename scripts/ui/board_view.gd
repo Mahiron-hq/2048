@@ -13,6 +13,10 @@ const SLIDE_TIME := 0.105
 const MERGE_TIME := 0.17
 const SPAWN_TIME := 0.2
 const RING_MIN_VALUE := 64
+const UNDO_VANISH := 0.12
+const UNDO_SQUEEZE := 0.07
+const UNDO_SQUEEZE_SCALE := 0.9
+const UNDO_SLIDE := 0.19
 
 var cell_size := 100.0
 var gap := 12.0
@@ -86,6 +90,44 @@ func play_move(result: Board.MoveResult) -> void:
 		if t:
 			_move_tween.tween_property(t, "position", cell_position(s[2]), SLIDE_TIME)
 	_move_tween.chain().tween_callback(_after_slide.bind(result))
+
+
+## Plays [param undone] backwards: the spawned tile shrinks away, merged tiles squeeze and split
+## into their halves, and every tile glides back to where it came from.
+func play_undo(undone: Board.MoveResult) -> void:
+	complete_animations()
+	var tw := create_tween().set_parallel()
+	_move_tween = tw
+	if not undone.spawn.is_empty():
+		var spawned: TileView = _tiles.get(undone.spawn[0])
+		if spawned:
+			_tiles.erase(undone.spawn[0])
+			spawned.z_index = 3
+			tw.tween_property(spawned, "scale", Vector2.ZERO, UNDO_VANISH).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+			tw.tween_property(spawned, "modulate:a", 0.0, UNDO_VANISH)
+			tw.tween_callback(_release.bind(spawned)).set_delay(UNDO_VANISH)
+	for m in undone.merges:
+		var survivor: TileView = _tiles.get(m[0])
+		if survivor == null:
+			continue
+		# The consumed half waits underneath, slightly smaller, until the pair splits.
+		var half := _acquire(m[1], m[3] / 2, m[2])
+		half.scale = Vector2(UNDO_SQUEEZE_SCALE, UNDO_SQUEEZE_SCALE) * 0.95
+		half.z_index = 1
+		survivor.z_index = 2
+		var squeezed := Vector2(UNDO_SQUEEZE_SCALE, UNDO_SQUEEZE_SCALE)
+		tw.tween_property(survivor, "scale", squeezed, UNDO_SQUEEZE).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(survivor.set_value.bind(m[3] / 2)).set_delay(UNDO_SQUEEZE)
+		for t in [survivor, half]:
+			tw.tween_property(t, "scale", Vector2.ONE, UNDO_SLIDE).set_delay(UNDO_SQUEEZE) \
+					.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	for s in undone.slides:
+		var t: TileView = _tiles.get(s[0])
+		if t:
+			t.set_meta("cell", s[1])
+			tw.tween_property(t, "position", cell_position(s[1]), UNDO_SLIDE).set_delay(UNDO_SQUEEZE) \
+					.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(_after_undo).set_delay(UNDO_SQUEEZE + UNDO_SLIDE)
 
 
 ## Small bump towards [param dir] for a swipe that changes nothing.
@@ -268,6 +310,12 @@ func _ring_at(index: int, color: Color) -> void:
 	var tw := _fx_tween()
 	tw.tween_property(ring, "t", 1.0, 0.45).from(0.0).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_callback(ring.hide)
+
+
+func _after_undo() -> void:
+	for t in _tiles.values():
+		t.z_index = 0
+	settled.emit()
 
 
 func _watch_settle() -> void:

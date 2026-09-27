@@ -185,11 +185,17 @@ func request_move(dir: Board.Dir) -> void:
 
 
 func undo() -> void:
-	if _game_over.is_open or not board.undo():
+	if _game_over.is_open:
+		return
+	var undone := board.undo()
+	if undone == null:
 		return
 	_pending_over = false
-	_board_view.show_board(board, BoardView.Appear.FADE)
-	_refresh_scores(false)
+	if undone.moved:
+		_board_view.play_undo(undone)
+	else:
+		_board_view.show_board(board, BoardView.Appear.FADE)
+	_refresh_scores(true)
 	_app.sfx.play(Sfx.Kind.SWIPE, 0.8, -4.0)
 	_persist()
 

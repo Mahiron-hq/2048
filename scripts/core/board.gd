@@ -90,51 +90,17 @@ func can_move() -> bool:
 ## previous state becomes the single undo step. Returns what happened; [code]moved[/code]
 ## is false (and nothing is mutated) when the move is a no-op.
 func move(dir: Dir) -> MoveResult:
-	var result := MoveResult.new()
-	var snapshot := _snapshot()
-	var prev_best := best_tile
-	var new_values := PackedInt32Array()
-	new_values.resize(CELL_COUNT)
-	var new_ids := PackedInt32Array()
-	new_ids.resize(CELL_COUNT)
-
-	for line in SIZE:
-		var cells := _line_cells(dir, line)
-		var write := 0
-		var last_value := 0
-		var last_id := 0
-		for read in SIZE:
-			var src := cells[read]
-			var v := values[src]
-			if v == 0:
-				continue
-			var id := ids[src]
-			if last_value == v:
-				var dst := cells[write - 1]
-				var merged := v * 2
-				new_values[dst] = merged
-				result.slides.append(PackedInt32Array([id, src, dst]))
-				result.merges.append(PackedInt32Array([last_id, id, dst, merged]))
-				result.gained += merged
-				best_tile = maxi(best_tile, merged)
-				last_value = 0
-			else:
-				var dst := cells[write]
-				new_values[dst] = v
-				new_ids[dst] = id
-				if dst != src:
-					result.slides.append(PackedInt32Array([id, src, dst]))
-				last_value = v
-				last_id = id
-				write += 1
-
-	result.moved = not result.slides.is_empty()
+	var slid := _slide(dir, values, ids)
+	var result: MoveResult = slid.result
 	if not result.moved:
-		best_tile = prev_best
 		return result
-
-	values = new_values
-	ids = new_ids
+	var snapshot := _snapshot()
+	snapshot.dir = dir
+	var prev_best := best_tile
+	values = slid.values
+	ids = slid.ids
+	for m in result.merges:
+		best_tile = maxi(best_tile, m[3])
 	score += result.gained
 	move_count += 1
 	_undo = snapshot
@@ -146,18 +112,26 @@ func move(dir: Dir) -> MoveResult:
 	return result
 
 
-## Restores the state before the last successful move. Tile ids are reissued, so a view
-## should rebuild rather than animate. Returns false when there is nothing to undo.
-func undo() -> bool:
+## Restores the state before the last successful move. Returns the move that was undone, with
+## the same tile ids the board has again afterwards, so a view can play it backwards. When the
+## move cannot be reconstructed (e.g. a save from an older version), the result has
+## [code]moved == false[/code] and a view should rebuild instead. Returns null when there is
+## nothing to undo.
+func undo() -> MoveResult:
 	if _undo.is_empty():
-		return false
-	values = _undo.values
-	score = _undo.score
-	best_tile = _undo.best_tile
-	move_count = _undo.move_count
+		return null
+	var snap := _undo
+	var undone := _reconstruct(snap)
+	values = snap.values
+	score = snap.score
+	best_tile = snap.best_tile
+	move_count = snap.move_count
 	_undo = {}
-	_reissue_ids()
-	return true
+	if snap.ids.is_empty():
+		_reissue_ids()
+	else:
+		ids = snap.ids
+	return undone
 
 
 ## Serializable form of the full state, including the pending undo step.
@@ -165,23 +139,30 @@ func to_dict() -> Dictionary:
 	var d := {
 		"size": SIZE,
 		"values": Array(values),
+		"ids": Array(ids),
 		"score": score,
 		"best_tile": best_tile,
 		"moves": move_count,
 	}
 	if not _undo.is_empty():
-		d["undo"] = {
+		var u := {
 			"size": SIZE,
 			"values": Array(_undo.values),
 			"score": _undo.score,
 			"best_tile": _undo.best_tile,
 			"moves": _undo.move_count,
 		}
+		if not _undo.ids.is_empty():
+			u["ids"] = Array(_undo.ids)
+			u["dir"] = _undo.dir
+		d["undo"] = u
 	return d
 
 
 ## Loads state produced by [method to_dict]. Returns false, leaving the board untouched,
 ## when the data is malformed (wrong size, non power-of-two values, negative counters).
+## Tile ids are optional: without valid ids they are reissued and undo still works, just
+## without a replayable move.
 func from_dict(d: Dictionary) -> bool:
 	var main := _parse_state(d)
 	if main.is_empty():
@@ -198,17 +179,93 @@ func from_dict(d: Dictionary) -> bool:
 	best_tile = main.best_tile
 	move_count = main.move_count
 	_undo = undo_state
-	_reissue_ids()
+	if main.ids.is_empty():
+		_reissue_ids()
+		if not _undo.is_empty():
+			_undo.ids = PackedInt32Array()
+	else:
+		ids = main.ids
+		_next_id = 1
+		for id in ids:
+			_next_id = maxi(_next_id, id + 1)
+		if not _undo.is_empty():
+			for id in _undo.ids:
+				_next_id = maxi(_next_id, id + 1)
 	return true
 
 
 func _snapshot() -> Dictionary:
 	return {
 		"values": values.duplicate(),
+		"ids": ids.duplicate(),
+		"dir": -1,
 		"score": score,
 		"best_tile": best_tile,
 		"move_count": move_count,
 	}
+
+
+## Replays the move stored in [param snap] and checks it lands on the current board; returns an
+## empty (non-animatable) result when it does not.
+func _reconstruct(snap: Dictionary) -> MoveResult:
+	var none := MoveResult.new()
+	if snap.ids.is_empty() or snap.dir < 0 or snap.dir > Dir.RIGHT:
+		return none
+	var slid := _slide(snap.dir, snap.values, snap.ids)
+	var result: MoveResult = slid.result
+	if not result.moved:
+		return none
+	var spawn_index := -1
+	for i in CELL_COUNT:
+		if slid.values[i] == 0 and values[i] != 0:
+			if spawn_index >= 0:
+				return none
+			spawn_index = i
+		elif slid.values[i] != values[i] or (values[i] != 0 and slid.ids[i] != ids[i]):
+			return none
+	if spawn_index >= 0:
+		result.spawn = PackedInt32Array([ids[spawn_index], spawn_index, values[spawn_index]])
+	return result
+
+
+## Pure slide/merge of one move over the given grid; does not touch the board.
+## Returns {values, ids, result} where result has no spawn or milestones filled in.
+func _slide(dir: Dir, src_values: PackedInt32Array, src_ids: PackedInt32Array) -> Dictionary:
+	var result := MoveResult.new()
+	var new_values := PackedInt32Array()
+	new_values.resize(CELL_COUNT)
+	var new_ids := PackedInt32Array()
+	new_ids.resize(CELL_COUNT)
+	for line in SIZE:
+		var cells := _line_cells(dir, line)
+		var write := 0
+		var last_value := 0
+		var last_id := 0
+		for read in SIZE:
+			var src := cells[read]
+			var v := src_values[src]
+			if v == 0:
+				continue
+			var id := src_ids[src]
+			if last_value == v:
+				var dst := cells[write - 1]
+				var merged := v * 2
+				new_values[dst] = merged
+				result.slides.append(PackedInt32Array([id, src, dst]))
+				result.merges.append(PackedInt32Array([last_id, id, dst, merged]))
+				result.gained += merged
+				last_value = 0
+			else:
+				var dst := cells[write]
+				new_values[dst] = v
+				new_ids[dst] = id
+				if dst != src:
+					result.slides.append(PackedInt32Array([id, src, dst]))
+				last_value = v
+				last_id = id
+				write += 1
+	result.moved = not result.slides.is_empty()
+	return {"values": new_values, "ids": new_ids, "result": result}
 
 
 func _parse_state(d: Dictionary) -> Dictionary:
@@ -232,12 +289,34 @@ func _parse_state(d: Dictionary) -> Dictionary:
 	var m := int(d.get("moves", -1))
 	if s < 0 or m < 0:
 		return {}
+	var dir = d.get("dir", -1)
 	return {
 		"values": parsed,
+		"ids": _parse_ids(d.get("ids"), parsed),
+		"dir": int(dir) if (dir is int or dir is float) else -1,
 		"score": s,
 		"best_tile": maxi(int(d.get("best_tile", 0)), max_value),
 		"move_count": m,
 	}
+
+
+## Tile ids aligned with [param cells]: positive and unique exactly where a tile is. Returns an
+## empty array when missing or inconsistent, which callers treat as "reissue".
+static func _parse_ids(raw, cells: PackedInt32Array) -> PackedInt32Array:
+	if not (raw is Array or raw is PackedInt32Array) or raw.size() != CELL_COUNT:
+		return PackedInt32Array()
+	var parsed := PackedInt32Array()
+	parsed.resize(CELL_COUNT)
+	var seen := {}
+	for i in CELL_COUNT:
+		if not (raw[i] is int or raw[i] is float):
+			return PackedInt32Array()
+		var id := int(raw[i])
+		if (id > 0) != (cells[i] != 0) or (id > 0 and seen.has(id)):
+			return PackedInt32Array()
+		seen[id] = true
+		parsed[i] = id
+	return parsed
 
 
 func _reissue_ids() -> void:
