@@ -2,7 +2,7 @@ class_name Icons
 extends RefCounted
 ## Vector UI glyphs drawn with canvas primitives, so they stay sharp at any density.
 
-enum Kind { NONE, MENU, UNDO, RESTART, BACK, GEAR, PLAY, TROPHY, CHECK }
+enum Kind { NONE, MENU, UNDO, RESTART, BACK, GEAR, PLAY, TROPHY, CHECK, SPEAKER_LOW, SPEAKER_HIGH }
 
 
 ## Draws [param kind] centered on [param center], fitting a square of side [param s].
@@ -55,6 +55,21 @@ static func draw(ci: CanvasItem, kind: Kind, center: Vector2, s: float, color: C
 			ci.draw_arc(Vector2(center.x + s * 0.27, top + s * 0.14), s * 0.12, -PI * 0.5, PI * 0.5, 12, color, w * 0.8, true)
 			ci.draw_line(Vector2(center.x, top + s * 0.4), Vector2(center.x, center.y + s * 0.28), color, w, true)
 			ci.draw_line(Vector2(center.x - s * 0.2, center.y + s * 0.32), Vector2(center.x + s * 0.2, center.y + s * 0.32), color, w * 1.3, true)
+		Kind.SPEAKER_LOW, Kind.SPEAKER_HIGH:
+			var body := PackedVector2Array([
+				center + Vector2(-s * 0.42, -s * 0.12),
+				center + Vector2(-s * 0.26, -s * 0.12),
+				center + Vector2(-s * 0.04, -s * 0.32),
+				center + Vector2(-s * 0.04, s * 0.32),
+				center + Vector2(-s * 0.26, s * 0.12),
+				center + Vector2(-s * 0.42, s * 0.12),
+			])
+			ci.draw_colored_polygon(body, color)
+			body.append(body[0])
+			ci.draw_polyline(body, color, 1.0, true)
+			var waves := [0.16] if kind == Kind.SPEAKER_LOW else [0.16, 0.32]
+			for r in waves:
+				ci.draw_arc(center + Vector2(s * 0.02, 0), s * r, -PI * 0.3, PI * 0.3, 12, color, w * 0.8, true)
 		Kind.CHECK:
 			var pts := PackedVector2Array([
 				center + Vector2(-s * 0.28, 0),

@@ -14,6 +14,9 @@ var best_score := 0
 var sound_on := true
 var music_on := true
 var haptics_on := true
+## Volume steps, 1 (quietest) to Sfx.LEVEL_COUNT.
+var sound_volume := 5
+var music_volume := 4
 var show_fps := false
 var theme: ThemeMode = ThemeMode.DARK
 ## Two-letter UI language code, one of [constant I18n.LANGUAGES].
@@ -79,6 +82,8 @@ func to_dict() -> Dictionary:
 			"sound": sound_on,
 			"music": music_on,
 			"haptics": haptics_on,
+			"sound_volume": sound_volume,
+			"music_volume": music_volume,
 			"show_fps": show_fps,
 			"theme": "light" if theme == ThemeMode.LIGHT else "dark",
 			"language": language,
@@ -96,6 +101,8 @@ func apply_dict(d: Dictionary) -> void:
 		sound_on = _bool_or(s.get("sound"), sound_on)
 		music_on = _bool_or(s.get("music"), music_on)
 		haptics_on = _bool_or(s.get("haptics"), haptics_on)
+		sound_volume = _step_or(s.get("sound_volume"), sound_volume)
+		music_volume = _step_or(s.get("music_volume"), music_volume)
 		show_fps = _bool_or(s.get("show_fps"), show_fps)
 		match s.get("theme"):
 			"light":
@@ -107,6 +114,12 @@ func apply_dict(d: Dictionary) -> void:
 			language = lang
 	var g = d.get("game", {})
 	game = g if g is Dictionary else {}
+
+
+static func _step_or(value, fallback: int) -> int:
+	if (value is int or value is float) and int(value) == value and value >= 1 and value <= Sfx.LEVEL_COUNT:
+		return int(value)
+	return fallback
 
 
 static func _bool_or(value, fallback: bool) -> bool:

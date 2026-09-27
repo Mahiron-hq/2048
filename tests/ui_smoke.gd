@@ -100,6 +100,16 @@ func _run() -> void:
 	await _wait(1.8)
 	check(is_equal_approx(sfx.music_level(), 1.0), "music reaches full level")
 	app._settings._haptics.button_pressed = false
+	var slider: StepSlider = app._settings._sound_volume
+	await _drag(slider, 0.02, 0.26)
+	check(app.store.sound_volume == 2, "dragging the sound slider picks step 2 (got %d)" % app.store.sound_volume)
+	var sfx_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index(Sfx.SFX_BUS))
+	check(is_equal_approx(sfx_db, Sfx.level_db(2)), "effects bus follows the slider (%.1f dB)" % sfx_db)
+	var music_slider: StepSlider = app._settings._music_volume
+	await _drag(music_slider, 0.98, 0.98)
+	await _wait(0.4)
+	var music_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index(Sfx.MUSIC_BUS))
+	check(app.store.music_volume == 5 and is_equal_approx(music_db, Sfx.level_db(5)), "music slider sets step 5 (%.1f dB)" % music_db)
 	app.set_theme_mode(SaveStore.ThemeMode.LIGHT)
 	app.set_language("ru")
 	await _wait(0.3)
@@ -117,6 +127,7 @@ func _run() -> void:
 	await _frames(5)
 	check(app.store.best_score == score, "best score survives restart")
 	check(app.store.music_on and not app.store.haptics_on, "settings survive restart")
+	check(app.store.sound_volume == 2 and app.store.music_volume == 5, "volume steps survive restart")
 	check(app.sfx._music.playing, "music starts on launch when enabled")
 	check(app.store.theme == SaveStore.ThemeMode.LIGHT and app.store.language == "ru", "theme/language survive restart")
 	check(app._menu._subtitle.text == I18n.STRINGS.ru.SUBTITLE, "labels use the saved language at startup")
@@ -200,6 +211,30 @@ func _swipe(from: Vector2, delta: Vector2) -> void:
 	up.position = start + delta * k
 	Input.parse_input_event(up)
 	await _wait(0.3)
+
+
+## Presses the slider at fraction [param a] of its width and drags to [param b], via real events.
+func _drag(slider: Control, a: float, b: float) -> void:
+	var r := slider.get_global_rect()
+	var k := root.get_final_transform().get_scale()
+	var y := r.get_center().y
+	var down := InputEventMouseButton.new()
+	down.button_index = MOUSE_BUTTON_LEFT
+	down.pressed = true
+	down.position = Vector2(r.position.x + r.size.x * a, y) * k
+	Input.parse_input_event(down)
+	await process_frame
+	var move := InputEventMouseMotion.new()
+	move.position = Vector2(r.position.x + r.size.x * b, y) * k
+	move.button_mask = MOUSE_BUTTON_MASK_LEFT
+	Input.parse_input_event(move)
+	await process_frame
+	var up := InputEventMouseButton.new()
+	up.button_index = MOUSE_BUTTON_LEFT
+	up.pressed = false
+	up.position = move.position
+	Input.parse_input_event(up)
+	await process_frame
 
 
 func _frames(n: int) -> void:
