@@ -1,13 +1,23 @@
 class_name Sfx
 extends Node
-## Procedurally synthesized sound effects and an ambient music loop. No audio files ship.
+## Synthesized sound effects plus the looping soundtrack ("2048 Quiet Tiles").
 
 enum Kind { CLICK, SWIPE, MERGE, MILESTONE, LOSE }
 
 const RATE := 44100
-const MUSIC_RATE := 22050
 const VOICES := 8
-const MUSIC_DB := -13.0
+
+const MUSIC_PATH := "res://assets/music/2048_Quiet_Tiles.mp3"
+const MUSIC_RATE := 44100.0
+## Encoder delay of the game MP3 in decoder frames, measured against the lossless master.
+## Regenerating the MP3 with tools/make_game_music.py keeps it at this value.
+const MUSIC_DELAY_FRAMES := 1107
+## The track is exactly this long and ends on a bar line, so the loop wraps here.
+const MUSIC_LOOP_FRAMES := 5_880_000
+## Linear music level relative to full scale; sits under the effects.
+const MUSIC_VOLUME := 0.5
+const MUSIC_FADE_IN := 2.2
+const MUSIC_FADE_OUT := 1.4
 
 var sound_enabled := true
 var music_enabled := false:
@@ -17,9 +27,11 @@ var _streams := {}
 var _players: Array[AudioStreamPlayer] = []
 var _next_voice := 0
 var _music := AudioStreamPlayer.new()
-var _music_task := -1
-var _music_stream: AudioStreamWAV
 var _music_tween: Tween
+var _music_gain := 0.0:
+	set(v):
+		_music_gain = v
+		_music.volume_db = linear_to_db(maxf(v * MUSIC_VOLUME, 0.00001))
 
 
 func _ready() -> void:
@@ -27,13 +39,27 @@ func _ready() -> void:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
 		_players.append(p)
-	_music.volume_db = -80.0
+	_music.stream = make_music_stream()
+	_music_gain = 0.0
 	add_child(_music)
 	_streams[Kind.CLICK] = _make_click()
 	_streams[Kind.SWIPE] = _make_swipe()
 	_streams[Kind.MERGE] = _make_pluck()
 	_streams[Kind.MILESTONE] = _make_chime()
 	_streams[Kind.LOSE] = _make_lose()
+
+
+## The soundtrack configured to loop sample-exactly: playback skips the MP3 encoder delay and
+## wraps at the bar line instead of at the end of the padded MP3 stream.
+static func make_music_stream() -> AudioStreamMP3:
+	var s: AudioStreamMP3 = load(MUSIC_PATH)
+	s.loop = true
+	# Godot truncates seconds to frames; the half-frame keeps float error from landing one short.
+	s.loop_offset = (MUSIC_DELAY_FRAMES + 0.5) / MUSIC_RATE
+	# A one-beat "bar" as long as delay + music makes Godot wrap exactly at the loop end.
+	s.beat_count = 1
+	s.bpm = MUSIC_RATE * 60.0 / (MUSIC_DELAY_FRAMES + MUSIC_LOOP_FRAMES + 0.5)
+	return s
 
 
 ## Plays [param kind]; [param pitch] scales playback speed, [param volume_db] offsets loudness.
@@ -54,108 +80,31 @@ func play_merge(value: int) -> void:
 	play(Kind.MERGE, pow(2.0, minf(step, 12) / 12.0), -2.0)
 
 
+## Fades the soundtrack in or out. Turning it off pauses it after the fade, so turning it back
+## on resumes where it left off; toggling mid-fade continues from the current level.
 func set_music_enabled(on: bool) -> void:
 	music_enabled = on
 	if not is_inside_tree():
 		return
-	if on:
-		if _music_stream:
-			_start_music()
-		elif _music_task < 0:
-			_music_task = WorkerThreadPool.add_task(_build_music, false, "music synth")
-			set_process(true)
-	else:
-		_fade_music(-80.0, 0.6, true)
-
-
-func _process(_delta: float) -> void:
-	if _music_task < 0 or not WorkerThreadPool.is_task_completed(_music_task):
-		if _music_task < 0:
-			set_process(false)
-		return
-	WorkerThreadPool.wait_for_task_completion(_music_task)
-	_music_task = -1
-	set_process(false)
-	if music_enabled:
-		_start_music()
-
-
-func _exit_tree() -> void:
-	if _music_task >= 0:
-		WorkerThreadPool.wait_for_task_completion(_music_task)
-		_music_task = -1
-
-
-func _start_music() -> void:
-	if _music.stream != _music_stream:
-		_music.stream = _music_stream
-	if not _music.playing:
-		_music.volume_db = -40.0
-		_music.play()
-	_fade_music(MUSIC_DB, 1.6, false)
-
-
-func _fade_music(db: float, time: float, stop_after: bool) -> void:
 	if _music_tween:
 		_music_tween.kill()
-	if not _music.playing:
-		return
-	_music_tween = create_tween()
-	_music_tween.tween_property(_music, "volume_db", db, time)
-	if stop_after:
-		_music_tween.tween_callback(_music.stop)
+	if on:
+		# A paused player reports playing == false, so unpause before deciding to start fresh.
+		if _music.stream_paused:
+			_music.stream_paused = false
+		elif not _music.playing:
+			_music.play(_music.stream.loop_offset)
+		_music_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_music_tween.tween_property(self, "_music_gain", 1.0, MUSIC_FADE_IN * (1.0 - _music_gain))
+	elif _music.playing and not _music.stream_paused:
+		_music_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_music_tween.tween_property(self, "_music_gain", 0.0, MUSIC_FADE_OUT * _music_gain)
+		_music_tween.tween_callback(func() -> void: _music.stream_paused = true)
 
 
-## Worker thread: renders the loop. Touches no scene nodes.
-func _build_music() -> void:
-	_music_stream = build_music_stream()
-
-
-## Renders the ambient loop: four soft chords with an arpeggio, phase-continuous across the seam.
-static func build_music_stream() -> AudioStreamWAV:
-	var chords := [
-		[261.63, 329.63, 392.0, 493.88],
-		[220.0, 261.63, 329.63, 392.0],
-		[174.61, 220.0, 261.63, 329.63],
-		[196.0, 246.94, 293.66, 392.0],
-	]
-	var seg := 4.0
-	var total := int(seg * chords.size() * MUSIC_RATE)
-	var buf := PackedFloat32Array()
-	buf.resize(total)
-	var fade := 1.2
-	for c in chords.size():
-		var start := c * seg
-		var from := int((start - fade) * MUSIC_RATE)
-		var to := int((start + seg + fade) * MUSIC_RATE)
-		var span := float(to - from)
-		for note in chords[c]:
-			var f: float = note * 0.5
-			for i in range(from, to):
-				var w := sin(PI * (i - from) / span)
-				var t := float(i) / MUSIC_RATE
-				var v := sin(TAU * f * t) + 0.5 * sin(TAU * f * 1.003 * t) + 0.12 * sin(TAU * f * 2.0 * t)
-				var k := posmod(i, total)
-				buf[k] += v * w * w * 0.09
-		var arp: Array = chords[c]
-		for n in 8:
-			var f2: float = arp[[0, 1, 2, 3, 2, 1, 2, 3][n]] * 2.0
-			var s0 := int((start + n * 0.5) * MUSIC_RATE)
-			var length := int(0.9 * MUSIC_RATE)
-			for i in length:
-				var t := float(i) / MUSIC_RATE
-				var env := minf(1.0, t * 200.0) * exp(-t * 5.0)
-				var v := sin(TAU * f2 * t) + 0.25 * sin(TAU * f2 * 2.0 * t)
-				buf[posmod(s0 + i, total)] += v * env * 0.07
-	# The mixer reads loop_end inclusively and the buffer has no padding, so a loop_end equal to the
-	# frame count reads past the allocation (a SIGSEGV on Android). Repeating frame 0 at the end keeps
-	# the read in bounds and the seam sample-exact.
-	buf.append(buf[0])
-	var wav := _to_wav(buf, MUSIC_RATE)
-	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	wav.loop_begin = 0
-	wav.loop_end = total
-	return wav
+## Current soundtrack level, 0 (silent) to 1 (full).
+func music_level() -> float:
+	return _music_gain
 
 
 func _make_click() -> AudioStreamWAV:

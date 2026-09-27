@@ -36,12 +36,12 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## Shows [param v]. With [param animate], counts up from the current value.
+## Shows [param v]. With [param animate], counts from the current value (up or down).
 func set_value(v: int, animate := true) -> void:
 	if _count_tween:
 		_count_tween.kill()
 	value = v
-	if not animate or v < _shown:
+	if not animate:
 		_shown = v
 		return
 	_count_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
