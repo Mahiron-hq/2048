@@ -285,6 +285,8 @@ func test_store_survives_restart() -> void:
 	s.music_on = true
 	s.theme = SaveStore.ThemeMode.LIGHT
 	s.language = "ru"
+	s.sound_volume = 2
+	s.music_volume = 5
 	var b := Board.new(2)
 	b.new_game()
 	b.move(Board.Dir.LEFT)
@@ -294,6 +296,10 @@ func test_store_survives_restart() -> void:
 	var t := SaveStore.new(path)
 	check(t.load_from_disk() and t.existed, "load ok")
 	check(t.best_score == 12345 and t.music_on and t.theme == SaveStore.ThemeMode.LIGHT and t.language == "ru", "settings restored")
+	check(t.sound_volume == 2 and t.music_volume == 5, "volume steps restored")
+	var junk := SaveStore.new("user://unused.json")
+	junk.apply_dict({"settings": {"sound_volume": 9, "music_volume": 2.5}})
+	check(junk.sound_volume == 5 and junk.music_volume == 4, "out-of-range volume steps fall back to defaults")
 	var c := Board.new(1)
 	check(c.from_dict(t.game) and c.values == b.values, "game restored")
 	check(c.can_undo() == b.can_undo(), "undo step restored")

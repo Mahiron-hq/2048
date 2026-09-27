@@ -14,8 +14,13 @@ const MUSIC_RATE := 44100.0
 const MUSIC_DELAY_FRAMES := 1107
 ## The track is exactly this long and ends on a bar line, so the loop wraps here.
 const MUSIC_LOOP_FRAMES := 5_880_000
-## Linear music level relative to full scale; sits under the effects.
-const MUSIC_VOLUME := 0.5
+## Linear music level at the top volume step, relative to full scale; sits under the effects.
+const MUSIC_VOLUME := 0.7
+## Bus gain in dB for volume steps 1..5.
+const LEVEL_DB := [-18.0, -12.0, -7.0, -3.0, 0.0]
+const LEVEL_COUNT := 5
+const SFX_BUS := &"SFX"
+const MUSIC_BUS := &"Music"
 const MUSIC_FADE_IN := 2.2
 const MUSIC_FADE_OUT := 1.4
 
@@ -32,13 +37,22 @@ var _music_gain := 0.0:
 	set(v):
 		_music_gain = v
 		_music.volume_db = linear_to_db(maxf(v * MUSIC_VOLUME, 0.00001))
+var _music_bus_db := 0.0:
+	set(v):
+		_music_bus_db = v
+		AudioServer.set_bus_volume_db(AudioServer.get_bus_index(MUSIC_BUS), v)
+var _level_tween: Tween
 
 
 func _ready() -> void:
+	_ensure_bus(SFX_BUS)
+	_ensure_bus(MUSIC_BUS)
 	for i in VOICES:
 		var p := AudioStreamPlayer.new()
+		p.bus = SFX_BUS
 		add_child(p)
 		_players.append(p)
+	_music.bus = MUSIC_BUS
 	_music.stream = make_music_stream()
 	_music_gain = 0.0
 	add_child(_music)
@@ -102,9 +116,38 @@ func set_music_enabled(on: bool) -> void:
 		_music_tween.tween_callback(func() -> void: _music.stream_paused = true)
 
 
-## Current soundtrack level, 0 (silent) to 1 (full).
+## Current soundtrack fade level, 0 (silent) to 1 (full).
 func music_level() -> float:
 	return _music_gain
+
+
+## Sets the effects volume step (1..LEVEL_COUNT); applies at once.
+func set_sound_volume(step: int) -> void:
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index(SFX_BUS), level_db(step))
+
+
+## Sets the music volume step (1..LEVEL_COUNT). With [param smooth], glides there to avoid a jump.
+func set_music_volume(step: int, smooth := true) -> void:
+	if _level_tween:
+		_level_tween.kill()
+	if not smooth or not is_inside_tree():
+		_music_bus_db = level_db(step)
+		return
+	_level_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_level_tween.tween_property(self, "_music_bus_db", level_db(step), 0.2)
+
+
+static func level_db(step: int) -> float:
+	return LEVEL_DB[clampi(step, 1, LEVEL_COUNT) - 1]
+
+
+static func _ensure_bus(bus_name: StringName) -> void:
+	if AudioServer.get_bus_index(bus_name) >= 0:
+		return
+	AudioServer.add_bus()
+	var index := AudioServer.bus_count - 1
+	AudioServer.set_bus_name(index, bus_name)
+	AudioServer.set_bus_send(index, &"Master")
 
 
 func _make_click() -> AudioStreamWAV:

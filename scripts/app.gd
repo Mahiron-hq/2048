@@ -48,6 +48,8 @@ func _ready() -> void:
 
 	add_child(sfx)
 	sfx.sound_enabled = store.sound_on
+	sfx.set_sound_volume(store.sound_volume)
+	sfx.set_music_volume(store.music_volume, false)
 	add_child(_background)
 	_safe.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_safe.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -167,6 +169,21 @@ func haptic(duration_ms: int, amplitude: float) -> void:
 func set_sound(on: bool) -> void:
 	store.sound_on = on
 	sfx.sound_enabled = on
+	save_now()
+
+
+## Stores the effects volume step; the click that follows previews the new level.
+func set_sound_volume(step: int) -> void:
+	store.sound_volume = step
+	sfx.set_sound_volume(step)
+	feedback_click()
+	save_now()
+
+
+func set_music_volume(step: int) -> void:
+	store.music_volume = step
+	sfx.set_music_volume(step)
+	feedback_click()
 	save_now()
 
 
