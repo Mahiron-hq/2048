@@ -1,14 +1,18 @@
 class_name Board
 extends RefCounted
-## Pure 2048-style board logic: slides, merges, spawns, undo snapshot and serialization.
+## Pure 2048-style board logic: slides, merges, spawns, a bounded undo history and serialization.
 ##
-## Tiles carry stable integer ids so a view can animate the same tile across a move.
-## Nothing here depends on frame time; a move is a discrete, instantaneous state change.
+## Tiles carry stable integer ids so a view can animate the same tile across a move (and back
+## again on undo). Nothing here depends on frame time; a move is a discrete state change.
 
 enum Dir { UP, DOWN, LEFT, RIGHT }
 
-const SIZE := 4
-const CELL_COUNT := SIZE * SIZE
+const MIN_SIZE := 3
+const MAX_SIZE := 6
+const DEFAULT_SIZE := 4
+## Largest undo history the game offers; [member undo_limit] is clamped to 0..MAX_UNDO.
+const MAX_UNDO := 5
+const DEFAULT_UNDO := 1
 const SPAWN_FOUR_CHANCE := 0.1
 const FIRST_MILESTONE := 128
 
@@ -28,40 +32,55 @@ class MoveResult:
 	var milestones := PackedInt32Array()
 
 
+## Side length; fixed per board instance (see [method new_game] to change it).
+var size := DEFAULT_SIZE
+var cell_count := DEFAULT_SIZE * DEFAULT_SIZE
 var values := PackedInt32Array()
 var ids := PackedInt32Array()
 var score := 0
 var best_tile := 0
 var move_count := 0
 var rng := RandomNumberGenerator.new()
+## How many moves can be undone in a row (0 disables undo). Lowering it drops the oldest steps.
+var undo_limit := DEFAULT_UNDO:
+	set(v):
+		undo_limit = clampi(v, 0, MAX_UNDO)
+		while _undo_stack.size() > undo_limit:
+			_undo_stack.pop_front()
 
 var _next_id := 1
-var _undo: Dictionary = {}
+## Snapshots before each recent move, oldest first.
+var _undo_stack: Array[Dictionary] = []
 
 
-func _init(seed_value: int = -1) -> void:
-	values.resize(CELL_COUNT)
-	ids.resize(CELL_COUNT)
+func _init(seed_value: int = -1, p_size := DEFAULT_SIZE) -> void:
+	_resize(p_size)
 	if seed_value >= 0:
 		rng.seed = seed_value
 	else:
 		rng.randomize()
 
 
-## Clears the board and places the two opening tiles.
-func new_game() -> void:
+static func is_valid_size(n: int) -> bool:
+	return n >= MIN_SIZE and n <= MAX_SIZE
+
+
+## Clears the board and places the two opening tiles. [param p_size] changes the side length.
+func new_game(p_size := -1) -> void:
+	if p_size > 0:
+		_resize(p_size)
 	values.fill(0)
 	ids.fill(0)
 	score = 0
 	best_tile = 0
 	move_count = 0
-	_undo = {}
+	_undo_stack.clear()
 	_spawn_random()
 	_spawn_random()
 
 
-static func index_of(x: int, y: int) -> int:
-	return y * SIZE + x
+func index_of(x: int, y: int) -> int:
+	return y * size + x
 
 
 func empty_count() -> int:
@@ -69,33 +88,42 @@ func empty_count() -> int:
 
 
 func can_undo() -> bool:
-	return not _undo.is_empty()
+	return undo_limit > 0 and not _undo_stack.is_empty()
+
+
+## Moves that can currently be undone, never more than were made this game.
+func undo_available() -> int:
+	return mini(_undo_stack.size(), undo_limit)
 
 
 ## True while at least one move would change the board.
 func can_move() -> bool:
-	for y in SIZE:
-		for x in SIZE:
+	for y in size:
+		for x in size:
 			var v := values[index_of(x, y)]
 			if v == 0:
 				return true
-			if x + 1 < SIZE and values[index_of(x + 1, y)] == v:
+			if x + 1 < size and values[index_of(x + 1, y)] == v:
 				return true
-			if y + 1 < SIZE and values[index_of(x, y + 1)] == v:
+			if y + 1 < size and values[index_of(x, y + 1)] == v:
 				return true
 	return false
 
 
 ## Applies a move in [param dir]. When the board changes, a new tile is spawned and the
-## previous state becomes the single undo step. Returns what happened; [code]moved[/code]
+## previous state is pushed onto the undo history. Returns what happened; [code]moved[/code]
 ## is false (and nothing is mutated) when the move is a no-op.
 func move(dir: Dir) -> MoveResult:
 	var slid := _slide(dir, values, ids)
 	var result: MoveResult = slid.result
 	if not result.moved:
 		return result
-	var snapshot := _snapshot()
-	snapshot.dir = dir
+	if undo_limit > 0:
+		var snapshot := _snapshot()
+		snapshot.dir = dir
+		_undo_stack.push_back(snapshot)
+		while _undo_stack.size() > undo_limit:
+			_undo_stack.pop_front()
 	var prev_best := best_tile
 	values = slid.values
 	ids = slid.ids
@@ -103,7 +131,6 @@ func move(dir: Dir) -> MoveResult:
 		best_tile = maxi(best_tile, m[3])
 	score += result.gained
 	move_count += 1
-	_undo = snapshot
 	var milestone := maxi(FIRST_MILESTONE, _next_power_of_two(prev_best + 1))
 	while milestone <= best_tile:
 		result.milestones.append(milestone)
@@ -112,21 +139,20 @@ func move(dir: Dir) -> MoveResult:
 	return result
 
 
-## Restores the state before the last successful move. Returns the move that was undone, with
-## the same tile ids the board has again afterwards, so a view can play it backwards. When the
-## move cannot be reconstructed (e.g. a save from an older version), the result has
-## [code]moved == false[/code] and a view should rebuild instead. Returns null when there is
-## nothing to undo.
+## Restores the state before the most recent move still in the history. Returns the move that
+## was undone, with the same tile ids the board has again afterwards, so a view can play it
+## backwards. When the move cannot be reconstructed (e.g. a save from an older version), the
+## result has [code]moved == false[/code] and a view should rebuild instead. Returns null when
+## there is nothing to undo.
 func undo() -> MoveResult:
-	if _undo.is_empty():
+	if not can_undo():
 		return null
-	var snap := _undo
+	var snap: Dictionary = _undo_stack.pop_back()
 	var undone := _reconstruct(snap)
 	values = snap.values
 	score = snap.score
 	best_tile = snap.best_tile
 	move_count = snap.move_count
-	_undo = {}
 	if snap.ids.is_empty():
 		_reissue_ids()
 	else:
@@ -134,64 +160,94 @@ func undo() -> MoveResult:
 	return undone
 
 
-## Serializable form of the full state, including the pending undo step.
+## Serializable form of the full state, including the undo history.
 func to_dict() -> Dictionary:
 	var d := {
-		"size": SIZE,
+		"size": size,
 		"values": Array(values),
 		"ids": Array(ids),
 		"score": score,
 		"best_tile": best_tile,
 		"moves": move_count,
 	}
-	if not _undo.is_empty():
+	var stack := []
+	for snap in _undo_stack:
 		var u := {
-			"size": SIZE,
-			"values": Array(_undo.values),
-			"score": _undo.score,
-			"best_tile": _undo.best_tile,
-			"moves": _undo.move_count,
+			"size": size,
+			"values": Array(snap.values),
+			"score": snap.score,
+			"best_tile": snap.best_tile,
+			"moves": snap.move_count,
 		}
-		if not _undo.ids.is_empty():
-			u["ids"] = Array(_undo.ids)
-			u["dir"] = _undo.dir
-		d["undo"] = u
+		if not snap.ids.is_empty():
+			u["ids"] = Array(snap.ids)
+			u["dir"] = snap.dir
+		stack.append(u)
+	if not stack.is_empty():
+		d["undo_stack"] = stack
 	return d
 
 
-## Loads state produced by [method to_dict]. Returns false, leaving the board untouched,
-## when the data is malformed (wrong size, non power-of-two values, negative counters).
-## Tile ids are optional: without valid ids they are reissued and undo still works, just
-## without a replayable move.
+## Loads state produced by [method to_dict] (or by 1.x saves with a single "undo" entry).
+## Returns false, leaving the board untouched, when the data is malformed: unsupported size,
+## wrong cell count, non power-of-two values or negative counters. Tile ids are optional:
+## without valid ids they are reissued and undo still works, just without a replayable move.
 func from_dict(d: Dictionary) -> bool:
-	var main := _parse_state(d)
+	var n := int(d.get("size", 0)) if (d.get("size") is int or d.get("size") is float) else 0
+	if not is_valid_size(n):
+		return false
+	var main := _parse_state(d, n)
 	if main.is_empty():
 		return false
-	var undo_state := {}
-	if d.has("undo"):
-		if not d.undo is Dictionary:
+	var raw_stack: Array = []
+	if d.has("undo_stack"):
+		if not d.undo_stack is Array:
 			return false
-		undo_state = _parse_state(d.undo)
-		if undo_state.is_empty():
+		raw_stack = d.undo_stack
+	elif d.has("undo"):
+		raw_stack = [d.undo]
+	var stack: Array[Dictionary] = []
+	for entry in raw_stack:
+		if not entry is Dictionary:
 			return false
+		var parsed := _parse_state(entry, n)
+		if parsed.is_empty():
+			return false
+		stack.append(parsed)
+	while stack.size() > MAX_UNDO:
+		stack.pop_front()
+
+	_resize(n)
 	values = main.values
 	score = main.score
 	best_tile = main.best_tile
 	move_count = main.move_count
-	_undo = undo_state
+	_undo_stack = stack
+	while _undo_stack.size() > undo_limit:
+		_undo_stack.pop_front()
 	if main.ids.is_empty():
 		_reissue_ids()
-		if not _undo.is_empty():
-			_undo.ids = PackedInt32Array()
+		for snap in _undo_stack:
+			snap.ids = PackedInt32Array()
 	else:
 		ids = main.ids
 		_next_id = 1
 		for id in ids:
 			_next_id = maxi(_next_id, id + 1)
-		if not _undo.is_empty():
-			for id in _undo.ids:
+		for snap in _undo_stack:
+			for id in snap.ids:
 				_next_id = maxi(_next_id, id + 1)
 	return true
+
+
+func _resize(n: int) -> void:
+	size = clampi(n, MIN_SIZE, MAX_SIZE)
+	cell_count = size * size
+	values.resize(cell_count)
+	ids.resize(cell_count)
+	values.fill(0)
+	ids.fill(0)
+	_undo_stack.clear()
 
 
 func _snapshot() -> Dictionary:
@@ -216,7 +272,7 @@ func _reconstruct(snap: Dictionary) -> MoveResult:
 	if not result.moved:
 		return none
 	var spawn_index := -1
-	for i in CELL_COUNT:
+	for i in cell_count:
 		if slid.values[i] == 0 and values[i] != 0:
 			if spawn_index >= 0:
 				return none
@@ -233,15 +289,15 @@ func _reconstruct(snap: Dictionary) -> MoveResult:
 func _slide(dir: Dir, src_values: PackedInt32Array, src_ids: PackedInt32Array) -> Dictionary:
 	var result := MoveResult.new()
 	var new_values := PackedInt32Array()
-	new_values.resize(CELL_COUNT)
+	new_values.resize(cell_count)
 	var new_ids := PackedInt32Array()
-	new_ids.resize(CELL_COUNT)
-	for line in SIZE:
+	new_ids.resize(cell_count)
+	for line in size:
 		var cells := _line_cells(dir, line)
 		var write := 0
 		var last_value := 0
 		var last_id := 0
-		for read in SIZE:
+		for read in size:
 			var src := cells[read]
 			var v := src_values[src]
 			if v == 0:
@@ -268,16 +324,17 @@ func _slide(dir: Dir, src_values: PackedInt32Array, src_ids: PackedInt32Array) -
 	return {"values": new_values, "ids": new_ids, "result": result}
 
 
-func _parse_state(d: Dictionary) -> Dictionary:
-	if int(d.get("size", 0)) != SIZE:
+func _parse_state(d: Dictionary, n: int) -> Dictionary:
+	if int(d.get("size", 0)) != n:
 		return {}
+	var cells := n * n
 	var raw = d.get("values")
-	if not (raw is Array or raw is PackedInt32Array) or raw.size() != CELL_COUNT:
+	if not (raw is Array or raw is PackedInt32Array) or raw.size() != cells:
 		return {}
 	var parsed := PackedInt32Array()
-	parsed.resize(CELL_COUNT)
+	parsed.resize(cells)
 	var max_value := 0
-	for i in CELL_COUNT:
+	for i in cells:
 		if not (raw[i] is int or raw[i] is float):
 			return {}
 		var v := int(raw[i])
@@ -303,12 +360,12 @@ func _parse_state(d: Dictionary) -> Dictionary:
 ## Tile ids aligned with [param cells]: positive and unique exactly where a tile is. Returns an
 ## empty array when missing or inconsistent, which callers treat as "reissue".
 static func _parse_ids(raw, cells: PackedInt32Array) -> PackedInt32Array:
-	if not (raw is Array or raw is PackedInt32Array) or raw.size() != CELL_COUNT:
+	if not (raw is Array or raw is PackedInt32Array) or raw.size() != cells.size():
 		return PackedInt32Array()
 	var parsed := PackedInt32Array()
-	parsed.resize(CELL_COUNT)
+	parsed.resize(cells.size())
 	var seen := {}
-	for i in CELL_COUNT:
+	for i in cells.size():
 		if not (raw[i] is int or raw[i] is float):
 			return PackedInt32Array()
 		var id := int(raw[i])
@@ -321,7 +378,7 @@ static func _parse_ids(raw, cells: PackedInt32Array) -> PackedInt32Array:
 
 func _reissue_ids() -> void:
 	ids.fill(0)
-	for i in CELL_COUNT:
+	for i in cell_count:
 		if values[i] != 0:
 			ids[i] = _take_id()
 
@@ -335,23 +392,23 @@ func _take_id() -> int:
 ## Cells of one row/column ordered from the edge tiles slide towards.
 func _line_cells(dir: Dir, line: int) -> PackedInt32Array:
 	var cells := PackedInt32Array()
-	cells.resize(SIZE)
-	for k in SIZE:
+	cells.resize(size)
+	for k in size:
 		match dir:
 			Dir.LEFT:
 				cells[k] = index_of(k, line)
 			Dir.RIGHT:
-				cells[k] = index_of(SIZE - 1 - k, line)
+				cells[k] = index_of(size - 1 - k, line)
 			Dir.UP:
 				cells[k] = index_of(line, k)
 			Dir.DOWN:
-				cells[k] = index_of(line, SIZE - 1 - k)
+				cells[k] = index_of(line, size - 1 - k)
 	return cells
 
 
 func _spawn_random() -> PackedInt32Array:
 	var free := PackedInt32Array()
-	for i in CELL_COUNT:
+	for i in cell_count:
 		if values[i] == 0:
 			free.append(i)
 	if free.is_empty():

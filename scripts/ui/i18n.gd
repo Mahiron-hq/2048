@@ -40,6 +40,23 @@ const STRINGS := {
 		"CANCEL": "Cancel",
 		"MILESTONE": "Tile %d reached!",
 		"HINT": "Swipe to move the tiles",
+		"STATS": "Statistics",
+		"STATS_ALL": "All",
+		"GAMES_PLAYED": "Games played",
+		"AVERAGE_SCORE": "Average score",
+		"TOTAL_MOVES": "Total moves",
+		"PLAY_TIME": "Time played",
+		"BOARD_SIZE": "Board size",
+		"APP_SETTINGS": "App settings",
+		"GAME_SETTINGS": "Game settings",
+		"UNDO_LIMIT": "Undo moves",
+		"UNDO_LIMIT_HINT": "How many moves in a row you can take back",
+		"UNDO_OFF": "Off",
+		"SWIPE_TO_PLAY": "Swipe to move the tiles",
+		"TIME_HM": "%d h %d min",
+		"TIME_MS": "%d min %d s",
+		"TIME_S": "%d s",
+		"NO_GAMES": "Finish a game to see your stats",
 	},
 	"ru": {
 		"TITLE": "2048",
@@ -76,6 +93,23 @@ const STRINGS := {
 		"CANCEL": "Отмена",
 		"MILESTONE": "Плитка %d собрана!",
 		"HINT": "Проведите пальцем, чтобы сдвинуть плитки",
+		"STATS": "Статистика",
+		"STATS_ALL": "Все",
+		"GAMES_PLAYED": "Сыграно партий",
+		"AVERAGE_SCORE": "Средний счёт",
+		"TOTAL_MOVES": "Всего ходов",
+		"PLAY_TIME": "Время в игре",
+		"BOARD_SIZE": "Размер поля",
+		"APP_SETTINGS": "Настройки приложения",
+		"GAME_SETTINGS": "Настройки игры",
+		"UNDO_LIMIT": "Отмена ходов",
+		"UNDO_LIMIT_HINT": "Сколько ходов подряд можно вернуть назад",
+		"UNDO_OFF": "Выкл",
+		"SWIPE_TO_PLAY": "Проведите пальцем, чтобы сдвинуть плитки",
+		"TIME_HM": "%d ч %d мин",
+		"TIME_MS": "%d мин %d с",
+		"TIME_S": "%d с",
+		"NO_GAMES": "Завершите партию, чтобы увидеть статистику",
 	},
 }
 
@@ -89,6 +123,33 @@ static func t(key: String) -> String:
 	if table.has(key):
 		return table[key]
 	return STRINGS.en.get(key, key)
+
+
+## Formats a duration in whole seconds, e.g. "2 h 15 min" / "2 ч 15 мин".
+static func duration(seconds: float) -> String:
+	var total := int(seconds)
+	var h := total / 3600
+	var m := (total % 3600) / 60
+	if h > 0:
+		return t("TIME_HM") % [h, m]
+	if m > 0:
+		return t("TIME_MS") % [m, total % 60]
+	return t("TIME_S") % total
+
+
+## Groups thousands with a thin space: 12480 -> "12 480".
+static func number(n: int) -> String:
+	var digits := str(absi(n))
+	var out := ""
+	while digits.length() > 3:
+		out = " " + digits.right(3) + out
+		digits = digits.left(digits.length() - 3)
+	return ("-" if n < 0 else "") + digits + out
+
+
+## Board size label such as "4×4".
+static func grid(n: int) -> String:
+	return "%d×%d" % [n, n]
 
 
 ## Language to use when the player has not chosen one: the OS language if supported.

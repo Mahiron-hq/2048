@@ -21,9 +21,12 @@ const UNDO_SLIDE := 0.19
 var cell_size := 100.0
 var gap := 12.0
 var board_rect := Rect2()
+## Side length of the grid currently shown.
+var grid_size := Board.DEFAULT_SIZE
 
 var _layer := Control.new()
 var _fx_layer := Control.new()
+var _hint := SwipeHint.new()
 var _tiles := {}
 var _pool: Array[TileView] = []
 var _rings: Array[MergeRing] = []
@@ -43,6 +46,8 @@ func _init() -> void:
 		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 		add_child(layer)
+	_hint.z_index = 4
+	add_child(_hint)
 
 
 func _notification(what: int) -> void:
@@ -60,8 +65,11 @@ func show_board(board: Board, appear := Appear.NONE) -> void:
 	for id in _tiles.keys():
 		_release(_tiles[id])
 	_tiles.clear()
+	if board.size != grid_size:
+		grid_size = board.size
+		_layout()
 	var order := 0
-	for i in Board.CELL_COUNT:
+	for i in board.cell_count:
 		if board.values[i] == 0:
 			continue
 		var t := _acquire(board.ids[i], board.values[i], i)
@@ -130,6 +138,20 @@ func play_undo(undone: Board.MoveResult) -> void:
 	tw.tween_callback(_after_undo).set_delay(UNDO_SQUEEZE + UNDO_SLIDE)
 
 
+## Shows the swipe hint over the board (start of a game).
+func show_hint() -> void:
+	_hint.appear()
+
+
+## Fades the swipe hint out; used on the first move.
+func hide_hint(instant := false) -> void:
+	_hint.dismiss(instant)
+
+
+func is_hint_visible() -> bool:
+	return _hint.is_showing()
+
+
 ## Small bump towards [param dir] for a swipe that changes nothing.
 func nudge(dir: Board.Dir) -> void:
 	if _nudge_tween and _nudge_tween.is_valid():
@@ -158,8 +180,8 @@ func complete_animations() -> void:
 
 
 func cell_position(index: int) -> Vector2:
-	var x := index % Board.SIZE
-	var y := index / Board.SIZE
+	var x := index % grid_size
+	var y := index / grid_size
 	return board_rect.position + Vector2(gap + x * (cell_size + gap), gap + y * (cell_size + gap))
 
 
@@ -223,7 +245,7 @@ func _on_skin_changed() -> void:
 
 func _draw() -> void:
 	draw_style_box(_board_box, board_rect)
-	for i in Board.CELL_COUNT:
+	for i in grid_size * grid_size:
 		draw_style_box(_cell_box, Rect2(cell_position(i), Vector2(cell_size, cell_size)))
 
 
@@ -234,8 +256,10 @@ func _layout() -> void:
 	# Sit above center: the thumb zone below the board stays free and the layout feels less floaty.
 	var free := size - Vector2(s, s)
 	board_rect = Rect2(Vector2(free.x * 0.5, free.y * 0.28), Vector2(s, s))
-	gap = roundf(s * 0.03)
-	cell_size = (s - gap * (Board.SIZE + 1)) / Board.SIZE
+	# Gaps shrink a little on bigger grids so cells keep a usable size.
+	gap = roundf(s * 0.15 / (grid_size + 1))
+	cell_size = (s - gap * (grid_size + 1)) / grid_size
+	_hint.board_rect = board_rect
 	_styles.clear()
 	_font_sizes.clear()
 	_update_boxes()

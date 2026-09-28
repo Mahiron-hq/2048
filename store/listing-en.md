@@ -1,4 +1,4 @@
-# Store page texts (itch.io, and Google Play later) — English
+# Store page texts — English
 
 Copy each block into the matching field. Character limits are in brackets.
 
@@ -44,7 +44,7 @@ Open source: github.com/Mahiron-hq/2048
 • Animated undo.
 ```
 
-## itch.io settings
+## Page settings (for storefronts that ask)
 - Kind of project: **Downloadable**
 - Classification: **Games**
 - Release status: **Released**
@@ -56,7 +56,7 @@ Open source: github.com/Mahiron-hq/2048
 - Links: Source code → `https://github.com/Mahiron-hq/2048`, Soundtrack → `https://youtu.be/hd3Zw0SmdUE`
 - Community: **Comments** on (optional)
 
-## Upload labels on itch.io
+## Upload labels
 | File | Platform checkbox | Display name |
 |---|---|---|
 | `2048-Merge-v1.1.1-arm64-v8a.apk` | Android | Android — most phones (arm64) |

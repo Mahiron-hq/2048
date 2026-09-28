@@ -1,7 +1,8 @@
 class_name GameScreen
 extends Control
-## The play screen: header with scores, action row, board, swipe/keyboard input,
-## milestones, undo, and the game-over summary.
+## The play screen: header with scores, action row, board, swipe/keyboard input, milestones,
+## undo, the start-of-game swipe hint and the game-over summary. Portrait stacks header,
+## actions and board; landscape puts header and actions in a side panel next to the board.
 
 signal menu_requested
 
@@ -10,6 +11,7 @@ const SWIPE_COMMIT := 44.0
 ## Shorter flicks still count when the finger lifts quickly.
 const SWIPE_FLICK := 22.0
 const FLICK_TIME_MS := 220
+const SIDE_PANEL_WIDTH := 540.0
 
 var board := Board.new()
 
@@ -20,10 +22,17 @@ var _best_box := ScoreBox.make("BEST")
 var _undo_btn := PillButton.make("UNDO", PillButton.Look.SECONDARY, Icons.Kind.UNDO, 76)
 var _new_btn := PillButton.make("NEW", PillButton.Look.SECONDARY, Icons.Kind.RESTART, 76)
 var _menu_btn := PillButton.make_icon(Icons.Kind.MENU, 76)
-var _hint := SkinLabel.make("HINT", 26, Fonts.MEDIUM, SkinLabel.Role.MUTED)
+var _logo := TileBadge.make(2048, 112, "2048")
 var _banner := MilestoneBanner.new()
 var _confetti := CPUParticles2D.new()
 var _game_over := GameOverOverlay.new()
+
+var _header := HBoxContainer.new()
+var _actions := HBoxContainer.new()
+var _portrait := VBoxContainer.new()
+var _landscape := HBoxContainer.new()
+var _side := VBoxContainer.new()
+var _landscape_mode := false
 
 var _touch_index := -1
 var _touch_start := Vector2.ZERO
@@ -34,6 +43,8 @@ var _best_at_start := 0
 var _record_flashed := false
 ## False until a game is started or resumed, so an empty board never overwrites a save.
 var _active := false
+## The current game already counts towards statistics (it ended in a loss).
+var _recorded := false
 
 
 func setup(app: App) -> void:
@@ -42,45 +53,36 @@ func setup(app: App) -> void:
 
 func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	var root := VBoxContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 26)
-	add_child(root)
 
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 14)
-	var logo := TileBadge.make(2048, 112, "2048")
-	logo.text_ratio = 0.3
-	header.add_child(logo)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	header.add_child(spacer)
+	_header.add_theme_constant_override("separation", 14)
+	_logo.text_ratio = 0.3
+	_header.add_child(_logo)
+	_header.add_child(_hspacer())
 	_score_box.custom_minimum_size = Vector2(172, 112)
 	_best_box.custom_minimum_size = Vector2(172, 112)
-	header.add_child(_score_box)
-	header.add_child(_best_box)
-	root.add_child(header)
+	_header.add_child(_score_box)
+	_header.add_child(_best_box)
 
-	var actions := HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 14)
-	actions.add_child(_menu_btn)
-	var spacer2 := Control.new()
-	spacer2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spacer2.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	actions.add_child(spacer2)
-	actions.add_child(_undo_btn)
-	actions.add_child(_new_btn)
-	root.add_child(actions)
+	_actions.add_theme_constant_override("separation", 14)
+	_actions.add_child(_menu_btn)
+	_actions.add_child(_hspacer())
+	_actions.add_child(_undo_btn)
+	_actions.add_child(_new_btn)
 
 	_board_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_board_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.add_child(_board_view)
 
-	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint.custom_minimum_size.y = 64
-	root.add_child(_hint)
+	_portrait.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_portrait.add_theme_constant_override("separation", 26)
+	add_child(_portrait)
+	_landscape.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_landscape.add_theme_constant_override("separation", 48)
+	_landscape.visible = false
+	add_child(_landscape)
+	_side.alignment = BoxContainer.ALIGNMENT_CENTER
+	_side.add_theme_constant_override("separation", 26)
+	_side.custom_minimum_size.x = SIDE_PANEL_WIDTH
+	_apply_layout(false)
 
 	_confetti.emitting = false
 	_confetti.one_shot = true
@@ -119,11 +121,15 @@ func _init() -> void:
 func _ready() -> void:
 	# Hosted on the app overlay layer so the scrim also covers the safe-area margins.
 	_app.add_overlay(_game_over)
+	board.undo_limit = _app.store.undo_limit
 	_on_skin_changed()
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
+		var wide := size.x > size.y * 1.1
+		if wide != _landscape_mode:
+			_apply_layout(wide)
 		_banner.rest_y = 128.0
 		_confetti.position = Vector2(size.x * 0.5, size.y * 0.55)
 
@@ -144,16 +150,25 @@ func is_modal_open() -> bool:
 	return _game_over.is_open
 
 
-## Starts a fresh game. With [param intro], tiles pop in.
-func start_new(intro := true) -> void:
-	board.new_game()
+## True while a game is on the board and not yet lost; the app counts play time only then.
+func is_playing() -> bool:
+	return _active and not _pending_over and not _game_over.is_open
+
+
+## Starts a fresh game of side [param grid] (the current size when 0). With [param intro],
+## tiles pop in. An unfinished game that is replaced counts as played.
+func start_new(grid := 0, intro := true) -> void:
+	_record_abandoned()
+	board.new_game(grid if grid > 0 else board.size)
 	_active = true
+	_recorded = false
 	_game_over.close()
 	_pending_over = false
-	_best_at_start = _app.store.best_score
+	_best_at_start = _app.store.best_for(board.size)
 	_record_flashed = false
 	_refresh_scores(false)
 	_board_view.show_board(board, BoardView.Appear.POP if intro else BoardView.Appear.NONE)
+	_board_view.show_hint()
 	_persist()
 
 
@@ -162,15 +177,28 @@ func resume_saved() -> bool:
 	if not _app.store.has_game() or not board.from_dict(_app.store.game):
 		return false
 	_active = true
+	_recorded = false
 	_game_over.close()
 	_pending_over = false
-	_best_at_start = _app.store.best_score
+	_best_at_start = _app.store.best_for(board.size)
 	_record_flashed = false
 	_refresh_scores(false)
 	_board_view.show_board(board, BoardView.Appear.POP)
+	if board.move_count == 0:
+		_board_view.show_hint()
+	else:
+		_board_view.hide_hint(true)
 	if not board.can_move():
 		_pending_over = true
 	return true
+
+
+## Applies a new undo depth; lowering it drops the oldest steps of the current game.
+func set_undo_limit(limit: int) -> void:
+	board.undo_limit = limit
+	_refresh_undo()
+	if _active:
+		_persist()
 
 
 func request_move(dir: Board.Dir) -> void:
@@ -180,6 +208,7 @@ func request_move(dir: Board.Dir) -> void:
 	if not result.moved:
 		_board_view.nudge(dir)
 		return
+	_board_view.hide_hint()
 	_board_view.play_move(result)
 	_on_moved(result)
 
@@ -219,10 +248,12 @@ func _on_moved(result: Board.MoveResult) -> void:
 		for m in result.merges:
 			top = maxi(top, m[3])
 		_app.sfx.play_merge(top)
-		_app.haptic(12, 0.35)
+		_app.haptic(Haptics.Kind.LIGHT)
 	if result.gained > 0:
 		_score_box.pop_gain(result.gained)
-	if _app.store.submit_score(board.score) and _best_at_start > 0 and not _record_flashed:
+	_app.store.record_move(board.size)
+	_app.store.record_best_tile(board.size, board.best_tile)
+	if _app.store.submit_score(board.score, board.size) and _best_at_start > 0 and not _record_flashed:
 		_record_flashed = true
 		_best_box.flash()
 	_refresh_scores(true)
@@ -236,7 +267,7 @@ func _on_moved(result: Board.MoveResult) -> void:
 func _celebrate(value: int) -> void:
 	_banner.celebrate(value)
 	_app.sfx.play(Sfx.Kind.MILESTONE, 1.0, -1.0)
-	_app.haptic(45, 0.8)
+	_app.haptic(Haptics.Kind.HEAVY)
 	_confetti.amount = 90 if value < 2048 else 160
 	_confetti.restart()
 
@@ -248,19 +279,38 @@ func _on_settled() -> void:
 	if not _pending_over or _game_over.is_open:
 		return
 	_app.sfx.play(Sfx.Kind.LOSE)
-	_app.haptic(60, 0.6)
+	_app.haptic(Haptics.Kind.DOUBLE)
+	if not _recorded:
+		_recorded = true
+		_app.store.record_game(board.size, board.score, board.best_tile)
+		_app.save_now()
 	var record := board.score > _best_at_start and board.score > 0
 	_game_over.present(board.score, board.best_tile, board.move_count, record)
 
 
+## Counts the game being replaced if it had any moves and was not already counted.
+func _record_abandoned() -> void:
+	if _active:
+		if board.move_count > 0 and not _recorded:
+			_app.store.record_game(board.size, board.score, board.best_tile)
+		return
+	# Not loaded yet (fresh launch): the saved game from disk is the one being replaced.
+	if _app.store.has_game():
+		var saved := Board.new(1)
+		if saved.from_dict(_app.store.game) and saved.move_count > 0:
+			_app.store.record_game(saved.size, saved.score, saved.best_tile)
+
+
 func _refresh_scores(animate: bool) -> void:
 	_score_box.set_value(board.score, animate)
-	_best_box.set_value(_app.store.best_score, animate)
+	_best_box.set_value(_app.store.best_for(board.size), animate)
+	_refresh_undo()
+
+
+func _refresh_undo() -> void:
+	_undo_btn.visible = board.undo_limit > 0
 	_undo_btn.disabled = not board.can_undo()
-	var show_hint := board.move_count == 0
-	var target := 1.0 if show_hint else 0.0
-	if not is_equal_approx(_hint.modulate.a, target):
-		create_tween().tween_property(_hint, "modulate:a", target, 0.3)
+	_undo_btn.badge = board.undo_available() if board.undo_limit > 1 else 0
 
 
 func _persist() -> void:
@@ -283,6 +333,37 @@ func _restart_from_over() -> void:
 func _menu_from_over() -> void:
 	_game_over.close()
 	menu_requested.emit()
+
+
+func _apply_layout(wide: bool) -> void:
+	_landscape_mode = wide
+	for node in [_header, _actions, _board_view]:
+		if node.get_parent():
+			node.get_parent().remove_child(node)
+	if _side.get_parent():
+		_side.get_parent().remove_child(_side)
+	if wide:
+		_side.add_child(_header)
+		_side.add_child(_actions)
+		_landscape.add_child(_side)
+		_landscape.add_child(_board_view)
+	else:
+		_portrait.add_child(_header)
+		_portrait.add_child(_actions)
+		_portrait.add_child(_board_view)
+	_portrait.visible = not wide
+	_landscape.visible = wide
+
+
+func _hspacer() -> Control:
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return spacer
+
+
+func _accepts_input() -> bool:
+	return _app.is_current(self) and not _game_over.is_open and not _app.is_modal_open()
 
 
 func _input(event: InputEvent) -> void:
@@ -324,17 +405,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _accepts_input() -> bool:
-	return _app.is_current(self) and not _game_over.is_open and not _app.is_modal_open()
-
-
 func _try_swipe(delta: Vector2, threshold: float) -> void:
-	# _input receives positions already mapped to the 720-wide viewport, so thresholds are DPI-independent.
-	var d := delta
-	if d.length() < threshold:
+	# _input receives positions already mapped to the base-resolution viewport, so thresholds
+	# are DPI-independent.
+	if delta.length() < threshold:
 		return
 	_touch_used = true
-	if absf(d.x) > absf(d.y):
-		request_move(Board.Dir.RIGHT if d.x > 0 else Board.Dir.LEFT)
+	if absf(delta.x) > absf(delta.y):
+		request_move(Board.Dir.RIGHT if delta.x > 0 else Board.Dir.LEFT)
 	else:
-		request_move(Board.Dir.DOWN if d.y > 0 else Board.Dir.UP)
+		request_move(Board.Dir.DOWN if delta.y > 0 else Board.Dir.UP)
