@@ -2,7 +2,7 @@ class_name GameScreen
 extends Control
 ## The play screen: header with scores, action row, board, swipe/keyboard input, milestones,
 ## undo, the start-of-game swipe hint and the game-over summary. Portrait stacks header,
-## actions and board; landscape puts header and actions in a side panel next to the board.
+## actions and board; landscape centers the board and places the controls around it.
 
 signal menu_requested
 
@@ -11,6 +11,19 @@ const SWIPE_COMMIT := 44.0
 ## Shorter flicks still count when the finger lifts quickly.
 const SWIPE_FLICK := 22.0
 const FLICK_TIME_MS := 220
+## Landscape: scores sit this close to the board's edges.
+const BOARD_GAP := 18.0
+## Landscape: minimum room between the menu button and the score beside it.
+const BRAND_GAP := 24.0
+const STACK_GAP := 14.0
+## Landscape arrangements take the board size of the best one if within this share of it,
+## so a slightly larger board never wins over the preferred layout.
+const LAYOUT_TOLERANCE := 0.97
+
+## Landscape arrangements, preferred first. ROW: logo, menu and score in one line top-left,
+## best top-right. STACKED: score under logo and menu. ONE_SIDE: every control left of the
+## board, for near-square screens.
+enum Arrangement { ROW, STACKED, ONE_SIDE }
 
 var board := Board.new()
 
@@ -29,12 +42,11 @@ var _game_over := GameOverOverlay.new()
 var _header := HBoxContainer.new()
 var _actions := HBoxContainer.new()
 var _portrait := VBoxContainer.new()
-var _landscape := HBoxContainer.new()
-var _side := VBoxContainer.new()
-var _side_scores := HBoxContainer.new()
-var _side_actions := HBoxContainer.new()
-var _side_brand := HBoxContainer.new()
+var _landscape := Control.new()
+var _brand := HBoxContainer.new()
+var _side_actions := GridContainer.new()
 var _landscape_mode := false
+var _arrangement := Arrangement.ROW
 
 var _touch_index := -1
 var _touch_start := Vector2.ZERO
@@ -59,10 +71,11 @@ func _init() -> void:
 	_logo.text_ratio = 0.3
 	_score_box.custom_minimum_size = Vector2(172, 112)
 	_best_box.custom_minimum_size = Vector2(172, 112)
-	for row in [_header, _actions, _side_scores, _side_actions, _side_brand]:
+	for row in [_header, _actions, _brand]:
 		row.add_theme_constant_override("separation", 14)
-	for row in [_side_scores, _side_actions, _side_brand]:
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_side_actions.add_theme_constant_override("h_separation", 14)
+	_side_actions.add_theme_constant_override("v_separation", 14)
+	_menu_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	_board_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_board_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -71,13 +84,13 @@ func _init() -> void:
 	_portrait.add_theme_constant_override("separation", 26)
 	add_child(_portrait)
 	_landscape.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_landscape.add_theme_constant_override("separation", 20)
+	_landscape.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_landscape.visible = false
 	add_child(_landscape)
-	_side.alignment = BoxContainer.ALIGNMENT_CENTER
-	_side.add_theme_constant_override("separation", 26)
-	# Deferred: the container emits this before it has positioned its children.
-	_landscape.sort_children.connect(_center_board, CONNECT_DEFERRED)
+	_landscape.resized.connect(_layout_landscape)
+	# Undo can be hidden (depth 0) and labels or scores can change the space controls need.
+	for node: Control in [_side_actions, _brand, _score_box, _best_box]:
+		node.minimum_size_changed.connect(_layout_landscape)
 	_apply_layout(false)
 
 	_confetti.emitting = false
@@ -245,7 +258,7 @@ func _on_moved(result: Board.MoveResult) -> void:
 		for m in result.merges:
 			top = maxi(top, m[3])
 		_app.sfx.play_merge(top)
-		_app.haptic(Haptics.Kind.LIGHT)
+		_app.haptic_merge(top / 2)
 	if result.gained > 0:
 		_score_box.pop_gain(result.gained)
 	_app.store.record_move(board.size)
@@ -264,7 +277,6 @@ func _on_moved(result: Board.MoveResult) -> void:
 func _celebrate(value: int) -> void:
 	_banner.celebrate(value)
 	_app.sfx.play(Sfx.Kind.MILESTONE, 1.0, -1.0)
-	_app.haptic(Haptics.Kind.HEAVY)
 	_confetti.amount = 90 if value < 2048 else 160
 	_confetti.restart()
 
@@ -276,7 +288,7 @@ func _on_settled() -> void:
 	if not _pending_over or _game_over.is_open:
 		return
 	_app.sfx.play(Sfx.Kind.LOSE)
-	_app.haptic(Haptics.Kind.DOUBLE)
+	_app.haptic_game_over()
 	if not _recorded:
 		_recorded = true
 		_app.store.record_game(board.size, board.score, board.best_tile)
@@ -333,38 +345,40 @@ func _menu_from_over() -> void:
 
 
 ## Portrait: header row (logo, scores) and action row (menu, undo, new) above the board.
-## Landscape: the same controls stacked in a column (scores, undo/new, logo and menu) beside a
-## board that stays centered on the screen.
+## Landscape: board in the middle of the screen, controls placed around it by
+## [method _layout_landscape].
 func _apply_layout(wide: bool) -> void:
 	_landscape_mode = wide
-	# A narrow column leaves room to center the board on common 20:9 screens.
+	# Narrower buttons leave the board more room beside them.
 	_undo_btn.compact = wide
 	_new_btn.compact = wide
-	for node in [_board_view, _side]:
-		if node.get_parent():
-			node.get_parent().remove_child(node)
+	if _board_view.get_parent():
+		_board_view.get_parent().remove_child(_board_view)
 	if wide:
-		_fill(_side_scores, [_score_box, _best_box])
+		_fill(_brand, [_logo, _menu_btn])
 		_fill(_side_actions, [_undo_btn, _new_btn])
-		_fill(_side_brand, [_logo, _menu_btn])
-		_fill(_side, [_side_scores, _side_actions, _side_brand])
-		_fill(_landscape, [_side, _board_view])
-		_board_view.center_offset_x = 0.0
+		for node: Control in [_board_view, _brand, _score_box, _best_box, _side_actions]:
+			if node.get_parent():
+				node.get_parent().remove_child(node)
+			_landscape.add_child(node)
 	else:
+		for node: Control in [_brand, _side_actions]:
+			if node.get_parent():
+				node.get_parent().remove_child(node)
 		_fill(_header, [_logo, null, _score_box, _best_box])
 		_fill(_actions, [_menu_btn, null, _undo_btn, _new_btn])
 		_fill(_portrait, [_header, _actions, _board_view])
-		_board_view.center_offset_x = 0.0
 	_portrait.visible = not wide
 	_landscape.visible = wide
+	_layout_landscape()
 
 
 ## Makes [param nodes] the children of [param box] in order; null entries become spacers.
-func _fill(box: BoxContainer, nodes: Array) -> void:
+func _fill(box: Container, nodes: Array) -> void:
 	for child in box.get_children():
 		box.remove_child(child)
 		if not child in [_logo, _score_box, _best_box, _menu_btn, _undo_btn, _new_btn, _board_view,
-				_header, _actions, _side, _side_scores, _side_actions, _side_brand]:
+				_header, _actions, _brand, _side_actions]:
 			child.queue_free()
 	for node in nodes:
 		if node == null:
@@ -375,13 +389,118 @@ func _fill(box: BoxContainer, nodes: Array) -> void:
 		box.add_child(node)
 
 
-## In landscape, shifts the board so it sits in the middle of the screen when the side column
-## leaves room for that, instead of in the middle of the space right of the column.
-func _center_board() -> void:
+## Sizes the board and places the controls around it: logo and menu in the top-left corner, the
+## score against the board's left edge and the best score against its right edge, undo and new
+## game in the bottom-left corner. Falls back to stacked arrangements when the screen is too
+## narrow for that without shrinking the board.
+func _layout_landscape() -> void:
 	if not _landscape_mode:
 		return
-	var view_center := _board_view.position.x + _board_view.size.x * 0.5
-	_board_view.center_offset_x = size.x * 0.5 - view_center
+	var area := _landscape.size
+	if area.x < 1.0 or area.y < 1.0:
+		return
+	var sides := {}
+	var best_side := 0.0
+	for arrangement: Arrangement in Arrangement.values():
+		sides[arrangement] = _board_side(arrangement, area)
+		best_side = maxf(best_side, sides[arrangement])
+	_arrangement = Arrangement.ONE_SIDE
+	for arrangement: Arrangement in Arrangement.values():
+		if sides[arrangement] >= best_side * LAYOUT_TOLERANCE:
+			_arrangement = arrangement
+			break
+	var s := maxf(sides[_arrangement], 0.0)
+	var x := (area.x - s) * 0.5
+	if _arrangement == Arrangement.ONE_SIDE:
+		var left := _left_width(_arrangement)
+		x = left + BOARD_GAP + (area.x - left - BOARD_GAP - s) * 0.5
+	var y := (area.y - s) * 0.5
+	_side_actions.columns = _action_columns(_arrangement)
+	var brand := _brand.get_combined_minimum_size()
+	var score := _score_box.get_combined_minimum_size()
+	var best := _best_box.get_combined_minimum_size()
+	var actions := _side_actions.get_combined_minimum_size()
+	_place(_board_view, Vector2(x, y), Vector2(s, s))
+	_place(_brand, Vector2(0.0, y), brand)
+	_place(_side_actions, Vector2(0.0, y + s - actions.y), actions)
+	match _arrangement:
+		Arrangement.ROW:
+			_place(_score_box, Vector2(x - BOARD_GAP - score.x, y), score)
+			_place(_best_box, Vector2(x + s + BOARD_GAP, y), best)
+		Arrangement.STACKED:
+			_place(_score_box, Vector2(x - BOARD_GAP - score.x, y + brand.y + STACK_GAP), score)
+			_place(_best_box, Vector2(x + s + BOARD_GAP, y), best)
+		Arrangement.ONE_SIDE:
+			_place(_score_box, Vector2(0.0, y + brand.y + STACK_GAP), score)
+			_place(_best_box, Vector2(0.0, y + brand.y + score.y + STACK_GAP * 2.0), best)
+
+
+## Board side length [param arrangement] allows in [param area], or -1 when its controls do
+## not fit beside the board.
+func _board_side(arrangement: Arrangement, area: Vector2) -> float:
+	var left := _left_width(arrangement)
+	var s := area.y
+	if arrangement == Arrangement.ONE_SIDE:
+		s = minf(s, area.x - left - BOARD_GAP)
+	else:
+		var right := _best_box.get_combined_minimum_size().x
+		s = minf(s, area.x - 2.0 * (maxf(left, right) + BOARD_GAP))
+	return s if s >= _left_height(arrangement) else -1.0
+
+
+func _left_width(arrangement: Arrangement) -> float:
+	var brand := _brand.get_combined_minimum_size().x
+	var score := _score_box.get_combined_minimum_size().x
+	var width := maxf(brand, score)
+	match arrangement:
+		Arrangement.ROW:
+			width = brand + BRAND_GAP + score
+		Arrangement.ONE_SIDE:
+			width = maxf(width, _best_box.get_combined_minimum_size().x)
+	return maxf(width, _actions_size(_action_columns(arrangement)).x)
+
+
+## Height the left-hand controls need: the top group plus the buttons at the bottom.
+func _left_height(arrangement: Arrangement) -> float:
+	var brand := _brand.get_combined_minimum_size().y
+	var score := _score_box.get_combined_minimum_size().y
+	var top := maxf(brand, score)
+	match arrangement:
+		Arrangement.STACKED:
+			top = brand + STACK_GAP + score
+		Arrangement.ONE_SIDE:
+			top = brand + score + _best_box.get_combined_minimum_size().y + STACK_GAP * 2.0
+	return top + STACK_GAP + _actions_size(_action_columns(arrangement)).y
+
+
+## Undo and new game side by side, unless that is wider than the rest of a stacked column.
+func _action_columns(arrangement: Arrangement) -> int:
+	if arrangement == Arrangement.ROW:
+		return 2
+	var column := maxf(_brand.get_combined_minimum_size().x, _score_box.get_combined_minimum_size().x)
+	return 2 if _actions_size(2).x <= column else 1
+
+
+func _actions_size(columns: int) -> Vector2:
+	var out := Vector2.ZERO
+	var first := true
+	for button: Control in [_undo_btn, _new_btn]:
+		if not button.visible:
+			continue
+		var m := button.get_combined_minimum_size()
+		if first:
+			out = m
+		elif columns == 1:
+			out = Vector2(maxf(out.x, m.x), out.y + STACK_GAP + m.y)
+		else:
+			out = Vector2(out.x + STACK_GAP + m.x, maxf(out.y, m.y))
+		first = false
+	return out
+
+
+func _place(node: Control, pos: Vector2, node_size: Vector2) -> void:
+	node.position = pos.round()
+	node.size = node_size.round()
 
 
 func _hspacer() -> Control:
@@ -416,15 +535,24 @@ func _input(event: InputEvent) -> void:
 		_try_swipe(event.position - _touch_start, SWIPE_COMMIT)
 
 
-## Swipes may start anywhere on the game screen except over the scores and buttons (header in
-## portrait, side column in landscape) or the screen edge outside it, so glancing at the status
-## bar or pulling the notification shade never moves the tiles.
+## Swipes may start anywhere on the game screen except over the scores and buttons (the header
+## in portrait; beside the board, the band of top controls and the bottom buttons in landscape)
+## or the screen edge outside it, so glancing at the status bar or pulling the notification
+## shade never moves the tiles.
 func _in_swipe_area(point: Vector2) -> bool:
 	if not get_global_rect().has_point(point):
 		return false
-	if _landscape_mode:
-		return point.x > _side.get_global_rect().end.x + 12.0
-	return point.y > _actions.get_global_rect().end.y + 8.0
+	if not _landscape_mode:
+		return point.y > _actions.get_global_rect().end.y + 8.0
+	if _side_actions.get_global_rect().grow(12.0).has_point(point):
+		return false
+	var board := _board_view.get_global_rect()
+	if point.x >= board.position.x - 8.0 and point.x <= board.end.x + 8.0:
+		return true
+	var top_end := 0.0
+	for node: Control in [_brand, _score_box, _best_box]:
+		top_end = maxf(top_end, node.get_global_rect().end.y)
+	return point.y > top_end + 12.0
 
 
 func _unhandled_input(event: InputEvent) -> void:

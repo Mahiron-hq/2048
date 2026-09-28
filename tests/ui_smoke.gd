@@ -118,9 +118,17 @@ func _run() -> void:
 	await _wait(0.4)
 	var music_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index(Sfx.MUSIC_BUS))
 	check(app.store.music_volume == Sfx.LEVEL_COUNT and is_equal_approx(music_db, 0.0), "music slider reaches the top step (%.1f dB)" % music_db)
+	for i in 6:
+		app.set_theme_mode(SaveStore.ThemeMode.LIGHT if i % 2 == 0 else SaveStore.ThemeMode.DARK)
+		await _frames(2)
+	var fades := app.get_children().filter(func(c: Node) -> bool: return c is TextureRect)
+	check(fades.size() <= 1, "rapid theme switches keep a single crossfade (%d)" % fades.size())
+	for fade: TextureRect in fades:
+		check(fade.size.is_equal_approx(app.size), "theme crossfade matches the screen (%s vs %s)" % [fade.size, app.size])
 	app.set_theme_mode(SaveStore.ThemeMode.LIGHT)
 	app.set_language("ru")
-	await _wait(0.3)
+	await _wait(0.5)
+	check(not app.get_children().any(func(c: Node) -> bool: return c is TextureRect), "crossfade snapshot is gone after the fade")
 	check(not Palette.current.dark and I18n.current == "ru", "theme and language apply immediately")
 	app._on_back()
 	await _wait(0.3)
@@ -318,6 +326,29 @@ func _fixes_121(app: App) -> void:
 	check(probe.load_from_disk() and probe.best_for(4) == app.store.best_for(4), "background save writes the latest state")
 
 
+func _board_rect(g: GameScreen) -> Rect2:
+	return Rect2(g._board_view.global_position + g._board_view.board_rect.position, g._board_view.board_rect.size)
+
+
+## Landscape game screen invariants: the board is large, visible and clear of every control,
+## the controls are on screen and apart, and the board is centered unless all controls share one side.
+func _check_landscape_game(g: GameScreen, vp: Rect2, tag: String) -> void:
+	var board_rect := _board_rect(g)
+	check(_inside(board_rect, vp) and board_rect.size.x > vp.size.y * 0.6, "%s: board is large and fully visible (%s)" % [tag, board_rect])
+	var controls: Array[Control] = [g._logo, g._menu_btn, g._score_box, g._best_box, g._undo_btn, g._new_btn]
+	for i in controls.size():
+		var r := controls[i].get_global_rect()
+		check(_inside(r, vp), "%s: %s is on screen (%s)" % [tag, controls[i].get_class(), r])
+		check(not r.intersects(board_rect), "%s: %s stays off the board" % [tag, controls[i].get_class()])
+		for j in range(i + 1, controls.size()):
+			check(not r.intersects(controls[j].get_global_rect()), "%s: controls %d and %d do not overlap" % [tag, i, j])
+	if g._arrangement != GameScreen.Arrangement.ONE_SIDE:
+		var center := g.get_global_rect().get_center().x
+		check(absf(board_rect.get_center().x - center) < 1.5, "%s: board centered on screen (%.0f vs %.0f)" % [tag, board_rect.get_center().x, center])
+	check(_view_matches(g), "%s: tiles follow the resized board" % tag)
+	await _frames(1)
+
+
 func _landscape(app: App) -> void:
 	var original := root.size
 	root.size = Vector2i(1600, 900)
@@ -331,29 +362,49 @@ func _landscape(app: App) -> void:
 	await _wait(0.6)
 	var g := app._game
 	check(g._landscape_mode, "game switches to the side-panel layout")
-	var board_rect := Rect2(g._board_view.global_position + g._board_view.board_rect.position, g._board_view.board_rect.size)
-	check(_inside(board_rect, vp) and board_rect.size.x > vp.size.y * 0.6, "board is large and fully visible (%s)" % [board_rect])
-	check(not board_rect.intersects(g._side.get_global_rect()), "side panel does not overlap the board")
-	for b: Control in [g._menu_btn, g._new_btn, g._score_box, g._best_box]:
-		check(_inside(b.get_global_rect(), vp), "%s is on screen" % b.get_class())
-	check(_view_matches(g), "tiles follow the resized board")
-	# Side column order: scores, then undo/new, then logo and menu; board centered on screen.
-	check(g._side_scores.get_global_rect().position.y < g._side_actions.get_global_rect().position.y
-			and g._side_actions.get_global_rect().position.y < g._side_brand.get_global_rect().position.y,
-			"side column stacks scores, actions, logo and menu")
+	var board_rect := _board_rect(g)
+	await _check_landscape_game(g, vp, "16:9")
 	root.size = Vector2i(2400, 1080)
 	await _frames(8)
 	await _wait(0.3)
 	vp = root.get_visible_rect()
-	board_rect = Rect2(g._board_view.global_position + g._board_view.board_rect.position, g._board_view.board_rect.size)
-	var screen_center := g.get_global_rect().get_center().x
-	var expected := maxf(screen_center, g._board_view.global_position.x + board_rect.size.x * 0.5)
-	check(absf(board_rect.get_center().x - expected) < 2.0, "board centered on screen as far as the column allows (%.0f vs %.0f)" % [board_rect.get_center().x, expected])
-	check(not board_rect.intersects(g._side.get_global_rect()) and _inside(board_rect, vp), "centered board stays clear of the column and on screen")
-	var side_point := g._side.get_global_rect().get_center()
+	await _check_landscape_game(g, vp, "20:9")
+	check(g._arrangement == GameScreen.Arrangement.ROW, "20:9 keeps logo, menu and score in one line")
+	board_rect = _board_rect(g)
+	var logo := g._logo.get_global_rect()
+	var menu := g._menu_btn.get_global_rect()
+	var score := g._score_box.get_global_rect()
+	var best := g._best_box.get_global_rect()
+	var undo := g._undo_btn.get_global_rect()
+	var new_game := g._new_btn.get_global_rect()
+	var area := g.get_global_rect()
+	check(absf(logo.position.x - area.position.x) < 1.0 and absf(logo.position.y - board_rect.position.y) < 1.0, "logo sits in the top-left corner")
+	check(menu.position.x > logo.end.x and menu.position.x - logo.end.x < 20.0 and menu.end.y < logo.end.y, "menu button right next to the logo")
+	check(score.position.x - menu.end.x >= GameScreen.BRAND_GAP - 1.0 and absf(score.position.y - board_rect.position.y) < 1.0, "score after a gap, level with the board top")
+	check(absf(board_rect.position.x - score.end.x - GameScreen.BOARD_GAP) < 1.5, "score nearly touches the board's left edge")
+	check(absf(best.position.x - board_rect.end.x - GameScreen.BOARD_GAP) < 1.5 and absf(best.position.y - board_rect.position.y) < 1.0, "best nearly touches the board's right edge, at the top")
+	check(absf(undo.position.x - area.position.x) < 1.0 and absf(maxf(undo.end.y, new_game.end.y) - board_rect.end.y) < 1.0, "undo and new game in the bottom-left corner")
+	check(new_game.position.x > undo.end.x and absf(new_game.position.y - undo.position.y) < 1.0, "undo and new game side by side")
 	var moves_before := g.board.move_count
-	await _swipe(side_point, Vector2(0, 150))
-	check(g.board.move_count == moves_before, "a swipe starting on the side column does not move")
+	await _swipe(Vector2((menu.end.x + score.position.x) * 0.5, menu.get_center().y), Vector2(0, 150))
+	check(g.board.move_count == moves_before, "a swipe starting in the top band beside the board does not move")
+	await _swipe(score.get_center(), Vector2(0, 150))
+	check(g.board.move_count == moves_before, "a swipe starting on the score does not move")
+	await _swipe(undo.get_center(), Vector2(0, -150))
+	check(g.board.move_count == moves_before, "a swipe starting on the buttons does not move")
+	# Narrower and near-square landscape screens stack the controls instead of shrinking the board.
+	for px: Vector2i in [Vector2i(2048, 1536), Vector2i(1242, 1080)]:
+		root.size = px
+		await _frames(8)
+		await _wait(0.3)
+		vp = root.get_visible_rect()
+		await _check_landscape_game(g, vp, "%dx%d" % [px.x, px.y])
+		check(g._arrangement != GameScreen.Arrangement.ROW, "%dx%d stacks the controls (%d)" % [px.x, px.y, g._arrangement])
+	check(g._arrangement == GameScreen.Arrangement.ONE_SIDE, "a near-square screen keeps every control on one side")
+	root.size = Vector2i(2400, 1080)
+	await _frames(8)
+	await _wait(0.3)
+	vp = root.get_visible_rect()
 	app._to_menu()
 	await _wait(0.5)
 	app._menu._size.pressed.emit()

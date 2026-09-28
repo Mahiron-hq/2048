@@ -46,6 +46,8 @@ var _fps_label := Label.new()
 var _current: Control
 var _settings_return: Control
 var _transition: Tween
+var _theme_snapshot: TextureRect
+var _theme_fade: Tween
 var _fps_accum := 0.0
 
 
@@ -143,8 +145,6 @@ func _process(delta: float) -> void:
 			var text := "%d FPS · %d Hz" % [Engine.get_frames_per_second(), roundi(DisplayServer.screen_get_refresh_rate())]
 			if DisplayRate.max_rate > 0.0:
 				text += " (max %d)" % roundi(DisplayRate.max_rate)
-			if store.haptics_on:
-				text += " · vib: %s" % Haptics.status
 			_fps_label.text = text
 
 
@@ -247,8 +247,23 @@ func feedback_click() -> void:
 
 ## Tactile feedback of [param kind] when vibration is enabled.
 func haptic(kind: Haptics.Kind) -> void:
-	if store.haptics_on and OS.has_feature("mobile"):
+	if _haptics_allowed():
 		Haptics.play(kind)
+
+
+## Merge buzz scaled to the value of the merged tiles, when vibration is enabled.
+func haptic_merge(value: int) -> void:
+	if _haptics_allowed():
+		Haptics.merge(value)
+
+
+func haptic_game_over() -> void:
+	if _haptics_allowed():
+		Haptics.game_over()
+
+
+func _haptics_allowed() -> bool:
+	return store.haptics_on and OS.has_feature("mobile")
 
 
 ## Adds play time accumulated since the last flush to the statistics.
@@ -311,23 +326,35 @@ func set_theme_mode(mode: SaveStore.ThemeMode) -> void:
 		return
 	store.theme = mode
 	save_now()
-	var snapshot := TextureRect.new()
+	# The captured frame already shows any crossfade in progress, so one snapshot is enough.
+	_clear_theme_fade()
 	var img := get_viewport().get_texture().get_image()
 	if img:
-		snapshot.texture = ImageTexture.create_from_image(img)
-		snapshot.set_anchors_preset(Control.PRESET_FULL_RECT)
-		snapshot.stretch_mode = TextureRect.STRETCH_SCALE
-		snapshot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		snapshot.z_index = 90
-		add_child(snapshot)
+		_theme_snapshot = TextureRect.new()
+		_theme_snapshot.texture = ImageTexture.create_from_image(img)
+		# The frame is in physical pixels; keeping its size as the minimum would blow the rect
+		# up past the (smaller) canvas on high-density screens.
+		_theme_snapshot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_theme_snapshot.stretch_mode = TextureRect.STRETCH_SCALE
+		_theme_snapshot.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_theme_snapshot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_theme_snapshot.z_index = 90
+		add_child(_theme_snapshot)
 	Palette.current = Palette.make(mode == SaveStore.ThemeMode.DARK)
 	_broadcast("_on_skin_changed")
-	if snapshot.texture:
-		var tw := create_tween()
-		tw.tween_property(snapshot, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE)
-		tw.tween_callback(snapshot.queue_free)
-	else:
-		snapshot.queue_free()
+	if _theme_snapshot:
+		_theme_fade = create_tween()
+		_theme_fade.tween_property(_theme_snapshot, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE)
+		_theme_fade.tween_callback(_clear_theme_fade)
+
+
+func _clear_theme_fade() -> void:
+	if _theme_fade:
+		_theme_fade.kill()
+		_theme_fade = null
+	if _theme_snapshot:
+		_theme_snapshot.queue_free()
+		_theme_snapshot = null
 
 
 func set_language(lang: String) -> void:
@@ -387,7 +414,22 @@ func _apply_safe_area() -> void:
 	_safe.add_theme_constant_override("margin_bottom", int(bottom))
 	_safe.add_theme_constant_override("margin_left", int(left))
 	_safe.add_theme_constant_override("margin_right", int(right))
-	_fps_label.position = Vector2(left, maxf(4.0, top - 30.0))
+	# Landscape keeps the logo in the top-left corner, so the overlay moves to the bottom right,
+	# which the game screen leaves free.
+	if vp_size.x > vp_size.y * 1.1:
+		_fps_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		_fps_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		_fps_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		_fps_label.offset_right = -right
+		_fps_label.offset_left = -right
+		_fps_label.offset_bottom = -maxf(4.0, bottom - 30.0)
+		_fps_label.offset_top = _fps_label.offset_bottom
+	else:
+		_fps_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_fps_label.grow_horizontal = Control.GROW_DIRECTION_END
+		_fps_label.grow_vertical = Control.GROW_DIRECTION_END
+		_fps_label.position = Vector2(left, maxf(4.0, top - 30.0))
+		_fps_label.size = Vector2.ZERO
 
 
 func _show_screen(next: Control) -> void:

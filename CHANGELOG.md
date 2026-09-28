@@ -2,6 +2,22 @@
 
 All notable changes to 2048 Merge. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.2] - 2026-09-28
+
+### 🇬🇧 English
+
+- **Haptics that grow with the tiles:** merging 2s is silent, merging 4s gives the lightest tap, and every step up to 65536 is a little stronger; bigger merges stay at the maximum. Phones with amplitude control scale the strength, others the pulse length. A lost game ends with a soft, wavy one-second vibration.
+- **FPS counter** no longer shows the vibration diagnostics line.
+- **Theme switch fixed** (present since 1.0.0): the crossfade snapshot was sized in physical pixels, so on high-density screens the interface briefly blew up past the screen edges, and rapid switching left trails. It now matches the screen and only one crossfade runs at a time.
+- **Landscape game layout:** the board sits in the middle; the 2048 badge and menu button are in the top-left corner, the score is against the board's left edge and the best score against its right edge, and undo/new game are in the bottom-left corner. Narrower screens (16:9, 4:3 tablets) stack these controls instead of shrinking the board. The FPS counter moves to the bottom-right corner in landscape.
+
+### 🇷🇺 Русский
+
+- **Вибрация растёт вместе с плитками:** слияние двоек без вибрации, четвёрок — самый лёгкий толчок, и каждая ступень до 65536 немного сильнее; дальше максимальная сила. На телефонах с регулировкой амплитуды меняется сила, на остальных — длительность импульса. Проигрыш завершается мягкой волнообразной вибрацией на секунду.
+- **Счётчик FPS** больше не показывает строку диагностики вибрации.
+- **Исправлена смена темы** (баг с 1.0.0): снимок экрана для плавного перехода брался в физических пикселях, поэтому на экранах с высокой плотностью интерфейс на мгновение раздувался за края экрана, а при частых переключениях оставались шлейфы. Теперь снимок точно по размеру экрана, и одновременно идёт только один переход.
+- **Игра в горизонтальном положении:** поле по центру; плашка 2048 и кнопка меню в левом верхнем углу, счёт прижат к левому краю поля, рекорд — к правому, «Отменить»/«Заново» в левом нижнем углу. На более узких экранах (16:9, планшеты 4:3) элементы складываются в столбик, а поле не уменьшается. Счётчик FPS в горизонтальном положении переехал в правый нижний угол.
+
 ## [1.2.1] - 2026-09-28
 
 ### 🇬🇧 English
@@ -35,7 +51,6 @@ All notable changes to 2048 Merge. Versions follow [Semantic Versioning](https:/
 - **Statistics:** games played, average score, best tile, best score, total moves and time played — overall or per board size.
 - **Any screen, any orientation:** landscape layouts for every screen and proper scaling on tablets; controls keep the same physical size when the device turns.
 - **Swipe hint:** each new game shows a translucent four-arrow hint over the board that fades away with the first move.
-- **Vibration fixed:** haptics now use the system's tuned haptic effects (Android 10+) or pulses long enough to feel. Previously the pulses were too short and weak to be noticed.
 - **Settings reorganized** into "App settings" and "Game settings".
 - **Automated builds:** every push and pull request runs the full test suite on GitHub Actions; tagging a version builds signed APKs and attaches them to the release.
 
@@ -46,7 +61,6 @@ All notable changes to 2048 Merge. Versions follow [Semantic Versioning](https:/
 - **Статистика:** сыграно партий, средний счёт, лучшая плитка, рекорд, всего ходов и время в игре — в целом или по размеру поля.
 - **Любой экран и ориентация:** горизонтальные раскладки всех экранов и корректное масштабирование на планшетах; при повороте элементы сохраняют физический размер.
 - **Подсказка свайпа:** в начале каждой партии поверх поля полупрозрачная подсказка со стрелками, исчезает после первого хода.
-- **Исправлена вибрация:** теперь используются системные тактильные эффекты (Android 10+) или импульсы достаточной длительности. Раньше импульсы были слишком короткими и слабыми, чтобы их почувствовать.
 - **Настройки разделены** на «Настройки приложения» и «Настройки игры».
 - **Автоматические сборки:** каждый push и pull request прогоняет все тесты на GitHub Actions; тег версии собирает подписанные APK и прикладывает их к релизу.
 
