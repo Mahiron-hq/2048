@@ -2,6 +2,30 @@
 
 All notable changes to 2048 Merge. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] - 2026-09-28
+
+### 🇬🇧 English
+
+- **Vibration fixed for real:** buzzes are now sent with the "media" usage that Android intends for games. Android 12+ used to file them under touch or notification feedback, which many phones mute, so they were dropped. With "Show FPS" on, the overlay also shows which haptics path is active.
+- **Board size picker:** always exactly four rows (it sometimes measured stale rows and grew to twice the size) and stays on screen in landscape.
+- **Statistics:** an undone move no longer counts towards total moves.
+- **Landscape game layout:** scores, undo/new, then the logo and menu are stacked in a slim column, and the board sits in the middle of the screen.
+- **Swipe hint:** the veil now covers the whole board and the arrows keep pulsing until the first move.
+- **Header and side column ignore swipes,** so checking the time or pulling down the notification shade never moves tiles.
+- **Smoother long games:** saving runs on a background thread and is batched, so a slow storage write can no longer freeze the game for seconds; a move now costs about half as much on the main thread.
+- **Louder music and finer volume:** the soundtrack's top level is ~14% louder, and music and effects each have 7 volume steps (saved levels carry over).
+
+### 🇷🇺 Русский
+
+- **Вибрация исправлена по-настоящему:** теперь она отправляется с назначением «медиа», которое Android предусматривает для игр. Android 12+ относил её к отклику на касания или уведомлениям, а их на многих телефонах отключают, поэтому вибрация глушилась. При включённом «Показывать FPS» строка также показывает, каким способом работает вибрация.
+- **Выбор размера поля:** всегда ровно четыре строки (иногда меню учитывало старые строки и становилось вдвое больше) и не выходит за экран в горизонтальном положении.
+- **Статистика:** отменённый ход больше не засчитывается в общее число ходов.
+- **Игра в горизонтальном положении:** счёт, «Отменить»/«Заново», затем логотип и меню — в узкой колонке, а поле стоит по центру экрана.
+- **Подсказка свайпа:** затемнение закрывает всё поле, стрелки пульсируют до первого хода.
+- **Шапка и боковая колонка не реагируют на свайпы** — можно посмотреть время или опустить шторку уведомлений, не сдвигая плитки.
+- **Плавность в долгих партиях:** сохранение идёт в фоновом потоке и пакетами, поэтому медленная запись на диск больше не может «подвесить» игру на секунды; ход стал примерно вдвое дешевле для основного потока.
+- **Музыка громче, громкость точнее:** максимальная громкость саундтрека выше примерно на 14%, у музыки и звуков по 7 делений (сохранённые уровни переносятся).
+
 ## [1.2.0] - 2026-09-28
 
 ### 🇬🇧 English

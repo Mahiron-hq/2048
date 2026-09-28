@@ -8,15 +8,15 @@ const KNOB_RADIUS := 17.0
 const TRACK_WIDTH := 8.0
 const TICK_RADIUS := 3.5
 
-var steps := 5
-var value := 5
+var steps := Sfx.LEVEL_COUNT
+var value := Sfx.LEVEL_COUNT
 ## Drawn faded while the feature it controls is switched off; still adjustable.
 var dimmed := false:
 	set(v):
 		dimmed = v
 		modulate.a = 0.45 if v else 1.0
 
-var _pos := 4.0:
+var _pos := float(Sfx.LEVEL_COUNT - 1):
 	set(v):
 		_pos = v
 		queue_redraw()

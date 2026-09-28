@@ -23,40 +23,49 @@ func _init() -> void:
 	_card.add_child(_list)
 	_card.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_card)
+	# Rows are built once; reopening only moves the check mark, so the card never measures
+	# rows that are still waiting to be freed.
+	for n in range(Board.MIN_SIZE, Board.MAX_SIZE + 1):
+		var row := _Row.new()
+		row.grid = n
+		row.pressed.connect(_choose.bind(n))
+		_list.add_child(row)
 
 
 ## Opens next to [param anchor] (global rect) with [param current] marked.
 func open_at(anchor: Rect2, current: int) -> void:
-	for child in _list.get_children():
-		child.queue_free()
-	for n in range(Board.MIN_SIZE, Board.MAX_SIZE + 1):
-		var row := _Row.new()
-		row.grid = n
-		row.selected = n == current
-		row.custom_minimum_size = Vector2(maxf(anchor.size.x, MIN_WIDTH) - 20.0, ROW_HEIGHT)
-		row.pressed.connect(_choose.bind(n))
-		_list.add_child(row)
+	var width := maxf(anchor.size.x, MIN_WIDTH)
+	for row: _Row in _list.get_children():
+		row.selected = row.grid == current
+		row.custom_minimum_size = Vector2(width - 20.0, ROW_HEIGHT)
+		row.queue_redraw()
 	is_open = true
 	show()
 	_card.modulate.a = 0.0
-	_card.reset_size()
-	await get_tree().process_frame
-	if not is_open:
-		return
-	var local := get_global_transform().affine_inverse() * anchor.position
+	_card.size = Vector2.ZERO
 	var card_size := _card.get_combined_minimum_size()
 	_card.size = card_size
-	var above := local.y - card_size.y - 12.0
-	var y := above if above >= 8.0 else local.y + anchor.size.y + 12.0
-	var x := clampf(local.x, 8.0, maxf(8.0, size.x - card_size.x - 8.0))
+	var local := get_global_transform().affine_inverse() * anchor.position
+	var area := get_rect().size
+	var space_above := local.y - 12.0
+	var space_below := area.y - (local.y + anchor.size.y + 12.0)
+	var above := space_above >= card_size.y or space_above >= space_below
+	var y := local.y - card_size.y - 12.0 if above else local.y + anchor.size.y + 12.0
+	y = clampf(y, 8.0, maxf(8.0, area.y - card_size.y - 8.0))
+	var x := clampf(local.x, 8.0, maxf(8.0, area.x - card_size.x - 8.0))
 	_card.position = Vector2(x, y)
-	_card.pivot_offset = Vector2(card_size.x * 0.2, card_size.y if above >= 8.0 else 0.0)
-	_card.scale = Vector2(0.92, 0.92)
+	# Short landscape screens: shrink the card rather than let it leave the screen.
+	var fit := minf(1.0, (area.y - 16.0) / card_size.y)
+	_card.pivot_offset = Vector2(card_size.x * 0.2, card_size.y if above else 0.0)
+	if fit < 1.0:
+		_card.position.y = 8.0
+		_card.pivot_offset = Vector2(card_size.x * 0.2, 0.0)
+	_card.scale = Vector2(0.92, 0.92) * fit
 	if _tween:
 		_tween.kill()
 	_tween = create_tween().set_parallel()
 	_tween.tween_property(_card, "modulate:a", 1.0, 0.14)
-	_tween.tween_property(_card, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(_card, "scale", Vector2(fit, fit), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func close() -> void:

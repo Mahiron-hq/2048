@@ -15,10 +15,10 @@ const MUSIC_DELAY_FRAMES := 1107
 ## The track is exactly this long and ends on a bar line, so the loop wraps here.
 const MUSIC_LOOP_FRAMES := 5_880_000
 ## Linear music level at the top volume step, relative to full scale; sits under the effects.
-const MUSIC_VOLUME := 0.7
-## Bus gain in dB for volume steps 1..5.
-const LEVEL_DB := [-18.0, -12.0, -7.0, -3.0, 0.0]
-const LEVEL_COUNT := 5
+const MUSIC_VOLUME := 0.8
+## Bus gain in dB for volume steps 1..LEVEL_COUNT.
+const LEVEL_DB := [-21.0, -16.0, -12.0, -9.0, -6.0, -3.0, 0.0]
+const LEVEL_COUNT := 7
 const SFX_BUS := &"SFX"
 const MUSIC_BUS := &"Music"
 const MUSIC_FADE_IN := 2.2

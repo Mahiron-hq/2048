@@ -11,7 +11,6 @@ const SWIPE_COMMIT := 44.0
 ## Shorter flicks still count when the finger lifts quickly.
 const SWIPE_FLICK := 22.0
 const FLICK_TIME_MS := 220
-const SIDE_PANEL_WIDTH := 540.0
 
 var board := Board.new()
 
@@ -32,6 +31,9 @@ var _actions := HBoxContainer.new()
 var _portrait := VBoxContainer.new()
 var _landscape := HBoxContainer.new()
 var _side := VBoxContainer.new()
+var _side_scores := HBoxContainer.new()
+var _side_actions := HBoxContainer.new()
+var _side_brand := HBoxContainer.new()
 var _landscape_mode := false
 
 var _touch_index := -1
@@ -54,20 +56,13 @@ func setup(app: App) -> void:
 func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	_header.add_theme_constant_override("separation", 14)
 	_logo.text_ratio = 0.3
-	_header.add_child(_logo)
-	_header.add_child(_hspacer())
 	_score_box.custom_minimum_size = Vector2(172, 112)
 	_best_box.custom_minimum_size = Vector2(172, 112)
-	_header.add_child(_score_box)
-	_header.add_child(_best_box)
-
-	_actions.add_theme_constant_override("separation", 14)
-	_actions.add_child(_menu_btn)
-	_actions.add_child(_hspacer())
-	_actions.add_child(_undo_btn)
-	_actions.add_child(_new_btn)
+	for row in [_header, _actions, _side_scores, _side_actions, _side_brand]:
+		row.add_theme_constant_override("separation", 14)
+	for row in [_side_scores, _side_actions, _side_brand]:
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	_board_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_board_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -76,12 +71,13 @@ func _init() -> void:
 	_portrait.add_theme_constant_override("separation", 26)
 	add_child(_portrait)
 	_landscape.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_landscape.add_theme_constant_override("separation", 48)
+	_landscape.add_theme_constant_override("separation", 20)
 	_landscape.visible = false
 	add_child(_landscape)
 	_side.alignment = BoxContainer.ALIGNMENT_CENTER
 	_side.add_theme_constant_override("separation", 26)
-	_side.custom_minimum_size.x = SIDE_PANEL_WIDTH
+	# Deferred: the container emits this before it has positioned its children.
+	_landscape.sort_children.connect(_center_board, CONNECT_DEFERRED)
 	_apply_layout(false)
 
 	_confetti.emitting = false
@@ -219,6 +215,7 @@ func undo() -> void:
 	var undone := board.undo()
 	if undone == null:
 		return
+	_app.store.record_move(board.size, -1)
 	_pending_over = false
 	if undone.moved:
 		_board_view.play_undo(undone)
@@ -315,7 +312,7 @@ func _refresh_undo() -> void:
 
 func _persist() -> void:
 	save_state()
-	_app.save_now()
+	_app.request_save()
 
 
 func _ask_new_game() -> void:
@@ -335,24 +332,56 @@ func _menu_from_over() -> void:
 	menu_requested.emit()
 
 
+## Portrait: header row (logo, scores) and action row (menu, undo, new) above the board.
+## Landscape: the same controls stacked in a column (scores, undo/new, logo and menu) beside a
+## board that stays centered on the screen.
 func _apply_layout(wide: bool) -> void:
 	_landscape_mode = wide
-	for node in [_header, _actions, _board_view]:
+	# A narrow column leaves room to center the board on common 20:9 screens.
+	_undo_btn.compact = wide
+	_new_btn.compact = wide
+	for node in [_board_view, _side]:
 		if node.get_parent():
 			node.get_parent().remove_child(node)
-	if _side.get_parent():
-		_side.get_parent().remove_child(_side)
 	if wide:
-		_side.add_child(_header)
-		_side.add_child(_actions)
-		_landscape.add_child(_side)
-		_landscape.add_child(_board_view)
+		_fill(_side_scores, [_score_box, _best_box])
+		_fill(_side_actions, [_undo_btn, _new_btn])
+		_fill(_side_brand, [_logo, _menu_btn])
+		_fill(_side, [_side_scores, _side_actions, _side_brand])
+		_fill(_landscape, [_side, _board_view])
+		_board_view.center_offset_x = 0.0
 	else:
-		_portrait.add_child(_header)
-		_portrait.add_child(_actions)
-		_portrait.add_child(_board_view)
+		_fill(_header, [_logo, null, _score_box, _best_box])
+		_fill(_actions, [_menu_btn, null, _undo_btn, _new_btn])
+		_fill(_portrait, [_header, _actions, _board_view])
+		_board_view.center_offset_x = 0.0
 	_portrait.visible = not wide
 	_landscape.visible = wide
+
+
+## Makes [param nodes] the children of [param box] in order; null entries become spacers.
+func _fill(box: BoxContainer, nodes: Array) -> void:
+	for child in box.get_children():
+		box.remove_child(child)
+		if not child in [_logo, _score_box, _best_box, _menu_btn, _undo_btn, _new_btn, _board_view,
+				_header, _actions, _side, _side_scores, _side_actions, _side_brand]:
+			child.queue_free()
+	for node in nodes:
+		if node == null:
+			box.add_child(_hspacer())
+			continue
+		if node.get_parent():
+			node.get_parent().remove_child(node)
+		box.add_child(node)
+
+
+## In landscape, shifts the board so it sits in the middle of the screen when the side column
+## leaves room for that, instead of in the middle of the space right of the column.
+func _center_board() -> void:
+	if not _landscape_mode:
+		return
+	var view_center := _board_view.position.x + _board_view.size.x * 0.5
+	_board_view.center_offset_x = size.x * 0.5 - view_center
 
 
 func _hspacer() -> Control:
@@ -372,6 +401,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed and _touch_index < 0:
+			if not _in_swipe_area(event.position):
+				return
 			_touch_index = event.index
 			_touch_start = event.position
 			_touch_time = Time.get_ticks_msec()
@@ -383,6 +414,17 @@ func _input(event: InputEvent) -> void:
 			_touch_index = -1
 	elif event is InputEventScreenDrag and event.index == _touch_index and not _touch_used:
 		_try_swipe(event.position - _touch_start, SWIPE_COMMIT)
+
+
+## Swipes may start anywhere on the game screen except over the scores and buttons (header in
+## portrait, side column in landscape) or the screen edge outside it, so glancing at the status
+## bar or pulling the notification shade never moves the tiles.
+func _in_swipe_area(point: Vector2) -> bool:
+	if not get_global_rect().has_point(point):
+		return false
+	if _landscape_mode:
+		return point.x > _side.get_global_rect().end.x + 12.0
+	return point.y > _actions.get_global_rect().end.y + 8.0
 
 
 func _unhandled_input(event: InputEvent) -> void:
