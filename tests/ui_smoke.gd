@@ -9,6 +9,14 @@ var _failed := 0
 
 func _initialize() -> void:
 	DirAccess.remove_absolute(SAVE)
+	# UI_SMOKE_FONT=<path to .ttf> lays everything out with that font instead of the system one,
+	# e.g. DejaVu Sans to reproduce the (wider) default font of Linux CI machines.
+	var font_path := OS.get_environment("UI_SMOKE_FONT")
+	if not font_path.is_empty():
+		var file := FontFile.new()
+		if file.load_dynamic_font(font_path) == OK:
+			Fonts.override_font = file
+			print("using font ", font_path)
 	_run.call_deferred()
 
 
