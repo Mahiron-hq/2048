@@ -8,6 +8,10 @@ const SIDE_PADDING := 28.0
 const VERTICAL_PADDING := 24.0
 ## Idle loop pacing while nothing animates; input still wakes the loop immediately.
 const IDLE_SLEEP_USEC := 8000
+## Stretch base per orientation: the short side is always 720 units, so controls keep the same
+## physical size when the device turns.
+const BASE_PORTRAIT := Vector2i(720, 1280)
+const BASE_LANDSCAPE := Vector2i(1280, 720)
 
 static var instance: App
 
@@ -21,7 +25,14 @@ var _overlays := Control.new()
 var _menu := MenuScreen.new()
 var _game := GameScreen.new()
 var _settings := SettingsScreen.new()
+var _stats := StatsScreen.new()
 var _confirm := ConfirmDialog.new()
+var _picker := SizePicker.new()
+## Board size for the next new game; every launch starts at the classic 4x4.
+var selected_size := Board.DEFAULT_SIZE
+## Play time not yet added to the statistics.
+var _play_time := 0.0
+var _focused := true
 var _fps_label := Label.new()
 var _current: Control
 var _settings_return: Control
@@ -62,10 +73,12 @@ func _ready() -> void:
 
 	_game.setup(self)
 	_settings.setup(self)
-	for s in [_menu, _game, _settings]:
+	_stats.setup(self)
+	for s in [_menu, _game, _settings, _stats]:
 		s.visible = false
 		_screens.add_child(s)
 	add_overlay(_confirm)
+	add_overlay(_picker)
 
 	_fps_label.add_theme_font_override("font", Fonts.sans(Fonts.BOLD, true))
 	_fps_label.add_theme_font_size_override("font_size", 22)
@@ -78,10 +91,15 @@ func _ready() -> void:
 	_menu.new_game_requested.connect(_on_menu_new_game)
 	_menu.continue_requested.connect(_on_menu_continue)
 	_menu.settings_requested.connect(_open_settings)
+	_menu.stats_requested.connect(_open_stats)
+	_menu.size_menu_requested.connect(func(anchor: Rect2) -> void: _picker.open_at(anchor, selected_size))
+	_picker.chosen.connect(_on_size_chosen)
 	_game.menu_requested.connect(_to_menu)
 	_settings.back_requested.connect(_close_settings)
-	get_viewport().size_changed.connect(_apply_safe_area)
+	_stats.back_requested.connect(_to_menu)
+	get_viewport().size_changed.connect(_on_viewport_resized)
 
+	_update_content_scale()
 	_apply_safe_area()
 	# Widgets are constructed before the saved language is known, so refresh their text too.
 	_broadcast("_on_language_changed")
@@ -99,6 +117,8 @@ func _exit_tree() -> void:
 
 
 func _process(delta: float) -> void:
+	if _focused and _current == _game and _game.is_playing():
+		_play_time += delta
 	var animating := not get_tree().get_processed_tweens().is_empty() or _game.is_celebrating()
 	OS.low_processor_usage_mode = not animating and not store.show_fps
 	if store.show_fps:
@@ -119,8 +139,12 @@ func _notification(what: int) -> void:
 			_flush_save()
 			get_tree().quit()
 		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT:
+			_focused = false
 			_flush_save()
+		NOTIFICATION_APPLICATION_FOCUS_IN:
+			_focused = true
 		NOTIFICATION_APPLICATION_RESUMED:
+			_focused = true
 			DisplayRate.request_max()
 			_apply_safe_area()
 
@@ -137,7 +161,7 @@ func add_overlay(c: Control) -> void:
 
 
 func is_modal_open() -> bool:
-	return _confirm.is_open
+	return _confirm.is_open or _picker.is_open
 
 
 ## True for the screen being shown or transitioned to; a screen fading out ignores input.
@@ -157,13 +181,26 @@ func save_now() -> void:
 
 func feedback_click() -> void:
 	sfx.play(Sfx.Kind.CLICK, 1.0, -4.0)
-	haptic(6, 0.2)
+	haptic(Haptics.Kind.TICK)
 
 
-## Short vibration when enabled. [param amplitude] is 0..1 where the device supports it.
-func haptic(duration_ms: int, amplitude: float) -> void:
+## Tactile feedback of [param kind] when vibration is enabled.
+func haptic(kind: Haptics.Kind) -> void:
 	if store.haptics_on and OS.has_feature("mobile"):
-		Input.vibrate_handheld(duration_ms, amplitude)
+		Haptics.play(kind)
+
+
+## Adds play time accumulated since the last flush to the statistics.
+func flush_play_time() -> void:
+	if _play_time > 0.0:
+		store.add_play_time(_game.board.size, _play_time)
+		_play_time = 0.0
+
+
+func set_undo_limit(limit: int) -> void:
+	store.undo_limit = limit
+	_game.set_undo_limit(limit)
+	save_now()
 
 
 func set_sound(on: bool) -> void:
@@ -196,7 +233,7 @@ func set_music(on: bool) -> void:
 func set_haptics(on: bool) -> void:
 	store.haptics_on = on
 	if on:
-		haptic(30, 0.6)
+		haptic(Haptics.Kind.LIGHT)
 	save_now()
 
 
@@ -246,6 +283,21 @@ func _broadcast(method: StringName) -> void:
 	RenderingServer.set_default_clear_color(Palette.current.bg_bottom)
 
 
+func _on_viewport_resized() -> void:
+	_update_content_scale()
+	_apply_safe_area()
+
+
+func _update_content_scale() -> void:
+	var window := get_window()
+	if window == null or window != get_tree().root:
+		return
+	var px := Vector2(window.size)
+	var base := BASE_LANDSCAPE if px.x > px.y * 1.1 else BASE_PORTRAIT
+	if window.content_scale_size != base:
+		window.content_scale_size = base
+
+
 func _apply_safe_area() -> void:
 	var top := VERTICAL_PADDING
 	var bottom := VERTICAL_PADDING
@@ -261,9 +313,11 @@ func _apply_safe_area() -> void:
 			left += safe.position.x * k.x
 			right += maxf(0.0, win.x - safe.end.x) * k.x
 			bottom += maxf(0.0, win.y - safe.end.y) * k.y
-	# Tablets and unusually wide screens: keep the phone-width column centered.
-	var width := get_viewport_rect().size.x
-	var max_content := 760.0
+	# Portrait tablets keep a phone-width column; landscape screens get a wide area (for the
+	# side-by-side layouts) that is only clamped on extreme aspect ratios.
+	var vp_size := get_viewport_rect().size
+	var width := vp_size.x
+	var max_content := 760.0 if vp_size.x <= vp_size.y * 1.1 else vp_size.y * 2.3
 	if width - left - right > max_content:
 		var extra := (width - left - right - max_content) * 0.5
 		left += extra
@@ -282,7 +336,7 @@ func _show_screen(next: Control) -> void:
 	_current = next
 	if _transition:
 		_transition.kill()
-		for s in [_menu, _game, _settings]:
+		for s in [_menu, _game, _settings, _stats]:
 			if s != next and s != prev:
 				s.visible = false
 	DisplayServer.screen_set_keep_on(next == _game)
@@ -303,9 +357,10 @@ func _show_screen(next: Control) -> void:
 
 func _to_menu() -> void:
 	_game.close_overlays()
+	flush_play_time()
 	_game.save_state()
 	save_now()
-	_menu.refresh(store.best_score, store.has_game())
+	_refresh_menu()
 	_show_screen(_menu)
 	_menu.play_intro()
 
@@ -319,7 +374,21 @@ func _on_menu_new_game() -> void:
 
 func _start_new_game() -> void:
 	_show_screen(_game)
-	_game.start_new()
+	_game.start_new(selected_size)
+
+
+func _refresh_menu() -> void:
+	_menu.refresh(store.best_for(selected_size), selected_size, store.game_size())
+
+
+func _on_size_chosen(n: int) -> void:
+	selected_size = n
+	_refresh_menu()
+
+
+func _open_stats() -> void:
+	_stats.refresh()
+	_show_screen(_stats)
 
 
 func _on_menu_continue() -> void:
@@ -342,8 +411,12 @@ func _close_settings() -> void:
 
 
 func _on_back() -> void:
-	if _confirm.is_open:
+	if _picker.is_open:
+		_picker.close()
+	elif _confirm.is_open:
 		_confirm.close()
+	elif _current == _stats:
+		_to_menu()
 	elif _current == _settings:
 		_close_settings()
 	elif _current == _game:
@@ -354,5 +427,6 @@ func _on_back() -> void:
 
 
 func _flush_save() -> void:
+	flush_play_time()
 	_game.save_state()
 	save_now()

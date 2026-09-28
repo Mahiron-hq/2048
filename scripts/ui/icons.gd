@@ -2,7 +2,7 @@ class_name Icons
 extends RefCounted
 ## Vector UI glyphs drawn with canvas primitives, so they stay sharp at any density.
 
-enum Kind { NONE, MENU, UNDO, RESTART, BACK, GEAR, PLAY, TROPHY, CHECK, SPEAKER_LOW, SPEAKER_HIGH }
+enum Kind { NONE, MENU, UNDO, RESTART, BACK, GEAR, PLAY, TROPHY, CHECK, SPEAKER_LOW, SPEAKER_HIGH, GRID, CHART }
 
 
 ## Draws [param kind] centered on [param center], fitting a square of side [param s].
@@ -70,6 +70,20 @@ static func draw(ci: CanvasItem, kind: Kind, center: Vector2, s: float, color: C
 			var waves := [0.16] if kind == Kind.SPEAKER_LOW else [0.16, 0.32]
 			for r in waves:
 				ci.draw_arc(center + Vector2(s * 0.02, 0), s * r, -PI * 0.3, PI * 0.3, 12, color, w * 0.8, true)
+		Kind.GRID:
+			var cell := s * 0.22
+			var step := s * 0.29
+			for gy in 3:
+				for gx in 3:
+					var pos := center + Vector2((gx - 1) * step, (gy - 1) * step) - Vector2(cell, cell) * 0.5
+					ci.draw_rect(Rect2(pos, Vector2(cell, cell)), color)
+		Kind.CHART:
+			var heights := [0.38, 0.62, 0.86]
+			var bar := s * 0.18
+			for i in 3:
+				var bh: float = s * heights[i]
+				var x := center.x + (i - 1) * s * 0.3 - bar * 0.5
+				ci.draw_rect(Rect2(Vector2(x, center.y + s * 0.43 - bh), Vector2(bar, bh)), color)
 		Kind.CHECK:
 			var pts := PackedVector2Array([
 				center + Vector2(-s * 0.28, 0),

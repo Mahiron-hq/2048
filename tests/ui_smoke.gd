@@ -30,7 +30,7 @@ func _run() -> void:
 	await _wait(0.5)
 	check(app._current == app._game, "New game opens the game screen")
 	var board := app._game.board
-	check(board.empty_count() == Board.CELL_COUNT - 2, "two opening tiles")
+	check(board.size == 4 and board.empty_count() == board.cell_count - 2, "a 4x4 game with two opening tiles by default")
 
 	var moved := false
 	for dir in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
@@ -74,7 +74,7 @@ func _run() -> void:
 	await _wait(0.5)
 	var snapshot := board.values.duplicate()
 	var score := board.score
-	check(app.store.best_score == score, "best score tracks the running score")
+	check(app.store.best_for(4) == score, "best score tracks the running score")
 
 	app._on_back()
 	await _wait(0.5)
@@ -125,7 +125,7 @@ func _run() -> void:
 	Palette.current = Palette.make(true)
 	app = _spawn_app()
 	await _frames(5)
-	check(app.store.best_score == score, "best score survives restart")
+	check(app.store.best_for(4) == score, "best score survives restart")
 	check(app.store.music_on and not app.store.haptics_on, "settings survive restart")
 	check(app.store.sound_volume == 2 and app.store.music_volume == 5, "volume steps survive restart")
 	check(app.sfx._music.playing, "music starts on launch when enabled")
@@ -141,7 +141,7 @@ func _run() -> void:
 	app._confirm._yes.pressed.emit()
 	await _wait(0.4)
 	check(app._game.board.move_count == 0 and app._game.board.score == 0, "confirmed new game starts fresh")
-	check(app.store.best_score == score, "best score kept after new game")
+	check(app.store.best_for(4) == score, "best score kept after new game")
 
 	var g := app._game
 	g.board.from_dict({"size": 4, "values": [2, 4, 2, 4, 4, 2, 4, 2, 2, 4, 2, 4, 4, 2, 8, 8], "score": 10, "moves": 5})
@@ -158,11 +158,136 @@ func _run() -> void:
 	else:
 		check(g.board.values != before_over, "move applied (spawn left a move open)")
 
+	await _new_features(app)
+	await _landscape(app)
+
 	app.queue_free()
 	await _frames(2)
 	DirAccess.remove_absolute(SAVE)
 	print("\nui smoke: %d failed" % _failed)
 	quit(_failed)
+
+
+func _new_features(app: App) -> void:
+	var g := app._game
+
+	# Swipe hint: shown when a game starts, gone with the first move.
+	g.start_new(0, false)
+	await _wait(0.4)
+	check(g._board_view.is_hint_visible(), "swipe hint shows at the start of a game")
+	for dir in [Board.Dir.LEFT, Board.Dir.RIGHT, Board.Dir.UP, Board.Dir.DOWN]:
+		g.request_move(dir)
+		if g.board.move_count > 0:
+			break
+	await _wait(0.5)
+	check(not g._board_view.is_hint_visible(), "swipe hint fades after the first move")
+	await _swipe(Vector2(360, 700), Vector2(0, 0))
+	check(not g._board_view.is_hint_visible(), "swipe hint stays hidden for the rest of the game")
+
+	# Undo depth: three steps back to the very start, and not one further.
+	app.set_undo_limit(3)
+	g.start_new(0, false)
+	var start_values := g.board.values.duplicate()
+	var guard := 0
+	while g.board.move_count < 3 and guard < 40:
+		g.request_move(guard % 4)
+		guard += 1
+		await _frames(1)
+	check(g._undo_btn.visible and g._undo_btn.badge == 3, "undo shows three available steps (badge %d)" % g._undo_btn.badge)
+	for i in 3:
+		g._undo_btn.pressed.emit()
+		await _frames(2)
+	await _wait(0.3)
+	check(g.board.values == start_values and g.board.move_count == 0, "three undos return to the start of the game")
+	check(g._undo_btn.disabled and _view_matches(g), "undo is spent and the view matches the board")
+	g._undo_btn.pressed.emit()
+	await _frames(2)
+	check(g.board.values == start_values, "extra undo presses do nothing")
+	app.set_undo_limit(0)
+	check(not g._undo_btn.visible, "undo button hides when undo is off")
+	app.set_undo_limit(1)
+
+	# Statistics: replacing a game after a move counts it as played.
+	var played: int = app.store.stats_for(0).games
+	guard = 0
+	while g.board.move_count == 0 and guard < 4:
+		g.request_move(guard)
+		guard += 1
+	g.start_new(0, false)
+	check(app.store.stats_for(0).games == played + 1, "an abandoned game counts as played")
+
+	# Board size from the menu: picker, 5x5 game.
+	app._to_menu()
+	await _wait(0.5)
+	check(app._menu._size.text_override == "4×4", "menu defaults to 4×4")
+	app._menu._size.pressed.emit()
+	await _wait(0.3)
+	check(app._picker.is_open and app._picker._list.get_child_count() == 4, "size button opens a picker with four sizes")
+	var five: BaseButton = app._picker._list.get_child(2)
+	five.pressed.emit()
+	await _wait(0.3)
+	check(not app._picker.is_open and app.selected_size == 5 and app._menu._size.text_override == "5×5", "picking 5×5 updates the menu")
+	app._menu._play.pressed.emit()
+	await _wait(0.3)
+	if app._confirm.is_open:
+		app._confirm._yes.pressed.emit()
+	await _wait(0.6)
+	check(app._current == g and g.board.size == 5 and g._board_view.grid_size == 5, "a 5×5 game starts")
+	check(_view_matches(g), "5×5 view matches the board")
+	var moved := false
+	for dir in [Board.Dir.LEFT, Board.Dir.RIGHT, Board.Dir.UP, Board.Dir.DOWN]:
+		g.request_move(dir)
+		if g.board.move_count > 0:
+			moved = true
+			break
+	await _wait(0.4)
+	check(moved and _view_matches(g), "5×5 moves animate into place")
+	check(app.store.best_for(5) == g.board.score, "records are tracked for 5×5")
+
+	# Statistics screen.
+	app._to_menu()
+	await _wait(0.4)
+	app._menu._stats.pressed.emit()
+	await _wait(0.5)
+	var st := app.store.stats_for(0)
+	check(app._current == app._stats, "Statistics opens from the menu")
+	check(app._stats._cards.GAMES_PLAYED._value.text == I18n.number(st.games) and st.moves > 0, "statistics show games and moves")
+	app._on_back()
+	await _wait(0.4)
+	check(app._current == app._menu, "back returns from statistics")
+
+
+func _landscape(app: App) -> void:
+	var original := root.size
+	root.size = Vector2i(1600, 900)
+	await _frames(6)
+	var vp := root.get_visible_rect()
+	check(vp.size.x > vp.size.y, "viewport turns landscape (%s)" % [vp.size])
+	await _wait(0.4)
+	check(app._menu._landscape_mode, "menu switches to its two-column layout")
+	check(_inside(app._menu._buttons.get_global_rect(), vp) and _inside(app._menu._best_card.get_global_rect(), vp), "menu content fits the landscape screen")
+	app._menu._continue.pressed.emit()
+	await _wait(0.6)
+	var g := app._game
+	check(g._landscape_mode, "game switches to the side-panel layout")
+	var board_rect := Rect2(g._board_view.global_position + g._board_view.board_rect.position, g._board_view.board_rect.size)
+	check(_inside(board_rect, vp) and board_rect.size.x > vp.size.y * 0.6, "board is large and fully visible (%s)" % [board_rect])
+	check(not board_rect.intersects(g._side.get_global_rect()), "side panel does not overlap the board")
+	for b in [g._menu_btn, g._new_btn, g._score_box, g._best_box]:
+		check(_inside(b.get_global_rect(), vp), "%s is on screen" % b.get_class())
+	check(_view_matches(g), "tiles follow the resized board")
+	app._open_settings()
+	await _wait(0.5)
+	check(_inside(app._settings._undo.get_global_rect(), vp) or app._settings._undo.get_global_rect().position.y > vp.size.y * 0.5, "settings stay laid out in landscape")
+	app._close_settings()
+	await _wait(0.4)
+	root.size = original
+	await _frames(6)
+	check(not g._landscape_mode, "back to portrait layout")
+
+
+func _inside(r: Rect2, area: Rect2) -> bool:
+	return area.grow(1.0).encloses(r)
 
 
 func _view_matches(g: GameScreen) -> bool:
@@ -173,7 +298,7 @@ func _view_matches(g: GameScreen) -> bool:
 		if c.visible:
 			shown += 1
 	var expected := 0
-	for i in Board.CELL_COUNT:
+	for i in g.board.cell_count:
 		if g.board.values[i] == 0:
 			continue
 		expected += 1

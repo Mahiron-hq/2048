@@ -50,11 +50,13 @@ func open() -> void:
 	if not is_open:
 		return
 	_card.pivot_offset = _card.size * 0.5
-	_card.scale = Vector2(0.86, 0.86)
+	# Short landscape screens: shrink the card to fit instead of letting it spill off screen.
+	var fit := minf(1.0, (get_viewport_rect().size.y - 32.0) / maxf(_card.size.y, 1.0))
+	_card.scale = Vector2(0.86, 0.86) * fit
 	_tween = create_tween().set_parallel()
 	_tween.tween_property(_scrim, "modulate:a", 1.0, 0.24)
 	_tween.tween_property(_card, "modulate:a", 1.0, 0.2).set_delay(0.05)
-	_tween.tween_property(_card, "scale", Vector2.ONE, 0.36).set_delay(0.05).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(_card, "scale", Vector2(fit, fit), 0.36).set_delay(0.05).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func close() -> void:
