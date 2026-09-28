@@ -1,7 +1,7 @@
 class_name SettingsScreen
 extends Control
-## App settings (sound, music, vibration, theme, language, FPS overlay) and game settings (undo
-## depth). Changes apply immediately.
+## App settings (sound, music, vibration, theme, language, FPS overlay and cap) and game settings
+## (undo depth). Changes apply immediately.
 
 signal back_requested
 
@@ -15,6 +15,10 @@ var _fps := ToggleSwitch.new()
 var _theme := Segmented.make(PackedStringArray(["THEME_LIGHT", "THEME_DARK"]))
 var _language := Segmented.make(PackedStringArray([I18n.LANGUAGE_NAMES.ru, I18n.LANGUAGE_NAMES.en]), false)
 var _undo := Segmented.make(PackedStringArray(["UNDO_OFF", "1", "2", "3", "4", "5"]))
+## Options depend on the display, so they are filled in by [method refresh].
+var _fps_limit := Segmented.make(PackedStringArray(["∞"]), false)
+## Cap behind each [member _fps_limit] option; 0 means none.
+var _fps_limits: Array[int] = [0]
 var _dividers: Array[ColorRect] = []
 var _columns: Array[Control] = []
 
@@ -77,6 +81,8 @@ func _init() -> void:
 	rows2.add_child(_row("LANGUAGE", _language))
 	rows2.add_child(_divider())
 	rows2.add_child(_row("SHOW_FPS", _fps))
+	rows2.add_child(_divider())
+	rows2.add_child(_fps_limit_block())
 	col.add_child(card2)
 
 	col.add_child(_section("GAME_SETTINGS"))
@@ -109,6 +115,7 @@ func _init() -> void:
 	_music_volume.changed.connect(func(step: int) -> void: _app.set_music_volume(step))
 	_haptics.toggled.connect(func(on: bool) -> void: _app.set_haptics(on))
 	_fps.toggled.connect(func(on: bool) -> void: _app.set_show_fps(on))
+	_fps_limit.selected.connect(func(i: int) -> void: _app.set_fps_limit(_fps_limits[i]))
 	_theme.selected.connect(func(i: int) -> void: _app.set_theme_mode(SaveStore.ThemeMode.LIGHT if i == 0 else SaveStore.ThemeMode.DARK))
 	_language.selected.connect(func(i: int) -> void: _app.set_language(I18n.LANGUAGES[i]))
 	_undo.selected.connect(func(i: int) -> void: _app.set_undo_limit(i))
@@ -133,9 +140,23 @@ func refresh() -> void:
 	_music_volume.dimmed = not s.music_on
 	_haptics.set_on_silently(s.haptics_on)
 	_fps.set_on_silently(s.show_fps)
+	_refresh_fps_limits()
 	_theme.set_index_silently(0 if s.theme == SaveStore.ThemeMode.LIGHT else 1)
 	_language.set_index_silently(I18n.LANGUAGES.find(s.language))
 	_undo.set_index_silently(s.undo_limit)
+
+
+## Offers only the caps this display can show evenly; a stored cap it cannot is dropped.
+func _refresh_fps_limits() -> void:
+	_fps_limits = DisplayRate.limit_options()
+	var labels := PackedStringArray()
+	for limit in _fps_limits:
+		labels.append(str(limit) if limit > 0 else "∞")
+	_fps_limit.options = labels
+	if not _fps_limits.has(_app.store.fps_limit):
+		_app.set_fps_limit(0)
+	_fps_limit.set_index_silently(_fps_limits.find(_app.store.fps_limit))
+	_fps_limit.queue_redraw()
 
 
 func _on_skin_changed() -> void:
@@ -180,6 +201,29 @@ func _row(key: String, control: Control) -> Control:
 	pad_r.custom_minimum_size.x = 14
 	row.add_child(pad_r)
 	return row
+
+
+## Frame cap: title, hint, then the cap selector across the card.
+func _fps_limit_block() -> Control:
+	# Same insets as the label and control of a _row (padding plus row separation).
+	var wrap := MarginContainer.new()
+	wrap.add_theme_constant_override("margin_left", 34)
+	wrap.add_theme_constant_override("margin_right", 30)
+	wrap.add_theme_constant_override("margin_top", 22)
+	wrap.add_theme_constant_override("margin_bottom", 18)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	box.add_child(SkinLabel.make("FPS_LIMIT", 32, Fonts.SEMIBOLD))
+	var hint := SkinLabel.make("FPS_LIMIT_HINT", 24, Fonts.REGULAR, SkinLabel.Role.MUTED)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(hint)
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 8
+	box.add_child(gap)
+	_fps_limit.custom_minimum_size = Vector2(0, 64)
+	box.add_child(_fps_limit)
+	wrap.add_child(box)
+	return wrap
 
 
 ## Volume slider line under a toggle row: quiet speaker, slider, loud speaker.

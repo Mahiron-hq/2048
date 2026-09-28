@@ -19,6 +19,8 @@ var haptics_on := true
 var sound_volume := 7
 var music_volume := 6
 var show_fps := false
+## Frame cap in frames per second, one of [constant DisplayRate.LIMITS]; 0 means no cap.
+var fps_limit := 0
 var theme: ThemeMode = ThemeMode.DARK
 ## Two-letter UI language code, one of [constant I18n.LANGUAGES].
 var language := "en"
@@ -166,6 +168,7 @@ func to_dict() -> Dictionary:
 			"music_volume": music_volume,
 			"volume_steps": Sfx.LEVEL_COUNT,
 			"show_fps": show_fps,
+			"fps_limit": fps_limit,
 			"theme": "light" if theme == ThemeMode.LIGHT else "dark",
 			"language": language,
 			"undo_limit": undo_limit,
@@ -209,6 +212,9 @@ func apply_dict(d: Dictionary) -> void:
 		music_volume = _volume_step(s.get("music_volume"), steps, music_volume)
 		undo_limit = _int_in(s.get("undo_limit"), 0, Board.MAX_UNDO, undo_limit)
 		show_fps = _bool_or(s.get("show_fps"), show_fps)
+		var limit = s.get("fps_limit")
+		if (limit is int or limit is float) and (limit == 0 or DisplayRate.LIMITS.has(int(limit))) and int(limit) == limit:
+			fps_limit = int(limit)
 		match s.get("theme"):
 			"light":
 				theme = ThemeMode.LIGHT

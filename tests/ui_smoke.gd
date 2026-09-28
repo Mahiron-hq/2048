@@ -9,8 +9,8 @@ var _failed := 0
 
 func _initialize() -> void:
 	DirAccess.remove_absolute(SAVE)
-	# UI_SMOKE_FONT=<path to .ttf> lays everything out with that font instead of the system one,
-	# e.g. DejaVu Sans to reproduce the (wider) default font of Linux CI machines.
+	# UI_SMOKE_FONT=<path to .ttf> lays everything out with that font instead of the bundled one,
+	# e.g. DejaVu Sans, a much wider face, to prove the layouts tolerate it.
 	var font_path := OS.get_environment("UI_SMOKE_FONT")
 	if not font_path.is_empty():
 		var file := FontFile.new()
@@ -118,6 +118,19 @@ func _run() -> void:
 	await _wait(0.4)
 	var music_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index(Sfx.MUSIC_BUS))
 	check(app.store.music_volume == Sfx.LEVEL_COUNT and is_equal_approx(music_db, 0.0), "music slider reaches the top step (%.1f dB)" % music_db)
+	var caps: Segmented = app._settings._fps_limit
+	var limits: Array[int] = app._settings._fps_limits
+	check(limits.slice(0, 2) == [30, 60] and limits[-1] == 0 and caps.options.size() == limits.size(), "FPS caps offered: %s" % [limits])
+	var scroll: ScrollContainer = app._settings.find_children("*", "ScrollContainer", true, false)[0]
+	scroll.ensure_control_visible(caps)
+	await _frames(2)
+	await _drag(caps, 1.5 / limits.size(), 1.5 / limits.size())
+	await _wait(0.3)
+	check(app.store.fps_limit == 60 and Engine.max_fps == 60, "tapping 60 caps the frame rate (%d, max_fps %d)" % [app.store.fps_limit, Engine.max_fps])
+	await _drag(caps, 1.0 - 0.5 / limits.size(), 1.0 - 0.5 / limits.size())
+	await _wait(0.3)
+	check(app.store.fps_limit == 0 and Engine.max_fps == 0, "tapping ∞ lifts the cap (%d, max_fps %d)" % [app.store.fps_limit, Engine.max_fps])
+	scroll.scroll_vertical = 0
 	for i in 6:
 		app.set_theme_mode(SaveStore.ThemeMode.LIGHT if i % 2 == 0 else SaveStore.ThemeMode.DARK)
 		await _frames(2)

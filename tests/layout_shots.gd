@@ -74,6 +74,15 @@ func _device(tag: String, px: Vector2i) -> void:
 	app._game._refresh_scores(false)
 	await _capture(tag + "-4-game-6x6", 0.4)
 
+	# The biggest score a 6x6 board can plausibly show must still fit the game-over card.
+	app._game._game_over.present(137438953472, 1 << 37, 99999, true)
+	await _capture(tag + "-4c-game-over-huge", 1.6)
+	app._game._game_over.close()
+	app.confirm("CONFIRM_NEW_TITLE", "CONFIRM_NEW_BODY", "YES_NEW", func() -> void: pass)
+	await _capture(tag + "-4d-confirm", 0.7)
+	app._confirm.close()
+	await _wait(0.3)
+
 	# Theme switched rapidly, captured mid-crossfade: the fading snapshot must match the screen.
 	app.set_show_fps(true)
 	for mode in [SaveStore.ThemeMode.LIGHT, SaveStore.ThemeMode.DARK, SaveStore.ThemeMode.LIGHT]:
@@ -88,6 +97,9 @@ func _device(tag: String, px: Vector2i) -> void:
 	app.set_theme_mode(SaveStore.ThemeMode.LIGHT)
 	app._open_settings()
 	await _capture(tag + "-5-settings", 0.6)
+	var scroll: ScrollContainer = app._settings.find_children("*", "ScrollContainer", true, false)[0]
+	scroll.scroll_vertical = 100000
+	await _capture(tag + "-5b-settings-bottom", 0.3)
 	app._close_settings()
 	await _wait(0.3)
 

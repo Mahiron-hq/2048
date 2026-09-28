@@ -44,6 +44,9 @@ func _initialize() -> void:
 		"test_volume_scale_migrates",
 		"test_undone_moves_leave_the_statistics",
 		"test_store_writes_from_a_worker_thread",
+		"test_tiles_grow_past_32_bits",
+		"test_fps_limit_options_follow_the_panel",
+		"test_fps_limit_persists",
 	]
 	for t in tests:
 		_current = t
@@ -257,9 +260,9 @@ func test_undo_of_legacy_save_rebuilds() -> void:
 func test_milestones_fire_once() -> void:
 	var b := board_from([[64, 64, 0, 0], [64, 64, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]])
 	var r := b.move(Board.Dir.LEFT)
-	check(r.milestones == PackedInt32Array([128]), "first 128 fires: %s" % [r.milestones])
+	check(r.milestones == PackedInt64Array([128]), "first 128 fires: %s" % [r.milestones])
 	var r2 := b.move(Board.Dir.UP)
-	check(r2.milestones == PackedInt32Array([256]), "256 fires once: %s" % [r2.milestones])
+	check(r2.milestones == PackedInt64Array([256]), "256 fires once: %s" % [r2.milestones])
 	var r3 := b.move(Board.Dir.RIGHT)
 	check(r3.milestones.is_empty(), "plain swipe fires nothing: %s" % [r3.milestones])
 
@@ -596,16 +599,18 @@ func test_game_over_wave() -> void:
 	for ms in timings:
 		total += ms
 	check(total == 1000, "game-over wave lasts one second (%d ms)" % total)
-	var pauses := 0
+	var swells: Array[int] = [0]
 	var highest := 0
 	var lowest := 255
-	for a in amplitudes:
-		if a == 0:
-			pauses += 1
+	for i in amplitudes.size():
+		if amplitudes[i] == 0:
+			swells.append(0)
 			continue
-		highest = maxi(highest, a)
-		lowest = mini(lowest, a)
-	check(pauses == Haptics.WAVE_SWELLS - 1, "short pauses between swells keep it wavy without amplitude control")
+		swells[-1] += timings[i]
+		highest = maxi(highest, amplitudes[i])
+		lowest = mini(lowest, amplitudes[i])
+	check(swells.size() == 2, "two swells with a pause between them: %s" % [swells])
+	check(swells.size() == 2 and swells[1] * 2 == swells[0] * 3, "second swell is 1.5 times the first: %s" % [swells])
 	check(highest <= 140 and lowest >= 40, "medium-soft: %d..%d of 255" % [lowest, highest])
 	check(highest - lowest >= 40, "each swell rises and falls noticeably")
 
@@ -655,3 +660,42 @@ func test_store_writes_from_a_worker_thread() -> void:
 	var t := SaveStore.new(path)
 	check(t.load_from_disk() and t.best_for(5) == 4242, "a save written on a worker thread loads back")
 	DirAccess.remove_absolute(path)
+
+
+func test_tiles_grow_past_32_bits() -> void:
+	var big := 1 << 30
+	var b := Board.new(3)
+	check(b.from_dict({"size": 4, "values": [big, big, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "score": 0, "moves": 0}), "board with 2^30 tiles loads")
+	var r := b.move(Board.Dir.LEFT)
+	check(r.moved and b.values[0] == 1 << 31, "two 2^30 tiles merge into 2^31, not a negative number: %d" % b.values[0])
+	check(r.merges.size() == 1 and r.merges[0][3] == 1 << 31 and b.best_tile == 1 << 31, "merge result and best tile keep the full value")
+	check(b.score == 1 << 31, "score counts the merged value")
+	var c := Board.new(4)
+	var text := JSON.stringify(b.to_dict())
+	check(c.from_dict(JSON.parse_string(text)) and c.values == b.values, "2^31 tile survives a save and reload")
+	var huge := Board.new(5)
+	check(huge.from_dict({"size": 6, "values": [1 << 37] + range(35).map(func(_i: int) -> int: return 0), "score": 0, "moves": 0}), "a 2^37 tile (the 6x6 maximum) loads")
+
+
+func test_fps_limit_options_follow_the_panel() -> void:
+	check(DisplayRate.options_for(PackedFloat32Array([144.00002, 120.00001, 60.0])) == [30, 60, 120, 0], "60/120/144 Hz panel: no 90, which would stutter")
+	check(DisplayRate.options_for(PackedFloat32Array([90.0, 60.0])) == [30, 60, 90, 0], "90 Hz panel")
+	check(DisplayRate.options_for(PackedFloat32Array([120.0, 90.0, 60.0])) == [30, 60, 90, 120, 0], "panel with 90 and 120 Hz modes")
+	check(DisplayRate.options_for(PackedFloat32Array([59.94])) == [30, 60, 0], "60 Hz panel keeps only 30 and 60")
+	check(DisplayRate.options_for(PackedFloat32Array([165.0])) == [30, 60, 0], "165 Hz panel has no whole multiple of 90 or 120")
+	check(DisplayRate.options_for(PackedFloat32Array([240.0])) == [30, 60, 120, 0], "240 Hz panel shows 120 evenly")
+	check(DisplayRate.options_for(PackedFloat32Array()) == [30, 60, 0], "unknown panel: the always-safe caps")
+
+
+func test_fps_limit_persists() -> void:
+	var s := SaveStore.new("user://unused.json")
+	check(s.fps_limit == 0, "no cap by default")
+	s.fps_limit = 90
+	var t := SaveStore.new("user://unused.json")
+	t.apply_dict(JSON.parse_string(s.serialize()))
+	check(t.fps_limit == 90, "cap survives a save and reload")
+	for bad in [45, -30, 90.5, "60", true, 1000]:
+		var u := SaveStore.new("user://unused.json")
+		u.fps_limit = 60
+		u.apply_dict({"settings": {"fps_limit": bad}})
+		check(u.fps_limit == 60, "invalid cap %s is ignored" % [bad])
