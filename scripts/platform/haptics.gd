@@ -6,11 +6,17 @@ extends RefCounted
 ## (touch or notification feedback), so the game's buzzes could be dropped entirely. Everything
 ## therefore goes through the system Vibrator with VibrationAttributes.USAGE_MEDIA, which Android
 ## documents as the usage for games and interactive media. UI taps use the device's predefined
-## effects (tuned per actuator); merges and the game-over wave are built from amplitude-controlled
-## one-shots and waveforms, falling back to pulse length alone on actuators without amplitude
-## control. Other platforms use Input.vibrate_handheld.
+## effects (tuned per actuator); merges and the game-over wave are one-shots and waveforms whose
+## amplitude and length both grow, so the steps are felt with or without amplitude control.
+## Other platforms use Input.vibrate_handheld.
+##
+## A JNI call that fails aborts only the GDScript function making it, so every optional effect is
+## built in its own function and falls back to a predefined click; the base path never depends
+## on it.
 
 enum Kind { TICK, LIGHT }
+
+enum AndroidState { UNKNOWN, READY, FAILED }
 
 ## VibrationEffect.EFFECT_TICK and EFFECT_CLICK.
 const PREDEFINED := {Kind.TICK: 2, Kind.LIGHT: 0}
@@ -26,37 +32,32 @@ const USAGE_MEDIA := 19
 const MERGE_FIRST_FELT := 4
 ## Merging two tiles of this value or more gives the strongest buzz.
 const MERGE_STRONGEST := 65536
-## Merge buzz range with amplitude control: amplitude grows geometrically (equal perceived steps),
-## length a little.
-const MERGE_AMPLITUDE := Vector2i(36, 255)
-const MERGE_MS := Vector2i(16, 42)
-## Without amplitude control, only the pulse length can carry the strength.
-const MERGE_MS_FIXED_AMPLITUDE := Vector2i(10, 60)
+## Amplitude grows geometrically (equal perceived steps); length grows with it, which is what
+## carries the strength on actuators without amplitude control.
+const MERGE_AMPLITUDE := Vector2i(60, 255)
+const MERGE_MS := Vector2i(20, 60)
 
-## Game over: one second of medium-soft vibration whose strength swells three times.
-const WAVE_SEGMENT_MS := 50
-const WAVE_SEGMENTS := 20
-const WAVE_CYCLES := 3.0
-const WAVE_AMPLITUDE := 90.0
-const WAVE_SWING := 35.0
-## On/off pattern (starting with "off") for actuators without amplitude control.
-const WAVE_PULSES_MS: Array[int] = [0, 140, 60, 140, 60, 140, 60, 140, 60, 140]
+## Game over: one second of medium-soft vibration in three swells separated by short pauses.
+const WAVE_SWELLS := 3
+const WAVE_SWELL_SEGMENTS := 10
+const WAVE_SEGMENT_MS := 32
+const WAVE_PAUSE_MS := 20
+const WAVE_AMPLITUDE := Vector2i(50, 120)
 
 static var _vibrator = null
 static var _attributes = null
 static var _effect_class = null
-static var _amplitude_control := false
 static var _effects := {}
 static var _merge_effects := {}
 static var _wave_effect = null
-static var _android_ready := false
-static var _android_failed := false
+static var _wave_built := false
+static var _android := AndroidState.UNKNOWN
 
 
 ## Plays a short UI feedback of [param kind].
 static func play(kind: Kind) -> void:
 	if OS.get_name() == "Android" and _android_available():
-		_vibrate(_effects.get(kind))
+		_vibrate(_effects[kind])
 		return
 	Input.vibrate_handheld(maxi(PULSE_MS[kind], MIN_PULSE_MS))
 
@@ -69,20 +70,23 @@ static func merge(value: int) -> void:
 	var strength := merge_strength(level)
 	if OS.get_name() == "Android" and _android_available():
 		if not _merge_effects.has(level):
+			# Stored before building so a failing build is not retried on every merge.
+			_merge_effects[level] = null
 			_merge_effects[level] = _make_merge_effect(strength)
 		_vibrate(_merge_effects[level])
 		return
-	Input.vibrate_handheld(roundi(lerpf(MERGE_MS.x, MERGE_MS.y, strength)), lerpf(0.15, 1.0, strength))
+	Input.vibrate_handheld(merge_ms(strength), lerpf(0.25, 1.0, strength))
 
 
 ## One second of soft, wavy vibration when the game is lost.
 static func game_over() -> void:
 	if OS.get_name() == "Android" and _android_available():
-		if _wave_effect == null:
+		if not _wave_built:
+			_wave_built = true
 			_wave_effect = _make_wave_effect()
 		_vibrate(_wave_effect)
 		return
-	Input.vibrate_handheld(WAVE_SEGMENT_MS * WAVE_SEGMENTS, WAVE_AMPLITUDE / 255.0)
+	Input.vibrate_handheld(1000, WAVE_AMPLITUDE.y / 255.0)
 
 
 ## Strength step for merging two [param value] tiles: 0 (none) for 2s, 1 for 4s, up to
@@ -111,36 +115,45 @@ static func merge_amplitude(strength: float) -> int:
 	return roundi(MERGE_AMPLITUDE.x * pow(float(MERGE_AMPLITUDE.y) / MERGE_AMPLITUDE.x, strength))
 
 
-## Amplitudes of the game-over wave, one per WAVE_SEGMENT_MS, easing in and out at the ends.
+static func merge_ms(strength: float) -> int:
+	return roundi(lerpf(MERGE_MS.x, MERGE_MS.y, strength))
+
+
+## Segment lengths of the game-over waveform: each swell's segments, with a pause between swells.
+static func wave_timings() -> PackedInt64Array:
+	var out := PackedInt64Array()
+	for swell in WAVE_SWELLS:
+		if swell > 0:
+			out.append(WAVE_PAUSE_MS)
+		for i in WAVE_SWELL_SEGMENTS:
+			out.append(WAVE_SEGMENT_MS)
+	return out
+
+
+## Amplitudes matching [method wave_timings]: each swell rises and falls, pauses are 0.
 static func wave_amplitudes() -> PackedInt32Array:
 	var out := PackedInt32Array()
-	for i in WAVE_SEGMENTS:
-		var t := (i + 0.5) / WAVE_SEGMENTS
-		var edge := minf(1.0, minf(t, 1.0 - t) * 6.0)
-		var a := (WAVE_AMPLITUDE + WAVE_SWING * sin(TAU * WAVE_CYCLES * t)) * lerpf(0.5, 1.0, edge)
-		out.append(clampi(roundi(a), 1, 255))
+	for swell in WAVE_SWELLS:
+		if swell > 0:
+			out.append(0)
+		for i in WAVE_SWELL_SEGMENTS:
+			var t := (i + 0.5) / WAVE_SWELL_SEGMENTS
+			out.append(roundi(lerpf(WAVE_AMPLITUDE.x, WAVE_AMPLITUDE.y, sin(PI * t))))
 	return out
 
 
 static func _make_merge_effect(strength: float):
-	if _amplitude_control:
-		return _effect_class.createOneShot(roundi(lerpf(MERGE_MS.x, MERGE_MS.y, strength)), merge_amplitude(strength))
-	var ms := roundi(lerpf(MERGE_MS_FIXED_AMPLITUDE.x, MERGE_MS_FIXED_AMPLITUDE.y, strength))
-	return _effect_class.createOneShot(ms, DEFAULT_AMPLITUDE)
+	return _effect_class.createOneShot(merge_ms(strength), merge_amplitude(strength))
 
 
 static func _make_wave_effect():
-	if _amplitude_control:
-		var timings := PackedInt64Array()
-		timings.resize(WAVE_SEGMENTS)
-		timings.fill(WAVE_SEGMENT_MS)
-		return _effect_class.createWaveform(timings, wave_amplitudes(), -1)
-	return _effect_class.createWaveform(PackedInt64Array(WAVE_PULSES_MS), -1)
+	return _effect_class.createWaveform(wave_timings(), wave_amplitudes(), -1)
 
 
+## Plays [param effect], or the predefined click when it could not be built.
 static func _vibrate(effect) -> void:
 	if effect == null:
-		return
+		effect = _effects[Kind.LIGHT]
 	if _attributes != null:
 		_vibrator.vibrate(effect, _attributes)
 	else:
@@ -148,13 +161,12 @@ static func _vibrate(effect) -> void:
 
 
 static func _android_available() -> bool:
-	if _android_ready:
-		return true
-	if _android_failed:
-		return false
-	_android_ready = _init_android()
-	_android_failed = not _android_ready
-	return _android_ready
+	if _android == AndroidState.UNKNOWN:
+		# Stays FAILED if initialization returns false or aborts on a JNI error.
+		_android = AndroidState.FAILED
+		if _init_android():
+			_android = AndroidState.READY
+	return _android == AndroidState.READY
 
 
 static func _fail(reason: String) -> bool:
@@ -186,7 +198,6 @@ static func _init_android() -> bool:
 	var attributes_class = JavaClassWrapper.wrap("android.os.VibrationAttributes")
 	if attributes_class != null and attributes_class.has_java_method("createForUsage"):
 		_attributes = attributes_class.createForUsage(USAGE_MEDIA)
-	_amplitude_control = vibrator.hasAmplitudeControl() == true
 	_effect_class = effect_class
 	_vibrator = vibrator
 	return true
