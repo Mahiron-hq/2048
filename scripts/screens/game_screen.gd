@@ -473,11 +473,11 @@ func _left_height(arrangement: Arrangement) -> float:
 	return top + STACK_GAP + _actions_size(_action_columns(arrangement)).y
 
 
-## Undo and new game side by side, unless that is wider than the rest of a stacked column.
+## Undo and new game side by side, unless that is wider than the controls above them.
 func _action_columns(arrangement: Arrangement) -> int:
-	if arrangement == Arrangement.ROW:
-		return 2
-	var column := maxf(_brand.get_combined_minimum_size().x, _score_box.get_combined_minimum_size().x)
+	var brand := _brand.get_combined_minimum_size().x
+	var score := _score_box.get_combined_minimum_size().x
+	var column := brand + BRAND_GAP + score if arrangement == Arrangement.ROW else maxf(brand, score)
 	return 2 if _actions_size(2).x <= column else 1
 
 

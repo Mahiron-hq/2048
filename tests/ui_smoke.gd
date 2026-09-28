@@ -384,7 +384,10 @@ func _landscape(app: App) -> void:
 	check(absf(board_rect.position.x - score.end.x - GameScreen.BOARD_GAP) < 1.5, "score nearly touches the board's left edge")
 	check(absf(best.position.x - board_rect.end.x - GameScreen.BOARD_GAP) < 1.5 and absf(best.position.y - board_rect.position.y) < 1.0, "best nearly touches the board's right edge, at the top")
 	check(absf(undo.position.x - area.position.x) < 1.0 and absf(maxf(undo.end.y, new_game.end.y) - board_rect.end.y) < 1.0, "undo and new game in the bottom-left corner")
-	check(new_game.position.x > undo.end.x and absf(new_game.position.y - undo.position.y) < 1.0, "undo and new game side by side")
+	if g._side_actions.columns == 2:
+		check(new_game.position.x > undo.end.x and absf(new_game.position.y - undo.position.y) < 1.0, "undo and new game side by side")
+	else:
+		check(new_game.position.y > undo.end.y and absf(new_game.position.x - undo.position.x) < 1.0, "wide labels stack undo over new game")
 	var moves_before := g.board.move_count
 	await _swipe(Vector2((menu.end.x + score.position.x) * 0.5, menu.get_center().y), Vector2(0, 150))
 	check(g.board.move_count == moves_before, "a swipe starting in the top band beside the board does not move")
