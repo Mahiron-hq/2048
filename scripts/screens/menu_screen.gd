@@ -90,7 +90,7 @@ func _init() -> void:
 	add_child(_portrait)
 	_landscape.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_landscape.alignment = BoxContainer.ALIGNMENT_CENTER
-	_landscape.add_theme_constant_override("separation", 96)
+	_landscape.add_theme_constant_override("separation", 72)
 	_landscape.visible = false
 	add_child(_landscape)
 	_left.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -145,6 +145,10 @@ func play_intro() -> void:
 
 func _apply_layout(wide: bool) -> void:
 	_landscape_mode = wide
+	# Two columns share one short screen: a slightly smaller logo leaves room for wide fonts.
+	var tile := 116.0 if wide else 136.0
+	for t in _logo_tiles:
+		t.custom_minimum_size = Vector2(tile, tile)
 	for node: Control in [_brand, _best_card, _buttons, _version]:
 		var parent := node.get_parent()
 		if parent:
