@@ -78,7 +78,7 @@ func _screenshots() -> void:
 		await _capture(dir + "02-milestone.png", 0.0)
 		await _wait(2.2)
 
-		app.store.best_score = 20932
+		app.store.submit_score(20932, 4)
 		app._to_menu()
 		await _wait(1.2)
 		await _capture(dir + "03-menu.png")
@@ -98,7 +98,7 @@ func _screenshots() -> void:
 		app.set_theme_mode(SaveStore.ThemeMode.DARK)
 		app._game.start_new()
 		await _wait(0.4)
-		app.store.best_score = 30000
+		app.store.submit_score(30000, 4)
 		app._game._best_at_start = 30000
 		_board([[2, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 16], [4, 2, 1024, 1024]], 31940, 31940)
 		app._game._best_at_start = 30000
@@ -121,7 +121,7 @@ func _board(rows: Array, score: int, best: int) -> void:
 	var g := app._game
 	g.board.from_dict({"size": 4, "values": flat, "score": score, "moves": 412})
 	g._pending_over = false
-	app.store.submit_score(best)
+	app.store.submit_score(best, 4)
 	g._board_view.show_board(g.board)
 	g._refresh_scores(false)
 

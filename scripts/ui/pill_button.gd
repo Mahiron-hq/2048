@@ -13,6 +13,18 @@ var font_size := 30
 var height := 84.0
 ## Icon-only buttons are square.
 var icon_only := false
+## Shown verbatim instead of the translation of [member key] when not empty.
+var text_override := "":
+	set(v):
+		text_override = v
+		if is_inside_tree():
+			_update_min_size()
+		queue_redraw()
+## Small count bubble on the top-right corner; hidden when 0 or less.
+var badge := 0:
+	set(v):
+		badge = v
+		queue_redraw()
 
 var _press := 0.0:
 	set(v):
@@ -116,7 +128,7 @@ func _draw() -> void:
 		Icons.draw(self, icon, center, icon_size, fg)
 		draw_set_transform(Vector2.ZERO)
 		return
-	var label := I18n.t(key)
+	var label := _label()
 	var text_w := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	var gap := height * 0.16
 	var total := text_w + (icon_size + gap if icon != Icons.Kind.NONE else 0.0)
@@ -126,14 +138,26 @@ func _draw() -> void:
 		x += icon_size + gap
 	var baseline := center.y + font_size * 0.36
 	draw_string(_font, Vector2(x, baseline), label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, fg)
+	if badge > 0 and not disabled:
+		var r := height * 0.2
+		var c := Vector2(size.x - r * 0.6, r * 0.6)
+		draw_circle(c, r, p.accent, true, -1.0, true)
+		var n := str(badge)
+		var bs := int(r * 1.25)
+		var bw := _font.get_string_size(n, HORIZONTAL_ALIGNMENT_LEFT, -1, bs).x
+		draw_string(_font, Vector2(c.x - bw * 0.5, c.y + bs * 0.36), n, HORIZONTAL_ALIGNMENT_LEFT, -1, bs, p.accent_text)
 	draw_set_transform(Vector2.ZERO)
+
+
+func _label() -> String:
+	return text_override if not text_override.is_empty() else I18n.t(key)
 
 
 func _update_min_size() -> void:
 	if icon_only:
 		custom_minimum_size = Vector2(height, height)
 		return
-	var w := _font.get_string_size(I18n.t(key), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var w := _font.get_string_size(_label(), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	if icon != Icons.Kind.NONE:
 		w += height * 0.58
 	custom_minimum_size = Vector2(ceilf(w + height * 0.9), height)

@@ -28,6 +28,17 @@ func _initialize() -> void:
 		"test_store_ignores_corrupt_file",
 		"test_store_best_score_only_increases",
 		"test_music_loop_is_seamless",
+		"test_every_size_plays",
+		"test_sizes_serialize",
+		"test_undo_many_steps_to_game_start",
+		"test_undo_limit_caps_and_trims",
+		"test_undo_disabled",
+		"test_undo_stack_survives_save",
+		"test_store_migrates_single_best_score",
+		"test_store_best_scores_per_size",
+		"test_statistics",
+		"test_haptic_pulses_are_perceptible",
+		"test_formatting",
 	]
 	for t in tests:
 		_current = t
@@ -55,8 +66,8 @@ func board_from(rows: Array) -> Board:
 
 func row(b: Board, y: int) -> Array:
 	var out := []
-	for x in Board.SIZE:
-		out.append(b.values[Board.index_of(x, y)])
+	for x in b.size:
+		out.append(b.values[b.index_of(x, y)])
 	return out
 
 
@@ -95,12 +106,12 @@ func test_directions_are_mirror_images() -> void:
 	rng.seed = 42
 	for n in 200:
 		var flat := []
-		for i in Board.CELL_COUNT:
+		for i in 16:
 			flat.append([0, 0, 2, 4, 8][rng.randi_range(0, 4)])
 		var mirrored := []
-		for y in Board.SIZE:
-			for x in Board.SIZE:
-				mirrored.append(flat[y * Board.SIZE + (Board.SIZE - 1 - x)])
+		for y in 4:
+			for x in 4:
+				mirrored.append(flat[y * 4 + (3 - x)])
 		var a := board_from([flat.slice(0, 4), flat.slice(4, 8), flat.slice(8, 12), flat.slice(12, 16)])
 		var b := board_from([mirrored.slice(0, 4), mirrored.slice(4, 8), mirrored.slice(8, 12), mirrored.slice(12, 16)])
 		var ra := a.move(Board.Dir.LEFT)
@@ -111,9 +122,9 @@ func test_directions_are_mirror_images() -> void:
 			a.values[ra.spawn[1]] = 0
 		if not rb.spawn.is_empty():
 			b.values[rb.spawn[1]] = 0
-		for y in Board.SIZE:
-			for x in Board.SIZE:
-				if a.values[Board.index_of(x, y)] != b.values[Board.index_of(Board.SIZE - 1 - x, y)]:
+		for y in 4:
+			for x in 4:
+				if a.values[a.index_of(x, y)] != b.values[b.index_of(3 - x, y)]:
 					check(false, "mirror mismatch case %d" % n)
 					return
 	check(true)
@@ -157,7 +168,7 @@ func test_ids_follow_tiles() -> void:
 			b.new_game()
 		b.move(rng.randi_range(0, 3))
 		var seen := {}
-		for i in Board.CELL_COUNT:
+		for i in b.cell_count:
 			var has_value := b.values[i] != 0
 			var has_id := b.ids[i] != 0
 			if has_value != has_id or (has_id and seen.has(b.ids[i])):
@@ -268,6 +279,8 @@ func test_rejects_malformed_state() -> void:
 	var before := b.values.duplicate()
 	var bad := [
 		{"size": 5, "values": [], "score": 0, "moves": 0},
+		{"size": 7, "values": [], "score": 0, "moves": 0},
+		{"size": 2, "values": [2, 0, 0, 0], "score": 0, "moves": 0},
 		{"size": 4, "values": [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "score": 0, "moves": 0},
 		{"size": 4, "values": [2, 0, 0], "score": 0, "moves": 0},
 		{"size": 4, "values": ["x", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "score": 0, "moves": 0},
@@ -281,7 +294,8 @@ func test_rejects_malformed_state() -> void:
 func test_store_survives_restart() -> void:
 	var path := "user://test_save.json"
 	var s := SaveStore.new(path)
-	s.best_score = 12345
+	s.submit_score(12345, 4)
+	s.undo_limit = 3
 	s.music_on = true
 	s.theme = SaveStore.ThemeMode.LIGHT
 	s.language = "ru"
@@ -295,7 +309,7 @@ func test_store_survives_restart() -> void:
 	check(s.save_to_disk() == OK, "save ok")
 	var t := SaveStore.new(path)
 	check(t.load_from_disk() and t.existed, "load ok")
-	check(t.best_score == 12345 and t.music_on and t.theme == SaveStore.ThemeMode.LIGHT and t.language == "ru", "settings restored")
+	check(t.best_for(4) == 12345 and t.undo_limit == 3 and t.music_on and t.theme == SaveStore.ThemeMode.LIGHT and t.language == "ru", "settings restored")
 	check(t.sound_volume == 2 and t.music_volume == 5, "volume steps restored")
 	var junk := SaveStore.new("user://unused.json")
 	junk.apply_dict({"settings": {"sound_volume": 9, "music_volume": 2.5}})
@@ -314,15 +328,15 @@ func test_store_ignores_corrupt_file() -> void:
 	f.close()
 	var s := SaveStore.new(path)
 	check(not s.load_from_disk(), "reports corrupt file")
-	check(s.best_score == 0 and not s.has_game(), "defaults kept")
+	check(s.best_for(4) == 0 and not s.has_game(), "defaults kept")
 	DirAccess.remove_absolute(path)
 
 
 func test_store_best_score_only_increases() -> void:
 	var s := SaveStore.new("user://unused.json")
-	check(s.submit_score(100), "first record")
-	check(not s.submit_score(50), "lower is not a record")
-	check(s.best_score == 100, "best kept")
+	check(s.submit_score(100, 4), "first record")
+	check(not s.submit_score(50, 4), "lower is not a record")
+	check(s.best_for(4) == 100, "best kept")
 
 
 func test_music_loop_is_seamless() -> void:
@@ -376,3 +390,183 @@ func _max_abs_diff(a: PackedVector2Array, b: PackedVector2Array, a0: int, b0: in
 		var d := a[a0 + i] - b[b0 + i]
 		m = maxf(m, maxf(absf(d.x), absf(d.y)))
 	return m
+
+
+func test_every_size_plays() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	for n in range(Board.MIN_SIZE, Board.MAX_SIZE + 1):
+		var b := Board.new(n, n)
+		b.new_game(n)
+		check(b.size == n and b.values.size() == n * n and b.empty_count() == n * n - 2, "%dx%d opens with two tiles" % [n, n])
+		var ok := true
+		for step in 800:
+			if not b.can_move():
+				b.new_game()
+			var before := 0
+			for v in b.values:
+				before += v
+			var r := b.move(rng.randi_range(0, 3))
+			var after := 0
+			for v in b.values:
+				after += v
+			var spawned := r.spawn[2] if not r.spawn.is_empty() else 0
+			if after != before + spawned:
+				ok = false
+				break
+		check(ok, "%dx%d conserves tiles over random play" % [n, n])
+
+
+func test_sizes_serialize() -> void:
+	for n in range(Board.MIN_SIZE, Board.MAX_SIZE + 1):
+		var b := Board.new(3, n)
+		b.undo_limit = 5
+		b.new_game(n)
+		for step in 30:
+			b.move(step % 4)
+		var c := Board.new(1)
+		c.undo_limit = 5
+		check(c.from_dict(JSON.parse_string(JSON.stringify(b.to_dict()))), "%dx%d loads" % [n, n])
+		check(c.size == n and c.values == b.values and c.score == b.score, "%dx%d round trip" % [n, n])
+		check(c.undo_available() == b.undo_available(), "%dx%d undo history round trip" % [n, n])
+	var small := Board.new(1, 3)
+	small.new_game(3)
+	var d := small.to_dict()
+	d.size = 4
+	check(not Board.new(1).from_dict(d), "cell count must match the size")
+
+
+func test_undo_many_steps_to_game_start() -> void:
+	var b := Board.new(5)
+	b.undo_limit = 5
+	b.new_game()
+	var start := b.values.duplicate()
+	var made := 0
+	for dir in [Board.Dir.LEFT, Board.Dir.UP, Board.Dir.RIGHT, Board.Dir.DOWN, Board.Dir.LEFT, Board.Dir.UP]:
+		if made == 3:
+			break
+		if b.move(dir).moved:
+			made += 1
+	check(b.undo_available() == 3, "only as many undos as moves made (%d)" % b.undo_available())
+	for i in 3:
+		var u := b.undo()
+		check(u != null and u.moved, "undo step %d replays" % (i + 1))
+	check(b.values == start and b.move_count == 0 and b.score == 0, "back at the start of the game")
+	check(b.undo() == null and not b.can_undo(), "no undo past the start")
+	check(b.move(Board.Dir.LEFT).moved or b.move(Board.Dir.RIGHT).moved, "game continues after undoing to the start")
+
+
+func test_undo_limit_caps_and_trims() -> void:
+	var b := Board.new(9)
+	b.undo_limit = 3
+	b.new_game()
+	var moves := 0
+	var guard := 0
+	while moves < 6 and guard < 50:
+		if b.move(guard % 4).moved:
+			moves += 1
+		guard += 1
+	check(b.undo_available() == 3, "history capped at the limit")
+	b.undo_limit = 2
+	check(b.undo_available() == 2, "lowering the limit drops the oldest steps")
+	check(b.undo() != null and b.undo() != null and b.undo() == null, "exactly two undos remain")
+	b.undo_limit = 5
+	check(b.undo_available() == 0, "raising the limit does not bring back dropped steps")
+
+
+func test_undo_disabled() -> void:
+	var b := Board.new(4)
+	b.undo_limit = 0
+	b.new_game()
+	b.move(Board.Dir.LEFT)
+	b.move(Board.Dir.UP)
+	check(not b.can_undo() and b.undo() == null, "undo off records nothing")
+	check(not b.to_dict().has("undo_stack"), "no history is saved")
+
+
+func test_undo_stack_survives_save() -> void:
+	var b := Board.new(12)
+	b.undo_limit = 4
+	b.new_game()
+	var results: Array = []
+	var guard := 0
+	while results.size() < 4 and guard < 40:
+		var r := b.move(guard % 4)
+		if r.moved:
+			results.append(r)
+		guard += 1
+	var c := Board.new(1)
+	c.undo_limit = 4
+	check(c.from_dict(JSON.parse_string(JSON.stringify(b.to_dict()))), "reloads with history")
+	var ok := true
+	for i in range(results.size() - 1, -1, -1):
+		var u := c.undo()
+		var r: Board.MoveResult = results[i]
+		if u == null or not u.moved or u.slides != r.slides or u.merges != r.merges or u.spawn != r.spawn:
+			ok = false
+	check(ok, "every restored step replays the original move")
+
+
+func test_store_migrates_single_best_score() -> void:
+	var s := SaveStore.new("user://unused.json")
+	s.apply_dict({"version": 1, "best_score": 20932, "settings": {}, "game": {}})
+	check(s.best_for(4) == 20932 and s.best_for(5) == 0, "1.x best score becomes the 4x4 record")
+	check(s.undo_limit == Board.DEFAULT_UNDO, "undo limit defaults to one step")
+
+
+func test_store_best_scores_per_size() -> void:
+	var s := SaveStore.new("user://unused.json")
+	s.submit_score(500, 3)
+	s.submit_score(900, 6)
+	var t := SaveStore.new("user://unused.json")
+	t.apply_dict(JSON.parse_string(JSON.stringify(s.to_dict())))
+	check(t.best_for(3) == 500 and t.best_for(6) == 900 and t.best_for(4) == 0, "records are kept per size")
+	t.apply_dict({"best_scores": {"9": 5, "x": 3, "5": -2}})
+	check(t.best_for(5) == 0, "invalid entries are ignored")
+
+
+func test_statistics() -> void:
+	var s := SaveStore.new("user://unused.json")
+	var empty := s.stats_for(0)
+	check(empty.games == 0 and empty.average_score == 0 and empty.time == 0.0, "empty stats are zero")
+	s.record_game(4, 1000, 128)
+	s.record_game(4, 3000, 256)
+	s.record_game(5, 500, 64)
+	for i in 7:
+		s.record_move(4)
+	s.record_move(5)
+	s.add_play_time(4, 90.5)
+	s.add_play_time(5, 30.0)
+	s.record_best_tile(5, 512)
+	s.submit_score(3000, 4)
+	var four := s.stats_for(4)
+	check(four.games == 2 and four.average_score == 2000 and four.best_tile == 256 and four.moves == 7, "4x4 stats %s" % [four])
+	check(four.best_score == 3000 and is_equal_approx(four.time, 90.5), "4x4 record and time")
+	var all := s.stats_for(0)
+	check(all.games == 3 and all.average_score == 1500 and all.best_tile == 512 and all.moves == 8, "overall stats %s" % [all])
+	check(is_equal_approx(all.time, 120.5), "overall time")
+	var t := SaveStore.new("user://unused.json")
+	t.apply_dict(JSON.parse_string(JSON.stringify(s.to_dict())))
+	check(t.stats_for(0) == all, "stats survive a save round trip")
+
+
+func test_haptic_pulses_are_perceptible() -> void:
+	check(Haptics.MIN_PULSE_MS >= 20, "minimum pulse long enough to feel")
+	for kind in Haptics.Kind.values():
+		check(Haptics.PULSE_MS[kind] >= Haptics.MIN_PULSE_MS, "pulse for kind %d is at least the minimum" % kind)
+		check(Haptics.PREDEFINED.has(kind), "kind %d maps to a system effect" % kind)
+	var ids := {}
+	for kind in Haptics.PREDEFINED:
+		ids[Haptics.PREDEFINED[kind]] = true
+	check(ids.size() == Haptics.PREDEFINED.size(), "each kind uses a distinct system effect")
+
+
+func test_formatting() -> void:
+	var saved := I18n.current
+	I18n.current = "en"
+	check(I18n.number(1234567) == "1 234 567" and I18n.number(999) == "999", "thousands grouping: %s" % I18n.number(1234567))
+	check(I18n.duration(45) == "45 s" and I18n.duration(125) == "2 min 5 s" and I18n.duration(3 * 3600 + 7 * 60) == "3 h 7 min", "durations")
+	check(I18n.grid(5) == "5×5", "grid label")
+	I18n.current = "ru"
+	check(I18n.duration(3600) == "1 ч 0 мин", "russian duration")
+	I18n.current = saved

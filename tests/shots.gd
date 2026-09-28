@@ -78,7 +78,7 @@ func _load_board(rows: Array, score: int) -> void:
 	var g := app._game
 	g.board.from_dict({"size": 4, "values": flat, "score": score, "moves": 40})
 	g._pending_over = false
-	app.store.submit_score(score)
+	app.store.submit_score(score, 4)
 	g._board_view.show_board(g.board, BoardView.Appear.FADE)
 	g._refresh_scores(false)
 

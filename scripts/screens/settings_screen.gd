@@ -1,6 +1,7 @@
 class_name SettingsScreen
 extends Control
-## Sound, music, vibration, theme, language and FPS overlay. Changes apply immediately.
+## App settings (sound, music, vibration, theme, language, FPS overlay) and game settings (undo
+## depth). Changes apply immediately.
 
 signal back_requested
 
@@ -13,7 +14,11 @@ var _haptics := ToggleSwitch.new()
 var _fps := ToggleSwitch.new()
 var _theme := Segmented.make(PackedStringArray(["THEME_LIGHT", "THEME_DARK"]))
 var _language := Segmented.make(PackedStringArray([I18n.LANGUAGE_NAMES.ru, I18n.LANGUAGE_NAMES.en]), false)
+var _undo := Segmented.make(PackedStringArray(["UNDO_OFF", "1", "2", "3", "4", "5"]))
 var _dividers: Array[ColorRect] = []
+var _columns: Array[Control] = []
+
+const COLUMN_MAX_WIDTH := 760.0
 
 
 func setup(app: App) -> void:
@@ -22,10 +27,10 @@ func setup(app: App) -> void:
 
 func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	var col := VBoxContainer.new()
-	col.set_anchors_preset(Control.PRESET_FULL_RECT)
-	col.add_theme_constant_override("separation", 30)
-	add_child(col)
+	var root := VBoxContainer.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_theme_constant_override("separation", 24)
+	add_child(root)
 
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 22)
@@ -37,8 +42,17 @@ func _init() -> void:
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.custom_minimum_size.y = 76
 	header.add_child(title)
-	col.add_child(header)
+	root.add_child(_centered(header))
 
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	root.add_child(scroll)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 22)
+	scroll.add_child(_centered(col, true))
+
+	col.add_child(_section("APP_SETTINGS"))
 	var card := Card.make(10, 36)
 	var rows := VBoxContainer.new()
 	rows.add_theme_constant_override("separation", 0)
@@ -61,16 +75,29 @@ func _init() -> void:
 	rows2.add_child(_row("THEME", _theme))
 	rows2.add_child(_divider())
 	rows2.add_child(_row("LANGUAGE", _language))
+	rows2.add_child(_divider())
+	rows2.add_child(_row("SHOW_FPS", _fps))
 	col.add_child(card2)
 
-	var card3 := Card.make(10, 36)
-	card3.add_child(_row("SHOW_FPS", _fps))
+	col.add_child(_section("GAME_SETTINGS"))
+	var card3 := Card.make(28, 36)
+	var undo_box := VBoxContainer.new()
+	undo_box.add_theme_constant_override("separation", 8)
+	var undo_title := SkinLabel.make("UNDO_LIMIT", 32, Fonts.SEMIBOLD)
+	undo_box.add_child(undo_title)
+	var undo_hint := SkinLabel.make("UNDO_LIMIT_HINT", 24, Fonts.REGULAR, SkinLabel.Role.MUTED)
+	undo_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	undo_box.add_child(undo_hint)
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 8
+	undo_box.add_child(gap)
+	_undo.custom_minimum_size = Vector2(0, 64)
+	undo_box.add_child(_undo)
+	card3.add_child(undo_box)
 	col.add_child(card3)
-
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(spacer)
+	var tail := Control.new()
+	tail.custom_minimum_size.y = 24
+	col.add_child(tail)
 
 	_sound.toggled.connect(func(on: bool) -> void:
 		_app.set_sound(on)
@@ -84,6 +111,15 @@ func _init() -> void:
 	_fps.toggled.connect(func(on: bool) -> void: _app.set_show_fps(on))
 	_theme.selected.connect(func(i: int) -> void: _app.set_theme_mode(SaveStore.ThemeMode.LIGHT if i == 0 else SaveStore.ThemeMode.DARK))
 	_language.selected.connect(func(i: int) -> void: _app.set_language(I18n.LANGUAGES[i]))
+	_undo.selected.connect(func(i: int) -> void: _app.set_undo_limit(i))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED:
+		# One readable column, centered on wide (landscape, tablet) screens.
+		var w := minf(size.x, COLUMN_MAX_WIDTH)
+		for c in _columns:
+			c.custom_minimum_size.x = w
 
 
 ## Syncs controls with the stored settings without triggering their handlers.
@@ -99,11 +135,31 @@ func refresh() -> void:
 	_fps.set_on_silently(s.show_fps)
 	_theme.set_index_silently(0 if s.theme == SaveStore.ThemeMode.LIGHT else 1)
 	_language.set_index_silently(I18n.LANGUAGES.find(s.language))
+	_undo.set_index_silently(s.undo_limit)
 
 
 func _on_skin_changed() -> void:
 	for d in _dividers:
 		d.color = Palette.current.surface_border
+
+
+## Wraps [param c] so it stays a centered column no wider than COLUMN_MAX_WIDTH.
+func _centered(c: Control, fill := false) -> Control:
+	var wrap := HBoxContainer.new()
+	wrap.alignment = BoxContainer.ALIGNMENT_CENTER
+	wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if fill:
+		wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	wrap.add_child(c)
+	_columns.append(c)
+	return wrap
+
+
+func _section(key: String) -> Control:
+	var label := SkinLabel.make(key, 26, Fonts.BOLD, SkinLabel.Role.MUTED)
+	label.custom_minimum_size.y = 40
+	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	return label
 
 
 func _row(key: String, control: Control) -> Control:
