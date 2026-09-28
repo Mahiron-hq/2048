@@ -6,14 +6,14 @@ All notable changes to 2048 Merge. Versions follow [Semantic Versioning](https:/
 
 ### 🇬🇧 English
 
-- **Haptics that grow with the tiles:** merging 2s is silent, merging 4s gives the lightest tap, and every step up to 65536 is a little stronger; bigger merges stay at the maximum. Phones with amplitude control scale the strength, others the pulse length. A lost game ends with a soft, wavy one-second vibration.
+- **Haptics that grow with the tiles:** merging 2s is silent, merging 4s gives the lightest tap, and every step up to 65536 is a little stronger; bigger merges stay at the maximum. Both the strength and the length of the buzz grow, so the steps are felt on any vibration motor. A lost game ends with a soft, wavy one-second vibration.
 - **FPS counter** no longer shows the vibration diagnostics line.
 - **Theme switch fixed** (present since 1.0.0): the crossfade snapshot was sized in physical pixels, so on high-density screens the interface briefly blew up past the screen edges, and rapid switching left trails. It now matches the screen and only one crossfade runs at a time.
 - **Landscape game layout:** the board sits in the middle; the 2048 badge and menu button are in the top-left corner, the score is against the board's left edge and the best score against its right edge, and undo/new game are in the bottom-left corner. Narrower screens (16:9, 4:3 tablets) stack these controls instead of shrinking the board. The FPS counter moves to the bottom-right corner in landscape.
 
 ### 🇷🇺 Русский
 
-- **Вибрация растёт вместе с плитками:** слияние двоек без вибрации, четвёрок — самый лёгкий толчок, и каждая ступень до 65536 немного сильнее; дальше максимальная сила. На телефонах с регулировкой амплитуды меняется сила, на остальных — длительность импульса. Проигрыш завершается мягкой волнообразной вибрацией на секунду.
+- **Вибрация растёт вместе с плитками:** слияние двоек без вибрации, четвёрок — самый лёгкий толчок, и каждая ступень до 65536 немного сильнее; дальше максимальная сила. Растут и сила, и длительность толчка, поэтому ступени ощущаются на любом вибромоторе. Проигрыш завершается мягкой волнообразной вибрацией на секунду.
 - **Счётчик FPS** больше не показывает строку диагностики вибрации.
 - **Исправлена смена темы** (баг с 1.0.0): снимок экрана для плавного перехода брался в физических пикселях, поэтому на экранах с высокой плотностью интерфейс на мгновение раздувался за края экрана, а при частых переключениях оставались шлейфы. Теперь снимок точно по размеру экрана, и одновременно идёт только один переход.
 - **Игра в горизонтальном положении:** поле по центру; плашка 2048 и кнопка меню в левом верхнем углу, счёт прижат к левому краю поля, рекорд — к правому, «Отменить»/«Заново» в левом нижнем углу. На более узких экранах (16:9, планшеты 4:3) элементы складываются в столбик, а поле не уменьшается. Счётчик FPS в горизонтальном положении переехал в правый нижний угол.
