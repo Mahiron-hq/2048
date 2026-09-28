@@ -39,6 +39,8 @@ func _initialize() -> void:
 		"test_statistics",
 		"test_haptic_pulses_are_perceptible",
 		"test_formatting",
+		"test_merge_haptics_scale_with_tile",
+		"test_game_over_wave",
 		"test_volume_scale_migrates",
 		"test_undone_moves_leave_the_statistics",
 		"test_store_writes_from_a_worker_thread",
@@ -562,6 +564,43 @@ func test_haptic_pulses_are_perceptible() -> void:
 	for kind in Haptics.PREDEFINED:
 		ids[Haptics.PREDEFINED[kind]] = true
 	check(ids.size() == Haptics.PREDEFINED.size(), "each kind uses a distinct system effect")
+
+
+func test_merge_haptics_scale_with_tile() -> void:
+	check(Haptics.merge_level(2) == 0, "merging 2s is silent")
+	check(Haptics.merge_level(4) == 1, "merging 4s is the weakest buzz")
+	check(Haptics.merge_level_count() == 15, "4 through 65536 is fifteen steps")
+	var previous := 0
+	var value := 4
+	while value <= 65536:
+		var level := Haptics.merge_level(value)
+		check(level == previous + 1, "merging %d is one step stronger than the tile below (%d)" % [value, level])
+		previous = level
+		value *= 2
+	check(Haptics.merge_level(131072) == Haptics.merge_level(65536) and Haptics.merge_level(1 << 20) == 15, "beyond 65536 stays at the strongest")
+	var first := Haptics.merge_strength(1)
+	var last := Haptics.merge_strength(Haptics.merge_level_count())
+	check(first == 0.0 and last == 1.0, "strength spans the whole range")
+	check(Haptics.merge_amplitude(first) == Haptics.MERGE_AMPLITUDE.x and Haptics.merge_amplitude(last) == 255, "amplitude spans the actuator range")
+	var ratio_low := Haptics.merge_amplitude(Haptics.merge_strength(3)) / float(Haptics.merge_amplitude(Haptics.merge_strength(2)))
+	var ratio_high := Haptics.merge_amplitude(Haptics.merge_strength(15)) / float(Haptics.merge_amplitude(Haptics.merge_strength(14)))
+	check(absf(ratio_low - ratio_high) < 0.05, "each step feels equally stronger (%.3f vs %.3f)" % [ratio_low, ratio_high])
+
+
+func test_game_over_wave() -> void:
+	var wave := Haptics.wave_amplitudes()
+	check(wave.size() * Haptics.WAVE_SEGMENT_MS == 1000, "game-over wave lasts one second")
+	var lowest := 255
+	var highest := 0
+	for a in wave:
+		lowest = mini(lowest, a)
+		highest = maxi(highest, a)
+	check(lowest >= 1 and highest <= 140, "medium-soft: peaks at %d of 255" % highest)
+	check(highest - lowest >= 40, "strength swells noticeably (%d..%d)" % [lowest, highest])
+	var total := 0
+	for ms in Haptics.WAVE_PULSES_MS:
+		total += ms
+	check(total >= 900 and total <= 1100, "on/off fallback also lasts about a second (%d ms)" % total)
 
 
 func test_formatting() -> void:

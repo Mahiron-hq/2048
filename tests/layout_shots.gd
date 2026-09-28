@@ -11,6 +11,8 @@ const DEVICES := {
 	"phone-land": Vector2i(2400, 1080),
 	"tablet": Vector2i(1600, 2560),
 	"tablet-land": Vector2i(2560, 1600),
+	"phone-land-16x9": Vector2i(1920, 1080),
+	"tablet-land-4x3": Vector2i(2048, 1536),
 }
 
 var app: App
@@ -71,6 +73,17 @@ func _device(tag: String, px: Vector2i) -> void:
 	app._game._board_view.hide_hint(true)
 	app._game._refresh_scores(false)
 	await _capture(tag + "-4-game-6x6", 0.4)
+
+	# Theme switched rapidly, captured mid-crossfade: the fading snapshot must match the screen.
+	app.set_show_fps(true)
+	for mode in [SaveStore.ThemeMode.LIGHT, SaveStore.ThemeMode.DARK, SaveStore.ThemeMode.LIGHT]:
+		app.set_theme_mode(mode)
+		await _frames(3)
+	var fades := app.get_children().filter(func(c: Node) -> bool: return c is TextureRect)
+	for fade: TextureRect in fades:
+		print("theme fade %s vs screen %s" % [fade.size, app.size])
+	await _capture(tag + "-4b-theme-fade", 0.05)
+	app.set_show_fps(false)
 
 	app.set_theme_mode(SaveStore.ThemeMode.LIGHT)
 	app._open_settings()

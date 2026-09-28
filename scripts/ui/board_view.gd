@@ -23,13 +23,6 @@ var gap := 12.0
 var board_rect := Rect2()
 ## Side length of the grid currently shown.
 var grid_size := Board.DEFAULT_SIZE
-## Horizontal shift of the board from the middle of this control (clamped to stay inside it);
-## lets the parent center the board on the screen rather than in this control.
-var center_offset_x := 0.0:
-	set(v):
-		if not is_equal_approx(v, center_offset_x):
-			center_offset_x = v
-			_layout()
 
 var _layer := Control.new()
 var _fx_layer := Control.new()
@@ -262,8 +255,7 @@ func _layout() -> void:
 		return
 	# Sit above center: the thumb zone below the board stays free and the layout feels less floaty.
 	var free := size - Vector2(s, s)
-	var x := clampf(free.x * 0.5 + center_offset_x, 0.0, free.x)
-	board_rect = Rect2(Vector2(x, free.y * 0.28), Vector2(s, s))
+	board_rect = Rect2(Vector2(free.x * 0.5, free.y * 0.28), Vector2(s, s))
 	# Gaps shrink a little on bigger grids so cells keep a usable size.
 	gap = roundf(s * 0.15 / (grid_size + 1))
 	cell_size = (s - gap * (grid_size + 1)) / grid_size
