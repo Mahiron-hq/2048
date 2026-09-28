@@ -20,6 +20,12 @@ var text_override := "":
 		if is_inside_tree():
 			_update_min_size()
 		queue_redraw()
+## Tighter side padding, for rows that must fit a narrow column.
+var compact := false:
+	set(v):
+		compact = v
+		_update_min_size()
+		queue_redraw()
 ## Small count bubble on the top-right corner; hidden when 0 or less.
 var badge := 0:
 	set(v):
@@ -160,7 +166,7 @@ func _update_min_size() -> void:
 	var w := _font.get_string_size(_label(), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	if icon != Icons.Kind.NONE:
 		w += height * 0.58
-	custom_minimum_size = Vector2(ceilf(w + height * 0.9), height)
+	custom_minimum_size = Vector2(ceilf(w + height * (0.5 if compact else 0.9)), height)
 
 
 func _animate_press(target: float, duration: float) -> void:

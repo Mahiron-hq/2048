@@ -39,6 +39,9 @@ func _initialize() -> void:
 		"test_statistics",
 		"test_haptic_pulses_are_perceptible",
 		"test_formatting",
+		"test_volume_scale_migrates",
+		"test_undone_moves_leave_the_statistics",
+		"test_store_writes_from_a_worker_thread",
 	]
 	for t in tests:
 		_current = t
@@ -313,7 +316,7 @@ func test_store_survives_restart() -> void:
 	check(t.sound_volume == 2 and t.music_volume == 5, "volume steps restored")
 	var junk := SaveStore.new("user://unused.json")
 	junk.apply_dict({"settings": {"sound_volume": 9, "music_volume": 2.5}})
-	check(junk.sound_volume == 5 and junk.music_volume == 4, "out-of-range volume steps fall back to defaults")
+	check(junk.sound_volume == 7 and junk.music_volume == 6, "out-of-range volume steps fall back to defaults")
 	var c := Board.new(1)
 	check(c.from_dict(t.game) and c.values == b.values, "game restored")
 	check(c.can_undo() == b.can_undo(), "undo step restored")
@@ -570,3 +573,40 @@ func test_formatting() -> void:
 	I18n.current = "ru"
 	check(I18n.duration(3600) == "1 ч 0 мин", "russian duration")
 	I18n.current = saved
+
+
+func test_volume_scale_migrates() -> void:
+	check(Sfx.LEVEL_COUNT == 7 and Sfx.LEVEL_DB.size() == 7, "seven volume steps")
+	check(Sfx.level_db(Sfx.LEVEL_COUNT) == 0.0 and Sfx.level_db(1) < Sfx.level_db(2), "steps rise to 0 dB")
+	var old := SaveStore.new("user://unused.json")
+	old.apply_dict({"settings": {"sound_volume": 5, "music_volume": 4}})
+	check(old.sound_volume == 7 and old.music_volume == 6, "1.2.0 steps map onto the 7-step scale (%d, %d)" % [old.sound_volume, old.music_volume])
+	var lowest := SaveStore.new("user://unused.json")
+	lowest.apply_dict({"settings": {"sound_volume": 1, "music_volume": 2}})
+	check(lowest.sound_volume == 1 and lowest.music_volume == 3, "quietest stays quietest")
+	var current := SaveStore.new("user://unused.json")
+	current.apply_dict({"settings": {"sound_volume": 5, "music_volume": 4, "volume_steps": 7}})
+	check(current.sound_volume == 5 and current.music_volume == 4, "current-scale values are kept")
+
+
+func test_undone_moves_leave_the_statistics() -> void:
+	var s := SaveStore.new("user://unused.json")
+	s.record_move(4)
+	s.record_move(4, -1)
+	s.record_move(4)
+	check(s.stats_for(4).moves == 1, "move, undo, move counts one move")
+	s.record_move(4, -1)
+	s.record_move(4, -1)
+	check(s.stats_for(4).moves == 0, "never negative")
+
+
+func test_store_writes_from_a_worker_thread() -> void:
+	var path := "user://test_async_save.json"
+	var s := SaveStore.new(path)
+	s.submit_score(4242, 5)
+	var text := s.serialize()
+	var task := WorkerThreadPool.add_task(func() -> void: s.write_text(text))
+	WorkerThreadPool.wait_for_task_completion(task)
+	var t := SaveStore.new(path)
+	check(t.load_from_disk() and t.best_for(5) == 4242, "a save written on a worker thread loads back")
+	DirAccess.remove_absolute(path)

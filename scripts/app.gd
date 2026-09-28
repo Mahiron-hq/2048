@@ -32,6 +32,15 @@ var _picker := SizePicker.new()
 var selected_size := Board.DEFAULT_SIZE
 ## Play time not yet added to the statistics.
 var _play_time := 0.0
+## Background save in flight (WorkerThreadPool task id), or -1.
+var _save_task := -1
+## Newer save text waiting for the one in flight to finish.
+var _queued_save := ""
+## Seconds until a requested (debounced) save runs; negative when none is pending.
+var _save_countdown := -1.0
+
+## Gameplay changes are batched: a burst of moves produces one write.
+const SAVE_DEBOUNCE := 0.75
 var _focused := true
 var _fps_label := Label.new()
 var _current: Control
@@ -110,6 +119,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	_flush_save()
 	# Static caches would otherwise outlive the scene tree and show up as leaks at exit.
 	Fonts.clear_cache()
 	if instance == self:
@@ -117,6 +127,11 @@ func _exit_tree() -> void:
 
 
 func _process(delta: float) -> void:
+	if _save_countdown >= 0.0:
+		_save_countdown -= delta
+		if _save_countdown < 0.0:
+			save_now()
+	_pump_saves()
 	if _focused and _current == _game and _game.is_playing():
 		_play_time += delta
 	var animating := not get_tree().get_processed_tweens().is_empty() or _game.is_celebrating()
@@ -128,6 +143,8 @@ func _process(delta: float) -> void:
 			var text := "%d FPS · %d Hz" % [Engine.get_frames_per_second(), roundi(DisplayServer.screen_get_refresh_rate())]
 			if DisplayRate.max_rate > 0.0:
 				text += " (max %d)" % roundi(DisplayRate.max_rate)
+			if store.haptics_on:
+				text += " · vib: %s" % Haptics.status
 			_fps_label.text = text
 
 
@@ -173,10 +190,54 @@ func confirm(title_key: String, body_key: String, yes_key: String, on_yes: Calla
 	_confirm.ask(title_key, body_key, yes_key, on_yes)
 
 
-func save_now() -> void:
-	var err := store.save_to_disk()
+## Saves the game state. Normally the file is written on a worker thread: a slow flash write
+## (which can take seconds on a busy phone) must never stall a move. [param sync] writes on the
+## spot and is used when the app goes to the background or quits.
+func save_now(sync := false) -> void:
+	_save_countdown = -1.0
+	var text := store.serialize()
+	if sync:
+		_wait_for_save()
+		_queued_save = ""
+		_report_save(store.write_text(text))
+		return
+	if _save_task >= 0 and not WorkerThreadPool.is_task_completed(_save_task):
+		_queued_save = text
+		return
+	_wait_for_save()
+	_save_task = WorkerThreadPool.add_task(_write_save.bind(text), false, "save")
+
+
+func _write_save(text: String) -> void:
+	_report_save(store.write_text(text))
+
+
+func _report_save(err: Error) -> void:
 	if err != OK:
 		push_error("Saving failed: %s" % error_string(err))
+
+
+func _wait_for_save() -> void:
+	if _save_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_save_task)
+		_save_task = -1
+
+
+## Schedules a save shortly; repeated requests within SAVE_DEBOUNCE collapse into one. Going to
+## the background or quitting always flushes synchronously, so nothing is lost on a kill.
+func request_save() -> void:
+	if _save_countdown < 0.0:
+		_save_countdown = SAVE_DEBOUNCE
+
+
+func _pump_saves() -> void:
+	if _save_task < 0 or not WorkerThreadPool.is_task_completed(_save_task):
+		return
+	_wait_for_save()
+	if not _queued_save.is_empty():
+		var text := _queued_save
+		_queued_save = ""
+		_save_task = WorkerThreadPool.add_task(_write_save.bind(text), false, "save")
 
 
 func feedback_click() -> void:
@@ -429,4 +490,4 @@ func _on_back() -> void:
 func _flush_save() -> void:
 	flush_play_time()
 	_game.save_state()
-	save_now()
+	save_now(true)

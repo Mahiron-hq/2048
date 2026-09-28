@@ -109,15 +109,15 @@ func _run() -> void:
 	check(is_equal_approx(sfx.music_level(), 1.0), "music reaches full level")
 	app._settings._haptics.button_pressed = false
 	var slider: StepSlider = app._settings._sound_volume
-	await _drag(slider, 0.02, 0.26)
-	check(app.store.sound_volume == 2, "dragging the sound slider picks step 2 (got %d)" % app.store.sound_volume)
+	await _drag(slider, 0.02, _step_fraction(slider, 3))
+	check(app.store.sound_volume == 3, "dragging the sound slider picks step 3 (got %d)" % app.store.sound_volume)
 	var sfx_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index(Sfx.SFX_BUS))
-	check(is_equal_approx(sfx_db, Sfx.level_db(2)), "effects bus follows the slider (%.1f dB)" % sfx_db)
+	check(is_equal_approx(sfx_db, Sfx.level_db(3)), "effects bus follows the slider (%.1f dB)" % sfx_db)
 	var music_slider: StepSlider = app._settings._music_volume
 	await _drag(music_slider, 0.98, 0.98)
 	await _wait(0.4)
 	var music_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index(Sfx.MUSIC_BUS))
-	check(app.store.music_volume == 5 and is_equal_approx(music_db, Sfx.level_db(5)), "music slider sets step 5 (%.1f dB)" % music_db)
+	check(app.store.music_volume == Sfx.LEVEL_COUNT and is_equal_approx(music_db, 0.0), "music slider reaches the top step (%.1f dB)" % music_db)
 	app.set_theme_mode(SaveStore.ThemeMode.LIGHT)
 	app.set_language("ru")
 	await _wait(0.3)
@@ -135,7 +135,7 @@ func _run() -> void:
 	await _frames(5)
 	check(app.store.best_for(4) == score, "best score survives restart")
 	check(app.store.music_on and not app.store.haptics_on, "settings survive restart")
-	check(app.store.sound_volume == 2 and app.store.music_volume == 5, "volume steps survive restart")
+	check(app.store.sound_volume == 3 and app.store.music_volume == Sfx.LEVEL_COUNT, "volume steps survive restart")
 	check(app.sfx._music.playing, "music starts on launch when enabled")
 	check(app.store.theme == SaveStore.ThemeMode.LIGHT and app.store.language == "ru", "theme/language survive restart")
 	check(app._menu._subtitle.text == I18n.STRINGS.ru.SUBTITLE, "labels use the saved language at startup")
@@ -167,6 +167,7 @@ func _run() -> void:
 		check(g.board.values != before_over, "move applied (spawn left a move open)")
 
 	await _new_features(app)
+	await _fixes_121(app)
 	await _landscape(app)
 
 	app.queue_free()
@@ -265,6 +266,58 @@ func _new_features(app: App) -> void:
 	check(app._current == app._menu, "back returns from statistics")
 
 
+func _fixes_121(app: App) -> void:
+	var g := app._game
+
+	# The swipe hint keeps pulsing until the first move and covers the whole board.
+	g.start_new(4, false)
+	await _wait(2.5)
+	var hint: SwipeHint = g._board_view._hint
+	check(hint.is_showing() and hint._pulse_tween != null and hint._pulse_tween.is_running(), "hint arrows keep pulsing")
+	check(hint.board_rect == g._board_view.board_rect, "hint veil covers the whole board")
+
+	# Swipes that start on the header/buttons are ignored; on the board they move.
+	var header_point := g._header.get_global_rect().get_center()
+	await _swipe(header_point, Vector2(0, 160))
+	check(g.board.move_count == 0, "a swipe starting on the header does not move")
+	var moved := false
+	for d in [Vector2.DOWN, Vector2.UP, Vector2.LEFT, Vector2.RIGHT]:
+		await _swipe(g._board_view.get_global_rect().get_center(), d * 140.0)
+		if g.board.move_count > 0:
+			moved = true
+			break
+	check(moved, "a swipe starting on the board moves")
+
+	# Statistics: move, undo, move counts one move.
+	var before: int = app.store.stats_for(0).moves
+	g.undo()
+	await _frames(2)
+	var guard := 0
+	while g.board.move_count == 0 and guard < 4:
+		g.request_move(guard)
+		guard += 1
+	check(app.store.stats_for(0).moves == before, "an undone move does not stay in the move count")
+
+	# The size picker keeps its size when reopened.
+	app._to_menu()
+	await _wait(0.5)
+	var heights := []
+	for i in 3:
+		app._menu._size.pressed.emit()
+		await _wait(0.3)
+		heights.append(app._picker._card.size.y)
+		app._picker.close()
+		await _wait(0.2)
+	var rows_height: float = SizePicker.ROW_HEIGHT * 4
+	check(heights[0] == heights[1] and heights[1] == heights[2] and heights[0] < rows_height * 1.4, "size picker stays four rows tall when reopened (%s)" % [heights])
+
+	# Background saving: the latest state reaches the disk.
+	app.save_now()
+	app._wait_for_save()
+	var probe := SaveStore.new(SAVE)
+	check(probe.load_from_disk() and probe.best_for(4) == app.store.best_for(4), "background save writes the latest state")
+
+
 func _landscape(app: App) -> void:
 	var original := root.size
 	root.size = Vector2i(1600, 900)
@@ -281,9 +334,37 @@ func _landscape(app: App) -> void:
 	var board_rect := Rect2(g._board_view.global_position + g._board_view.board_rect.position, g._board_view.board_rect.size)
 	check(_inside(board_rect, vp) and board_rect.size.x > vp.size.y * 0.6, "board is large and fully visible (%s)" % [board_rect])
 	check(not board_rect.intersects(g._side.get_global_rect()), "side panel does not overlap the board")
-	for b in [g._menu_btn, g._new_btn, g._score_box, g._best_box]:
+	for b: Control in [g._menu_btn, g._new_btn, g._score_box, g._best_box]:
 		check(_inside(b.get_global_rect(), vp), "%s is on screen" % b.get_class())
 	check(_view_matches(g), "tiles follow the resized board")
+	# Side column order: scores, then undo/new, then logo and menu; board centered on screen.
+	check(g._side_scores.get_global_rect().position.y < g._side_actions.get_global_rect().position.y
+			and g._side_actions.get_global_rect().position.y < g._side_brand.get_global_rect().position.y,
+			"side column stacks scores, actions, logo and menu")
+	root.size = Vector2i(2400, 1080)
+	await _frames(8)
+	await _wait(0.3)
+	vp = root.get_visible_rect()
+	board_rect = Rect2(g._board_view.global_position + g._board_view.board_rect.position, g._board_view.board_rect.size)
+	var screen_center := g.get_global_rect().get_center().x
+	var expected := maxf(screen_center, g._board_view.global_position.x + board_rect.size.x * 0.5)
+	check(absf(board_rect.get_center().x - expected) < 2.0, "board centered on screen as far as the column allows (%.0f vs %.0f)" % [board_rect.get_center().x, expected])
+	check(not board_rect.intersects(g._side.get_global_rect()) and _inside(board_rect, vp), "centered board stays clear of the column and on screen")
+	var side_point := g._side.get_global_rect().get_center()
+	var moves_before := g.board.move_count
+	await _swipe(side_point, Vector2(0, 150))
+	check(g.board.move_count == moves_before, "a swipe starting on the side column does not move")
+	app._to_menu()
+	await _wait(0.5)
+	app._menu._size.pressed.emit()
+	await _wait(0.4)
+	var card := app._picker._card
+	var card_rect := Rect2(card.global_position, card.size * card.scale)
+	check(_inside(card_rect, vp), "size picker stays on screen in landscape (%s in %s)" % [card_rect, vp])
+	app._picker.close()
+	await _wait(0.2)
+	app._menu._continue.pressed.emit()
+	await _wait(0.5)
 	app._open_settings()
 	await _wait(0.5)
 	check(_inside(app._settings._undo.get_global_rect(), vp) or app._settings._undo.get_global_rect().position.y > vp.size.y * 0.5, "settings stay laid out in landscape")
@@ -344,6 +425,12 @@ func _swipe(from: Vector2, delta: Vector2) -> void:
 	up.position = start + delta * k
 	Input.parse_input_event(up)
 	await _wait(0.3)
+
+
+## Fraction of the slider width where [param step] sits.
+func _step_fraction(slider: StepSlider, step: int) -> float:
+	var usable := slider.size.x - StepSlider.KNOB_RADIUS * 2.0
+	return (StepSlider.KNOB_RADIUS + usable * (step - 1) / float(slider.steps - 1)) / slider.size.x
 
 
 ## Presses the slider at fraction [param a] of its width and drags to [param b], via real events.
