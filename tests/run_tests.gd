@@ -585,23 +585,29 @@ func test_merge_haptics_scale_with_tile() -> void:
 	var ratio_low := Haptics.merge_amplitude(Haptics.merge_strength(3)) / float(Haptics.merge_amplitude(Haptics.merge_strength(2)))
 	var ratio_high := Haptics.merge_amplitude(Haptics.merge_strength(15)) / float(Haptics.merge_amplitude(Haptics.merge_strength(14)))
 	check(absf(ratio_low - ratio_high) < 0.05, "each step feels equally stronger (%.3f vs %.3f)" % [ratio_low, ratio_high])
+	check(Haptics.merge_ms(first) >= Haptics.MIN_PULSE_MS and Haptics.merge_ms(last) > Haptics.merge_ms(first) * 2, "pulse length also carries the strength")
 
 
 func test_game_over_wave() -> void:
-	var wave := Haptics.wave_amplitudes()
-	check(wave.size() * Haptics.WAVE_SEGMENT_MS == 1000, "game-over wave lasts one second")
-	var lowest := 255
-	var highest := 0
-	for a in wave:
-		lowest = mini(lowest, a)
-		highest = maxi(highest, a)
-	check(lowest >= 1 and highest <= 140, "medium-soft: peaks at %d of 255" % highest)
-	check(highest - lowest >= 40, "strength swells noticeably (%d..%d)" % [lowest, highest])
+	var timings := Haptics.wave_timings()
+	var amplitudes := Haptics.wave_amplitudes()
+	check(timings.size() == amplitudes.size(), "one amplitude per waveform segment")
 	var total := 0
-	for ms in Haptics.WAVE_PULSES_MS:
+	for ms in timings:
 		total += ms
-	check(total >= 900 and total <= 1100, "on/off fallback also lasts about a second (%d ms)" % total)
-
+	check(total == 1000, "game-over wave lasts one second (%d ms)" % total)
+	var pauses := 0
+	var highest := 0
+	var lowest := 255
+	for a in amplitudes:
+		if a == 0:
+			pauses += 1
+			continue
+		highest = maxi(highest, a)
+		lowest = mini(lowest, a)
+	check(pauses == Haptics.WAVE_SWELLS - 1, "short pauses between swells keep it wavy without amplitude control")
+	check(highest <= 140 and lowest >= 40, "medium-soft: %d..%d of 255" % [lowest, highest])
+	check(highest - lowest >= 40, "each swell rises and falls noticeably")
 
 func test_formatting() -> void:
 	var saved := I18n.current
