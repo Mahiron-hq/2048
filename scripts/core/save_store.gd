@@ -6,7 +6,9 @@ extends RefCounted
 ## mid-write leaves the previous save intact instead of a truncated file.
 
 const DEFAULT_PATH := "user://save.json"
-const FORMAT_VERSION := 2
+const FORMAT_VERSION := 3
+## Volume steps were 1..5 before format 3; they now span 1..Sfx.LEVEL_COUNT.
+const LEGACY_VOLUME_STEPS := 5
 
 enum ThemeMode { LIGHT, DARK }
 
@@ -14,8 +16,8 @@ var sound_on := true
 var music_on := true
 var haptics_on := true
 ## Volume steps, 1 (quietest) to Sfx.LEVEL_COUNT.
-var sound_volume := 5
-var music_volume := 4
+var sound_volume := 7
+var music_volume := 6
 var show_fps := false
 var theme: ThemeMode = ThemeMode.DARK
 ## Two-letter UI language code, one of [constant I18n.LANGUAGES].
@@ -55,11 +57,22 @@ func load_from_disk() -> bool:
 
 ## Persists the current state. Returns the first error encountered, or OK.
 func save_to_disk() -> Error:
+	return write_text(serialize())
+
+
+## The save file contents for the current state; cheap enough for the main thread.
+func serialize() -> String:
+	return JSON.stringify(to_dict())
+
+
+## Writes [param text] as the save file atomically. Touches no store state, so it may run on a
+## worker thread while the game keeps playing.
+func write_text(text: String) -> Error:
 	var tmp := _path + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
 		return FileAccess.get_open_error()
-	f.store_string(JSON.stringify(to_dict()))
+	f.store_string(text)
 	var err := f.get_error()
 	f.close()
 	if err != OK:
@@ -91,8 +104,11 @@ func game_size() -> int:
 	return int(n) if (n is int or n is float) else 0
 
 
-func record_move(size: int) -> void:
-	_stat(size).moves += 1
+## Counts a move; an undone move is taken back with [param delta] = -1, so the total matches
+## the moves that actually stand.
+func record_move(size: int, delta := 1) -> void:
+	var s := _stat(size)
+	s.moves = maxi(0, s.moves + delta)
 
 
 func record_best_tile(size: int, tile: int) -> void:
@@ -148,6 +164,7 @@ func to_dict() -> Dictionary:
 			"haptics": haptics_on,
 			"sound_volume": sound_volume,
 			"music_volume": music_volume,
+			"volume_steps": Sfx.LEVEL_COUNT,
 			"show_fps": show_fps,
 			"theme": "light" if theme == ThemeMode.LIGHT else "dark",
 			"language": language,
@@ -187,8 +204,9 @@ func apply_dict(d: Dictionary) -> void:
 		sound_on = _bool_or(s.get("sound"), sound_on)
 		music_on = _bool_or(s.get("music"), music_on)
 		haptics_on = _bool_or(s.get("haptics"), haptics_on)
-		sound_volume = _int_in(s.get("sound_volume"), 1, Sfx.LEVEL_COUNT, sound_volume)
-		music_volume = _int_in(s.get("music_volume"), 1, Sfx.LEVEL_COUNT, music_volume)
+		var steps := LEGACY_VOLUME_STEPS if s.get("volume_steps") == null else Sfx.LEVEL_COUNT
+		sound_volume = _volume_step(s.get("sound_volume"), steps, sound_volume)
+		music_volume = _volume_step(s.get("music_volume"), steps, music_volume)
 		undo_limit = _int_in(s.get("undo_limit"), 0, Board.MAX_UNDO, undo_limit)
 		show_fps = _bool_or(s.get("show_fps"), show_fps)
 		match s.get("theme"):
@@ -212,6 +230,17 @@ func _stat(size: int) -> Dictionary:
 static func _size_key(key) -> int:
 	var n := int(key) if (key is String and key.is_valid_int()) or key is int else 0
 	return n if Board.is_valid_size(n) else 0
+
+
+## Reads a volume step saved on a scale of [param steps] and maps it onto the current scale,
+## keeping both ends (quietest and loudest) fixed.
+static func _volume_step(value, steps: int, fallback: int) -> int:
+	var v := _int_in(value, 1, steps, -1)
+	if v < 0:
+		return fallback
+	if steps == Sfx.LEVEL_COUNT:
+		return v
+	return roundi(float(v - 1) * (Sfx.LEVEL_COUNT - 1) / (steps - 1)) + 1
 
 
 static func _is_count(value) -> bool:
