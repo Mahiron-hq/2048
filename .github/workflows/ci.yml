@@ -6,12 +6,17 @@ on:
   pull_request:
   workflow_call:
 
+permissions:
+  contents: read
+
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   GODOT_VERSION: 4.7.2
+  # From the release's SHA512-SUMS.txt; a mismatch fails the job instead of running a tampered binary.
+  GODOT_SHA512: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
 
 jobs:
   test:
@@ -19,11 +24,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Cache Godot
         id: godot-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/godot
           key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
@@ -34,6 +41,7 @@ jobs:
           mkdir -p ~/godot
           curl -fsSL -o /tmp/godot.zip \
             "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          echo "$GODOT_SHA512  /tmp/godot.zip" | sha512sum --check --strict
           unzip -q /tmp/godot.zip -d ~/godot
           mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
 
@@ -45,3 +53,9 @@ jobs:
 
       - name: UI tests
         run: timeout 600 ~/godot/godot --headless --path . --script res://tests/ui_smoke.gd
+
+      - name: UI tests with a wide font
+        run: |
+          font=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+          test -f "$font" || sudo apt-get install -y --no-install-recommends fonts-dejavu-core
+          UI_SMOKE_FONT="$font" timeout 600 ~/godot/godot --headless --path . --script res://tests/ui_smoke.gd

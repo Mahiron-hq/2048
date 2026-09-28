@@ -297,6 +297,10 @@ func _on_settled() -> void:
 	_game_over.present(board.score, board.best_tile, board.move_count, record)
 
 
+func prime_overlays() -> void:
+	_game_over.prime()
+
+
 ## Counts the game being replaced if it had any moves and was not already counted.
 func _record_abandoned() -> void:
 	if _active:

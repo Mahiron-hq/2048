@@ -5,9 +5,11 @@ extends Modal
 signal restart_requested
 signal menu_requested
 
+const SCORE_FONT_SIZE := 104
+
 var _title := SkinLabel.make("GAME_OVER", 44, Fonts.BOLD)
 var _record := _RecordBadge.new()
-var _score := SkinLabel.make("", 104, Fonts.BLACK, SkinLabel.Role.TEXT, true)
+var _score := SkinLabel.make("", SCORE_FONT_SIZE, Fonts.BLACK, SkinLabel.Role.TEXT, true)
 var _score_caption := SkinLabel.make("FINAL_SCORE", 24, Fonts.BOLD, SkinLabel.Role.MUTED)
 var _tile := TileBadge.make(2, 92)
 var _tile_caption := SkinLabel.make("BEST_TILE", 22, Fonts.MEDIUM, SkinLabel.Role.MUTED)
@@ -65,11 +67,30 @@ func present(score: int, best_tile: int, moves: int, record: bool) -> void:
 	_record.visible = record
 	_shown_score = 0.0
 	open()
+	_fit_score_font(score)
 	var tw := create_tween()
 	tw.tween_interval(0.25)
 	tw.tween_property(self, "_shown_score", float(score), 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_tile.scale = Vector2.ZERO
 	tw.parallel().tween_property(_tile, "scale", Vector2.ONE, 0.45).set_delay(0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Caches every digit at the score and move-count sizes, plus the record badge.
+func prime() -> void:
+	_score.text = "0123456789"
+	_moves.text = "0123456789"
+	_record.visible = true
+	super.prime()
+
+
+## Shrinks the score font so the final value fits the card; counting up must not widen it.
+func _fit_score_font(score: int) -> void:
+	var font := _score.get_theme_font("font")
+	var room := _card.custom_minimum_size.x - 2.0 * _card.padding
+	var fs := SCORE_FONT_SIZE
+	while fs > 40 and font.get_string_size(str(score), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
+		fs -= 4
+	_score.add_theme_font_size_override("font_size", fs)
 
 
 static func _centered(c: Control) -> CenterContainer:

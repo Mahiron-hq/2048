@@ -1,0 +1,8 @@
+# Actions are pinned to commit SHAs; Dependabot proposes the new SHA (with its version comment)
+# when an action publishes a release, so the pins do not go stale.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

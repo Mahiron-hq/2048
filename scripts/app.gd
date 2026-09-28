@@ -64,7 +64,6 @@ func _ready() -> void:
 	I18n.current = store.language
 	Palette.current = Palette.make(store.theme == SaveStore.ThemeMode.DARK)
 
-	Engine.max_fps = 0
 	OS.low_processor_usage_mode_sleep_usec = IDLE_SLEEP_USEC
 	get_tree().set_auto_accept_quit(false)
 
@@ -116,8 +115,11 @@ func _ready() -> void:
 	_broadcast("_on_language_changed")
 	_broadcast("_on_skin_changed")
 	sfx.music_enabled = store.music_on
-	DisplayRate.request_max()
+	DisplayRate.apply(store.fps_limit)
 	_to_menu()
+	# While the launch frames are still slow anyway, not in the middle of a game.
+	_game.prime_overlays()
+	_confirm.prime()
 
 
 func _exit_tree() -> void:
@@ -142,10 +144,21 @@ func _process(delta: float) -> void:
 		_fps_accum += delta
 		if _fps_accum >= 0.5:
 			_fps_accum = 0.0
-			var text := "%d FPS · %d Hz" % [Engine.get_frames_per_second(), roundi(DisplayServer.screen_get_refresh_rate())]
-			if DisplayRate.max_rate > 0.0:
-				text += " (max %d)" % roundi(DisplayRate.max_rate)
-			_fps_label.text = text
+			_fps_label.text = _fps_text()
+
+
+## Overlay line: measured FPS, the display's current rate, the cap, and the ceilings that apply.
+func _fps_text() -> String:
+	var text := "%d FPS · %d Hz" % [Engine.get_frames_per_second(), roundi(DisplayServer.screen_get_refresh_rate())]
+	if store.fps_limit > 0:
+		text += " · cap %d" % store.fps_limit
+	var top := roundi(DisplayRate.max_rate())
+	var panel := roundi(DisplayRate.panel_max())
+	if panel > top:
+		text += " (max %d, panel %d)" % [top, panel]
+	elif top > 0:
+		text += " (max %d)" % top
+	return text
 
 
 func _notification(what: int) -> void:
@@ -162,7 +175,8 @@ func _notification(what: int) -> void:
 			_focused = true
 		NOTIFICATION_APPLICATION_RESUMED:
 			_focused = true
-			DisplayRate.request_max()
+			# The system refresh rate setting may have changed while the game was away.
+			DisplayRate.apply(store.fps_limit)
 			_apply_safe_area()
 
 
@@ -316,6 +330,14 @@ func set_haptics(on: bool) -> void:
 func set_show_fps(on: bool) -> void:
 	store.show_fps = on
 	_fps_label.visible = on
+	_fps_accum = 1.0
+	save_now()
+
+
+## Caps the frame rate at [param limit] (0: no cap) and asks the display for a matching rate.
+func set_fps_limit(limit: int) -> void:
+	store.fps_limit = limit
+	DisplayRate.apply(limit)
 	_fps_accum = 1.0
 	save_now()
 

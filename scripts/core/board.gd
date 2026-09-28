@@ -25,17 +25,18 @@ class MoveResult:
 	## Each entry: [tile_id, from_index, to_index]. Includes tiles that end up consumed by a merge.
 	var slides: Array[PackedInt32Array] = []
 	## Each entry: [survivor_id, consumed_id, index, new_value].
-	var merges: Array[PackedInt32Array] = []
+	var merges: Array[PackedInt64Array] = []
 	## [tile_id, index, value], empty when nothing spawned.
 	var spawn := PackedInt32Array()
 	## Milestone values (powers of two >= FIRST_MILESTONE) reached for the first time this game.
-	var milestones := PackedInt32Array()
+	var milestones := PackedInt64Array()
 
 
 ## Side length; fixed per board instance (see [method new_game] to change it).
 var size := DEFAULT_SIZE
 var cell_count := DEFAULT_SIZE * DEFAULT_SIZE
-var values := PackedInt32Array()
+## Tile values are 64-bit: a 6x6 board can reach 2^37, past the range of 32-bit integers.
+var values := PackedInt64Array()
 var ids := PackedInt32Array()
 var score := 0
 var best_tile := 0
@@ -286,9 +287,9 @@ func _reconstruct(snap: Dictionary) -> MoveResult:
 
 ## Pure slide/merge of one move over the given grid; does not touch the board.
 ## Returns {values, ids, result} where result has no spawn or milestones filled in.
-func _slide(dir: Dir, src_values: PackedInt32Array, src_ids: PackedInt32Array) -> Dictionary:
+func _slide(dir: Dir, src_values: PackedInt64Array, src_ids: PackedInt32Array) -> Dictionary:
 	var result := MoveResult.new()
-	var new_values := PackedInt32Array()
+	var new_values := PackedInt64Array()
 	new_values.resize(cell_count)
 	var new_ids := PackedInt32Array()
 	new_ids.resize(cell_count)
@@ -308,7 +309,7 @@ func _slide(dir: Dir, src_values: PackedInt32Array, src_ids: PackedInt32Array) -
 				var merged := v * 2
 				new_values[dst] = merged
 				result.slides.append(PackedInt32Array([id, src, dst]))
-				result.merges.append(PackedInt32Array([last_id, id, dst, merged]))
+				result.merges.append(PackedInt64Array([last_id, id, dst, merged]))
 				result.gained += merged
 				last_value = 0
 			else:
@@ -329,9 +330,9 @@ func _parse_state(d: Dictionary, n: int) -> Dictionary:
 		return {}
 	var cells := n * n
 	var raw = d.get("values")
-	if not (raw is Array or raw is PackedInt32Array) or raw.size() != cells:
+	if not (raw is Array or raw is PackedInt32Array or raw is PackedInt64Array) or raw.size() != cells:
 		return {}
-	var parsed := PackedInt32Array()
+	var parsed := PackedInt64Array()
 	parsed.resize(cells)
 	var max_value := 0
 	for i in cells:
@@ -359,7 +360,7 @@ func _parse_state(d: Dictionary, n: int) -> Dictionary:
 
 ## Tile ids aligned with [param cells]: positive and unique exactly where a tile is. Returns an
 ## empty array when missing or inconsistent, which callers treat as "reissue".
-static func _parse_ids(raw, cells: PackedInt32Array) -> PackedInt32Array:
+static func _parse_ids(raw, cells: PackedInt64Array) -> PackedInt32Array:
 	if not (raw is Array or raw is PackedInt32Array) or raw.size() != cells.size():
 		return PackedInt32Array()
 	var parsed := PackedInt32Array()

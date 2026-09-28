@@ -37,11 +37,11 @@ const MERGE_STRONGEST := 65536
 const MERGE_AMPLITUDE := Vector2i(60, 255)
 const MERGE_MS := Vector2i(20, 60)
 
-## Game over: one second of medium-soft vibration in three swells separated by short pauses.
-const WAVE_SWELLS := 3
-const WAVE_SWELL_SEGMENTS := 10
+## Game over: one second of medium-soft vibration in two swells, the second 1.5 times as long,
+## with a short pause between them.
+const WAVE_SWELL_SEGMENTS := [12, 18]
 const WAVE_SEGMENT_MS := 32
-const WAVE_PAUSE_MS := 20
+const WAVE_PAUSE_MS := 40
 const WAVE_AMPLITUDE := Vector2i(50, 120)
 
 static var _vibrator = null
@@ -122,10 +122,10 @@ static func merge_ms(strength: float) -> int:
 ## Segment lengths of the game-over waveform: each swell's segments, with a pause between swells.
 static func wave_timings() -> PackedInt64Array:
 	var out := PackedInt64Array()
-	for swell in WAVE_SWELLS:
+	for swell in WAVE_SWELL_SEGMENTS.size():
 		if swell > 0:
 			out.append(WAVE_PAUSE_MS)
-		for i in WAVE_SWELL_SEGMENTS:
+		for i in WAVE_SWELL_SEGMENTS[swell]:
 			out.append(WAVE_SEGMENT_MS)
 	return out
 
@@ -133,11 +133,12 @@ static func wave_timings() -> PackedInt64Array:
 ## Amplitudes matching [method wave_timings]: each swell rises and falls, pauses are 0.
 static func wave_amplitudes() -> PackedInt32Array:
 	var out := PackedInt32Array()
-	for swell in WAVE_SWELLS:
+	for swell in WAVE_SWELL_SEGMENTS.size():
 		if swell > 0:
 			out.append(0)
-		for i in WAVE_SWELL_SEGMENTS:
-			var t := (i + 0.5) / WAVE_SWELL_SEGMENTS
+		var segments: int = WAVE_SWELL_SEGMENTS[swell]
+		for i in segments:
+			var t := (i + 0.5) / segments
 			out.append(roundi(lerpf(WAVE_AMPLITUDE.x, WAVE_AMPLITUDE.y, sin(PI * t))))
 	return out
 
