@@ -7,6 +7,10 @@ signal changed(value: int)
 const KNOB_RADIUS := 17.0
 const TRACK_WIDTH := 8.0
 const TICK_RADIUS := 3.5
+## Finger travel, in screen units, that decides between dragging the knob and scrolling past.
+const TAP_SLOP := 12.0
+
+enum Gesture { IDLE, PENDING, DRAGGING }
 
 var steps := Sfx.LEVEL_COUNT
 var value := Sfx.LEVEL_COUNT
@@ -21,7 +25,9 @@ var _pos := float(Sfx.LEVEL_COUNT - 1):
 		_pos = v
 		queue_redraw()
 var _tween: Tween
-var _dragging := false
+var _gesture := Gesture.IDLE
+var _press_at := Vector2.ZERO
+var _press_x := 0.0
 
 
 func _init() -> void:
@@ -40,16 +46,37 @@ func _on_skin_changed() -> void:
 	queue_redraw()
 
 
+## A touch only moves the knob once it is clearly a tap or a sideways drag; a vertical swipe that
+## starts on the slider scrolls the page and leaves the value alone. Screen positions are
+## compared because the slider scrolls along with the finger.
 func _gui_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb and mb.button_index == MOUSE_BUTTON_LEFT:
-		_dragging = mb.pressed
 		if mb.pressed:
-			_pick(mb.position.x)
+			_gesture = Gesture.PENDING
+			_press_at = mb.global_position
+			_press_x = mb.position.x
+		elif _gesture == Gesture.PENDING:
+			_pick(_press_x)
+			_gesture = Gesture.IDLE
+		else:
+			_gesture = Gesture.IDLE
 		accept_event()
-	elif event is InputEventMouseMotion and _dragging:
-		_pick(event.position.x)
-		accept_event()
+		return
+	var motion := event as InputEventMouseMotion
+	if motion == null:
+		return
+	match _gesture:
+		Gesture.PENDING:
+			var travel := motion.global_position - _press_at
+			if travel.length() > TAP_SLOP:
+				_gesture = Gesture.DRAGGING if absf(travel.x) >= absf(travel.y) else Gesture.IDLE
+				if _gesture == Gesture.DRAGGING:
+					_pick(motion.position.x)
+			accept_event()
+		Gesture.DRAGGING:
+			_pick(motion.position.x)
+			accept_event()
 
 
 func _pick(x: float) -> void:

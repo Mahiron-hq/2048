@@ -118,6 +118,9 @@ func _run() -> void:
 	await _wait(0.4)
 	var music_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index(Sfx.MUSIC_BUS))
 	check(app.store.music_volume == Sfx.LEVEL_COUNT and is_equal_approx(music_db, 0.0), "music slider reaches the top step (%.1f dB)" % music_db)
+	await _gesture(music_slider, Vector2(music_slider.size.x * 0.1, music_slider.size.y * 0.5), Vector2(4, 220))
+	await _wait(0.3)
+	check(app.store.music_volume == Sfx.LEVEL_COUNT, "a vertical swipe that starts on a slider scrolls instead of moving it (%d)" % app.store.music_volume)
 	var caps: Segmented = app._settings._fps_limit
 	var limits: Array[int] = app._settings._fps_limits
 	check(limits.slice(0, 2) == [30, 60] and limits[-1] == 0 and caps.options.size() == limits.size(), "FPS caps offered: %s" % [limits])
@@ -130,6 +133,9 @@ func _run() -> void:
 	await _drag(caps, 1.0 - 0.5 / limits.size(), 1.0 - 0.5 / limits.size())
 	await _wait(0.3)
 	check(app.store.fps_limit == 0 and Engine.max_fps == 0, "tapping ∞ lifts the cap (%d, max_fps %d)" % [app.store.fps_limit, Engine.max_fps])
+	await _drag(caps, 0.5 / limits.size(), 1.0 - 0.5 / limits.size())
+	await _wait(0.3)
+	check(app.store.fps_limit == 0, "a drag that starts on the selector is a scroll, not a choice (%d)" % app.store.fps_limit)
 	scroll.scroll_vertical = 0
 	for i in 6:
 		app.set_theme_mode(SaveStore.ThemeMode.LIGHT if i % 2 == 0 else SaveStore.ThemeMode.DARK)
@@ -520,6 +526,30 @@ func _drag(slider: Control, a: float, b: float) -> void:
 	up.button_index = MOUSE_BUTTON_LEFT
 	up.pressed = false
 	up.position = move.position
+	Input.parse_input_event(up)
+	await process_frame
+
+
+## Presses [param c] at local [param at], moves the pointer by [param delta] and releases, via
+## real events.
+func _gesture(c: Control, at: Vector2, delta: Vector2) -> void:
+	var k := root.get_final_transform().get_scale()
+	var start := c.get_global_rect().position + at
+	var down := InputEventMouseButton.new()
+	down.button_index = MOUSE_BUTTON_LEFT
+	down.pressed = true
+	down.position = start * k
+	Input.parse_input_event(down)
+	await process_frame
+	for i in 4:
+		var move := InputEventMouseMotion.new()
+		move.position = (start + delta * (i + 1) / 4.0) * k
+		move.button_mask = MOUSE_BUTTON_MASK_LEFT
+		Input.parse_input_event(move)
+		await process_frame
+	var up := InputEventMouseButton.new()
+	up.button_index = MOUSE_BUTTON_LEFT
+	up.position = (start + delta) * k
 	Input.parse_input_event(up)
 	await process_frame
 
