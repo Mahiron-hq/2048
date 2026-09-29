@@ -52,9 +52,8 @@ func _init() -> void:
 	_filter.selected.connect(func(_i: int) -> void: refresh())
 	col.add_child(_filter)
 
-	var scroll := ScrollContainer.new()
+	var scroll := TouchScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	col.add_child(scroll)
 	var inner := VBoxContainer.new()
 	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL

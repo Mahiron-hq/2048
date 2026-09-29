@@ -48,9 +48,8 @@ func _init() -> void:
 	header.add_child(title)
 	root.add_child(_centered(header))
 
-	var scroll := ScrollContainer.new()
+	var scroll := TouchScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	root.add_child(scroll)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 22)

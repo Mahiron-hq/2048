@@ -2,6 +2,20 @@
 
 All notable changes to 2048 Merge. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.4] - 2026-09-29
+
+### 🇬🇧 English
+
+- **Scrolling fixed** in Settings and Statistics, on phones and tablets in both orientations: the page scrolled only when a swipe started in a gap between cards, so in portrait it seemed not to scroll at all. It now scrolls from anywhere — text, cards, switches, selectors, sliders — and a swipe that turns into a scroll never flips the control it started on. A slightly shaky tap is still a tap.
+- **What the FPS limit saves,** measured on an Infinix phone with continuous drawing: 60 FPS cuts the game's CPU time by 38% and 30 FPS by 59%, and the GPU draws half or a quarter of the frames. The README has the full table.
+- **Why not 144 Hz on some phones:** Infinix XOS gives 144 Hz only to apps on the maker's own list; every other app can run at 60 or 120 Hz. The game asks for the panel's maximum and gets it wherever the phone allows.
+
+### 🇷🇺 Русский
+
+- **Исправлена прокрутка** в настройках и статистике — на телефонах и планшетах, в любом положении экрана. Страница прокручивалась, только если свайп начинался в промежутке между карточками, поэтому в вертикальном положении казалось, что прокрутки нет вовсе. Теперь листать можно откуда угодно — с текста, карточек, тумблеров, переключателей и ползунков, — и свайп, ставший прокруткой, не переключает то, с чего начался. Касание с лёгким дрожанием пальца по-прежнему считается касанием.
+- **Что даёт ограничение FPS** — замер на телефоне Infinix при непрерывной отрисовке: 60 FPS снижает процессорное время игры на 38%, 30 FPS — на 59%, а видеочип рисует вдвое и вчетверо меньше кадров. Полная таблица — в README.
+- **Почему на некоторых телефонах не 144 Гц:** Infinix XOS даёт 144 Гц только приложениям из собственного списка производителя, остальным — 60 или 120 Гц. Игра просит у системы максимум экрана и получает его везде, где телефон это позволяет.
+
 ## [1.2.3] - 2026-09-29
 
 ### 🇬🇧 English
