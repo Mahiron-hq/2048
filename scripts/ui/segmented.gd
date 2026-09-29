@@ -4,6 +4,9 @@ extends Control
 
 signal selected(index: int)
 
+## Finger travel, in screen units, beyond which a touch is a scroll rather than a tap.
+const TAP_SLOP := 16.0
+
 var options: PackedStringArray = []
 ## When true, [member options] are translation keys; otherwise shown verbatim.
 var translate := true
@@ -18,6 +21,8 @@ var _font: Font = Fonts.sans(Fonts.SEMIBOLD)
 var _font_size := 26
 var _box := StyleBoxFlat.new()
 var _knob := StyleBoxFlat.new()
+var _tracking := false
+var _press_at := Vector2.ZERO
 
 
 static func make(p_options: PackedStringArray, p_translate := true) -> Segmented:
@@ -47,11 +52,31 @@ func _on_language_changed() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	var mb := event as InputEventMouseButton
-	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT or options.is_empty():
+	if options.is_empty():
 		return
-	var i := clampi(int(mb.position.x / (size.x / options.size())), 0, options.size() - 1)
+	var motion := event as InputEventMouseMotion
+	if motion != null:
+		if _tracking and motion.global_position.distance_to(_press_at) > TAP_SLOP:
+			_tracking = false
+		return
+	var mb := event as InputEventMouseButton
+	if mb == null or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
 	accept_event()
+	if mb.pressed:
+		_tracking = true
+		_press_at = mb.global_position
+		return
+	# Selecting on release, and only for a tap, keeps a scroll that starts on the control from
+	# changing the setting. Screen positions are compared because the control scrolls along
+	# with the finger.
+	var tap := _tracking and mb.global_position.distance_to(_press_at) <= TAP_SLOP
+	_tracking = false
+	if tap and Rect2(Vector2.ZERO, size).has_point(mb.position):
+		_select(clampi(int(mb.position.x / (size.x / options.size())), 0, options.size() - 1))
+
+
+func _select(i: int) -> void:
 	if i == index:
 		return
 	index = i
