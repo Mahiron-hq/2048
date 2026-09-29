@@ -36,6 +36,12 @@ func _init() -> void:
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
+func _notification(what: int) -> void:
+	# Inside a TouchScroll the press also reaches the scroll area; once it scrolls, no tap.
+	if what == NOTIFICATION_SCROLL_BEGIN and _gesture == Gesture.PENDING:
+		_gesture = Gesture.IDLE
+
+
 ## Sets [param v] without emitting [signal changed] or animating.
 func set_value_silently(v: int) -> void:
 	value = clampi(v, 1, steps)
@@ -48,7 +54,8 @@ func _on_skin_changed() -> void:
 
 ## A touch only moves the knob once it is clearly a tap or a sideways drag; a vertical swipe that
 ## starts on the slider scrolls the page and leaves the value alone. Screen positions are
-## compared because the slider scrolls along with the finger.
+## compared because the slider scrolls along with the finger. Only a sideways drag keeps its
+## motion from the scroll container.
 func _gui_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb and mb.button_index == MOUSE_BUTTON_LEFT:
@@ -61,7 +68,6 @@ func _gui_input(event: InputEvent) -> void:
 			_gesture = Gesture.IDLE
 		else:
 			_gesture = Gesture.IDLE
-		accept_event()
 		return
 	var motion := event as InputEventMouseMotion
 	if motion == null:
@@ -73,7 +79,7 @@ func _gui_input(event: InputEvent) -> void:
 				_gesture = Gesture.DRAGGING if absf(travel.x) >= absf(travel.y) else Gesture.IDLE
 				if _gesture == Gesture.DRAGGING:
 					_pick(motion.position.x)
-			accept_event()
+					accept_event()
 		Gesture.DRAGGING:
 			_pick(motion.position.x)
 			accept_event()

@@ -136,6 +136,19 @@ func _run() -> void:
 	await _drag(caps, 0.5 / limits.size(), 1.0 - 0.5 / limits.size())
 	await _wait(0.3)
 	check(app.store.fps_limit == 0, "a drag that starts on the selector is a scroll, not a choice (%d)" % app.store.fps_limit)
+	# A swipe scrolls the page wherever it starts: on a card's text, on a selector or on a switch.
+	var theme_label: Control = app._settings.find_children("*", "SkinLabel", true, false).filter(
+			func(l: SkinLabel) -> bool: return l.key == "THEME")[0]
+	var before := {"theme": app.store.theme, "fps": app.store.show_fps, "lang": app.store.language}
+	for start: Control in [theme_label, app._settings._language, app._settings._fps]:
+		scroll.scroll_vertical = 0
+		await _frames(3)
+		var at := start.size * 0.5
+		await _gesture(start, at, Vector2(0, -260))
+		await _wait(0.2)
+		check(scroll.scroll_vertical > 100, "a swipe that starts on %s scrolls the settings (%d)" % [start.get_class(), scroll.scroll_vertical])
+	var after := {"theme": app.store.theme, "fps": app.store.show_fps, "lang": app.store.language}
+	check(before == after, "scrolling changes no setting: %s -> %s" % [before, after])
 	scroll.scroll_vertical = 0
 	for i in 6:
 		app.set_theme_mode(SaveStore.ThemeMode.LIGHT if i % 2 == 0 else SaveStore.ThemeMode.DARK)
@@ -544,6 +557,8 @@ func _gesture(c: Control, at: Vector2, delta: Vector2) -> void:
 	for i in 4:
 		var move := InputEventMouseMotion.new()
 		move.position = (start + delta * (i + 1) / 4.0) * k
+		# ScrollContainer scrolls by the reported relative motion, not by position.
+		move.relative = delta / 4.0 * k
 		move.button_mask = MOUSE_BUTTON_MASK_LEFT
 		Input.parse_input_event(move)
 		await process_frame

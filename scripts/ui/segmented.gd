@@ -37,6 +37,12 @@ func _init() -> void:
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
+func _notification(what: int) -> void:
+	# Inside a TouchScroll the press also reaches the scroll area; once it scrolls, no tap.
+	if what == NOTIFICATION_SCROLL_BEGIN:
+		_tracking = false
+
+
 ## Selects [param i] without emitting [signal selected] or animating.
 func set_index_silently(i: int) -> void:
 	index = i
@@ -62,7 +68,6 @@ func _gui_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb == null or mb.button_index != MOUSE_BUTTON_LEFT:
 		return
-	accept_event()
 	if mb.pressed:
 		_tracking = true
 		_press_at = mb.global_position
