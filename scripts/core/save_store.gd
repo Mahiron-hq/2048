@@ -15,6 +15,8 @@ enum ThemeMode { LIGHT, DARK }
 var sound_on := true
 var music_on := true
 var haptics_on := true
+## Shows the move hint button on the game screen.
+var hints_on := true
 ## Volume steps, 1 (quietest) to Sfx.LEVEL_COUNT.
 var sound_volume := 7
 var music_volume := 6
@@ -164,6 +166,7 @@ func to_dict() -> Dictionary:
 			"sound": sound_on,
 			"music": music_on,
 			"haptics": haptics_on,
+			"hints": hints_on,
 			"sound_volume": sound_volume,
 			"music_volume": music_volume,
 			"volume_steps": Sfx.LEVEL_COUNT,
@@ -207,6 +210,7 @@ func apply_dict(d: Dictionary) -> void:
 		sound_on = _bool_or(s.get("sound"), sound_on)
 		music_on = _bool_or(s.get("music"), music_on)
 		haptics_on = _bool_or(s.get("haptics"), haptics_on)
+		hints_on = _bool_or(s.get("hints"), hints_on)
 		var steps := LEGACY_VOLUME_STEPS if s.get("volume_steps") == null else Sfx.LEVEL_COUNT
 		sound_volume = _volume_step(s.get("sound_volume"), steps, sound_volume)
 		music_volume = _volume_step(s.get("music_volume"), steps, music_volume)

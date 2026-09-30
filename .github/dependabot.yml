@@ -6,3 +6,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # One pull request per week for all actions, so the pins move together and CI runs once.
+    groups:
+      github-actions:
+        patterns: ["*"]

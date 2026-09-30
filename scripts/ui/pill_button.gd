@@ -32,12 +32,19 @@ var badge := 0:
 		badge = v
 		queue_redraw()
 
+## Accent halo and tint from 0 (none) to 1, to draw the eye to the button.
+var glow := 0.0:
+	set(v):
+		glow = v
+		queue_redraw()
+
 var _press := 0.0:
 	set(v):
 		_press = v
 		queue_redraw()
 var _press_tween: Tween
 var _style := StyleBoxFlat.new()
+var _glow_style := StyleBoxFlat.new()
 var _font: Font
 
 
@@ -123,12 +130,21 @@ func _draw() -> void:
 		_style.bg_color = Color(bg, bg.a * 0.45)
 	elif _press > 0.0 or is_hovered():
 		_style.bg_color = bg.darkened(0.07 * maxf(_press, 0.5)) if not p.dark else bg.lightened(0.06 * maxf(_press, 0.5))
+	if glow > 0.0 and not disabled:
+		_glow_style.set_corner_radius_all(int(height * 0.5))
+		_glow_style.corner_detail = 12
+		_glow_style.bg_color = Color(p.accent, 0.0)
+		_glow_style.shadow_color = Color(p.accent, 0.6 * glow)
+		_glow_style.shadow_size = int(height * 0.3)
+		draw_style_box(_glow_style, rect)
 	draw_style_box(_style, rect)
 	_style.bg_color = bg
 
 	var fg := p.accent_text if look == Look.PRIMARY else p.text
 	if disabled:
 		fg = Color(fg, 0.35)
+	elif glow > 0.0:
+		fg = fg.lerp(p.accent, glow)
 	var icon_size := height * 0.42
 	if icon_only:
 		Icons.draw(self, icon, center, icon_size, fg)

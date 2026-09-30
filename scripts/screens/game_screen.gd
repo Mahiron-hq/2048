@@ -20,6 +20,11 @@ const STACK_GAP := 14.0
 ## so a slightly larger board never wins over the preferred layout.
 const LAYOUT_TOLERANCE := 0.97
 
+## Seconds without a move before the hint button lights up on its own.
+const HINT_IDLE := 15.0
+## Thinking time for one hint; the search goes deeper on faster phones in the same time.
+const HINT_BUDGET_MS := 350
+
 ## Landscape arrangements, preferred first. ROW: logo, menu and score in one line top-left,
 ## best top-right. STACKED: score under logo and menu. ONE_SIDE: every control left of the
 ## board, for near-square screens.
@@ -34,6 +39,7 @@ var _best_box := ScoreBox.make("BEST")
 var _undo_btn := PillButton.make("UNDO", PillButton.Look.SECONDARY, Icons.Kind.UNDO, 76)
 var _new_btn := PillButton.make("NEW", PillButton.Look.SECONDARY, Icons.Kind.RESTART, 76)
 var _menu_btn := PillButton.make_icon(Icons.Kind.MENU, 76)
+var _hint_btn := PillButton.make_icon(Icons.Kind.BULB, 76)
 var _logo := TileBadge.make(2048, 112, "2048")
 var _banner := MilestoneBanner.new()
 var _confetti := CPUParticles2D.new()
@@ -59,6 +65,16 @@ var _record_flashed := false
 var _active := false
 ## The current game already counts towards statistics (it ended in a loss).
 var _recorded := false
+var _solver := HintSolver.new()
+## Background search in flight (WorkerThreadPool task id), or -1.
+var _hint_task := -1
+## Written by the search task; read once it has completed.
+var _hint_result := -1
+## Board the search was started for; its answer is dropped if the board has changed since.
+var _hint_values := PackedInt64Array()
+## Seconds since the last move while a game is waiting for one.
+var _idle := 0.0
+var _hint_glow_tween: Tween
 
 
 func setup(app: App) -> void:
@@ -76,6 +92,7 @@ func _init() -> void:
 	_side_actions.add_theme_constant_override("h_separation", 14)
 	_side_actions.add_theme_constant_override("v_separation", 14)
 	_menu_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_hint_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	_board_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_board_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -120,6 +137,7 @@ func _init() -> void:
 	add_child(_banner)
 
 	_menu_btn.pressed.connect(func() -> void: menu_requested.emit())
+	_hint_btn.pressed.connect(request_hint)
 	_undo_btn.pressed.connect(undo)
 	_new_btn.pressed.connect(_ask_new_game)
 	_board_view.settled.connect(_on_settled)
@@ -131,7 +149,32 @@ func _ready() -> void:
 	# Hosted on the app overlay layer so the scrim also covers the safe-area margins.
 	_app.add_overlay(_game_over)
 	board.undo_limit = _app.store.undo_limit
+	set_hints_enabled(_app.store.hints_on)
 	_on_skin_changed()
+
+
+func _exit_tree() -> void:
+	if _hint_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_hint_task)
+		_hint_task = -1
+
+
+func _process(delta: float) -> void:
+	if _hint_task >= 0 and WorkerThreadPool.is_task_completed(_hint_task):
+		WorkerThreadPool.wait_for_task_completion(_hint_task)
+		_hint_task = -1
+		if _hint_result >= 0 and board.values == _hint_values and is_playing():
+			# The swipe tutorial would sit on top of the suggestion; asking for a hint shows the
+			# player already knows how to move.
+			_board_view.hide_hint()
+			_board_view.show_move_hint(_hint_result)
+	var waiting := _app.store.hints_on and is_playing() and _app.is_current(self) \
+			and not _app.is_modal_open() and not _board_view.is_animating() and _hint_task < 0 \
+			and not _board_view.is_showing_move_hint()
+	if waiting:
+		_idle += delta
+		if _idle >= HINT_IDLE and _hint_btn.glow == 0.0 and not _hint_glowing():
+			_set_hint_glow(true)
 
 
 func _notification(what: int) -> void:
@@ -149,6 +192,58 @@ func _on_skin_changed() -> void:
 	ramp.offsets = PackedFloat32Array([0.0, 0.25, 0.5, 0.75, 1.0])
 	ramp.colors = PackedColorArray([p.tile_bg(16), p.tile_bg(128), p.accent, p.tile_bg(4096), p.tile_bg(64)])
 	_confetti.color_initial_ramp = ramp
+
+
+## Shows or hides the hint button; the layout closes the gap it leaves.
+func set_hints_enabled(on: bool) -> void:
+	_hint_btn.visible = on
+	if not on:
+		_set_hint_glow(false)
+		_board_view.stop_move_hint()
+	_layout_landscape()
+
+
+## Works out the best move in the background, then shows it on the board without playing it.
+func request_hint() -> void:
+	_reset_idle()
+	if not _app.store.hints_on or not is_playing() or _hint_task >= 0 or not board.can_move():
+		return
+	_board_view.stop_move_hint()
+	_hint_values = board.values.duplicate()
+	var values := _hint_values.duplicate()
+	var grid := board.size
+	_hint_result = -1
+	_hint_task = WorkerThreadPool.add_task(func() -> void:
+		_hint_result = _solver.best_move(values, grid, HINT_BUDGET_MS), false, "move hint")
+
+
+func is_hint_busy() -> bool:
+	return _hint_task >= 0
+
+
+## The move waiting is over: the idle clock restarts and a lit hint button goes back to normal.
+func _reset_idle() -> void:
+	_idle = 0.0
+	_set_hint_glow(false)
+
+
+func _hint_glowing() -> bool:
+	return _hint_glow_tween != null and _hint_glow_tween.is_valid()
+
+
+## Lights the hint button with a few slow pulses, then leaves it lit; or puts it out.
+func _set_hint_glow(on: bool) -> void:
+	if _hint_glow_tween:
+		_hint_glow_tween.kill()
+		_hint_glow_tween = null
+	if not on:
+		_hint_btn.glow = 0.0
+		return
+	_hint_glow_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_hint_glow_tween.tween_property(_hint_btn, "glow", 1.0, 0.5)
+	for pulse in 3:
+		_hint_glow_tween.tween_property(_hint_btn, "glow", 0.45, 0.6)
+		_hint_glow_tween.tween_property(_hint_btn, "glow", 1.0, 0.6)
 
 
 func close_overlays() -> void:
@@ -178,6 +273,7 @@ func start_new(grid := 0, intro := true) -> void:
 	_refresh_scores(false)
 	_board_view.show_board(board, BoardView.Appear.POP if intro else BoardView.Appear.NONE)
 	_board_view.show_hint()
+	_reset_idle()
 	_persist()
 
 
@@ -199,6 +295,7 @@ func resume_saved() -> bool:
 		_board_view.hide_hint(true)
 	if not board.can_move():
 		_pending_over = true
+	_reset_idle()
 	return true
 
 
@@ -213,6 +310,7 @@ func set_undo_limit(limit: int) -> void:
 func request_move(dir: Board.Dir) -> void:
 	if _game_over.is_open or _pending_over:
 		return
+	_reset_idle()
 	var result := board.move(dir)
 	if not result.moved:
 		_board_view.nudge(dir)
@@ -228,6 +326,7 @@ func undo() -> void:
 	var undone := board.undo()
 	if undone == null:
 		return
+	_reset_idle()
 	_app.store.record_move(board.size, -1)
 	_pending_over = false
 	if undone.moved:
@@ -361,7 +460,7 @@ func _apply_layout(wide: bool) -> void:
 	if wide:
 		_fill(_brand, [_logo, _menu_btn])
 		_fill(_side_actions, [_undo_btn, _new_btn])
-		for node: Control in [_board_view, _brand, _score_box, _best_box, _side_actions]:
+		for node: Control in [_board_view, _brand, _score_box, _best_box, _side_actions, _hint_btn]:
 			if node.get_parent():
 				node.get_parent().remove_child(node)
 			_landscape.add_child(node)
@@ -370,7 +469,7 @@ func _apply_layout(wide: bool) -> void:
 			if node.get_parent():
 				node.get_parent().remove_child(node)
 		_fill(_header, [_logo, null, _score_box, _best_box])
-		_fill(_actions, [_menu_btn, null, _undo_btn, _new_btn])
+		_fill(_actions, [_menu_btn, _hint_btn, null, _undo_btn, _new_btn])
 		_fill(_portrait, [_header, _actions, _board_view])
 	_portrait.visible = not wide
 	_landscape.visible = wide
@@ -381,8 +480,8 @@ func _apply_layout(wide: bool) -> void:
 func _fill(box: Container, nodes: Array) -> void:
 	for child in box.get_children():
 		box.remove_child(child)
-		if not child in [_logo, _score_box, _best_box, _menu_btn, _undo_btn, _new_btn, _board_view,
-				_header, _actions, _brand, _side_actions]:
+		if not child in [_logo, _score_box, _best_box, _menu_btn, _hint_btn, _undo_btn, _new_btn,
+				_board_view, _header, _actions, _brand, _side_actions]:
 			child.queue_free()
 	for node in nodes:
 		if node == null:
@@ -394,8 +493,8 @@ func _fill(box: Container, nodes: Array) -> void:
 
 
 ## Sizes the board and places the controls around it: logo and menu in the top-left corner, the
-## score against the board's left edge and the best score against its right edge, undo and new
-## game in the bottom-left corner. Falls back to stacked arrangements when the screen is too
+## score against the board's left edge and the best score against its right edge with the hint
+## button beside it, undo and new game in the bottom-left corner. Falls back to stacked arrangements when the screen is too
 ## narrow for that without shrinking the board.
 func _layout_landscape() -> void:
 	if not _landscape_mode:
@@ -424,6 +523,7 @@ func _layout_landscape() -> void:
 	var score := _score_box.get_combined_minimum_size()
 	var best := _best_box.get_combined_minimum_size()
 	var actions := _side_actions.get_combined_minimum_size()
+	var hint := _hint_btn.get_combined_minimum_size()
 	_place(_board_view, Vector2(x, y), Vector2(s, s))
 	_place(_brand, Vector2(0.0, y), brand)
 	_place(_side_actions, Vector2(0.0, y + s - actions.y), actions)
@@ -437,6 +537,7 @@ func _layout_landscape() -> void:
 		Arrangement.ONE_SIDE:
 			_place(_score_box, Vector2(0.0, y + brand.y + STACK_GAP), score)
 			_place(_best_box, Vector2(0.0, y + brand.y + score.y + STACK_GAP * 2.0), best)
+	_place(_hint_btn, _best_box.position + Vector2(best.x + STACK_GAP, (best.y - hint.y) * 0.5), hint)
 
 
 ## Board side length [param arrangement] allows in [param area], or -1 when its controls do
@@ -447,7 +548,7 @@ func _board_side(arrangement: Arrangement, area: Vector2) -> float:
 	if arrangement == Arrangement.ONE_SIDE:
 		s = minf(s, area.x - left - BOARD_GAP)
 	else:
-		var right := _best_box.get_combined_minimum_size().x
+		var right := _best_box.get_combined_minimum_size().x + _hint_width()
 		s = minf(s, area.x - 2.0 * (maxf(left, right) + BOARD_GAP))
 	return s if s >= _left_height(arrangement) else -1.0
 
@@ -460,8 +561,13 @@ func _left_width(arrangement: Arrangement) -> float:
 		Arrangement.ROW:
 			width = brand + BRAND_GAP + score
 		Arrangement.ONE_SIDE:
-			width = maxf(width, _best_box.get_combined_minimum_size().x)
+			width = maxf(width, _best_box.get_combined_minimum_size().x + _hint_width())
 	return maxf(width, _actions_size(_action_columns(arrangement)).x)
+
+
+## Room the hint button takes beside the best score, with its gap; none when hints are off.
+func _hint_width() -> float:
+	return STACK_GAP + _hint_btn.get_combined_minimum_size().x if _hint_btn.visible else 0.0
 
 
 ## Height the left-hand controls need: the top group plus the buttons at the bottom.
@@ -554,8 +660,9 @@ func _in_swipe_area(point: Vector2) -> bool:
 	if point.x >= board.position.x - 8.0 and point.x <= board.end.x + 8.0:
 		return true
 	var top_end := 0.0
-	for node: Control in [_brand, _score_box, _best_box]:
-		top_end = maxf(top_end, node.get_global_rect().end.y)
+	for node: Control in [_brand, _score_box, _best_box, _hint_btn]:
+		if node.visible:
+			top_end = maxf(top_end, node.get_global_rect().end.y)
 	return point.y > top_end + 12.0
 
 
@@ -572,6 +679,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_DOWN, KEY_S: dir = Board.Dir.DOWN
 		KEY_Z, KEY_BACKSPACE:
 			undo()
+			get_viewport().set_input_as_handled()
+			return
+		KEY_H:
+			request_hint()
 			get_viewport().set_input_as_handled()
 			return
 	if dir >= 0:

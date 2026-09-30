@@ -1,7 +1,7 @@
 class_name SettingsScreen
 extends Control
 ## App settings (sound, music, vibration, theme, language, FPS overlay and cap) and game settings
-## (undo depth). Changes apply immediately.
+## (move hints, undo depth). Changes apply immediately.
 
 signal back_requested
 
@@ -11,6 +11,9 @@ var _music := ToggleSwitch.new()
 var _sound_volume := StepSlider.new()
 var _music_volume := StepSlider.new()
 var _haptics := ToggleSwitch.new()
+var _hints := ToggleSwitch.new()
+## Shown under the vibration switch while the phone itself silences app vibrations.
+var _haptics_blocked := MarginContainer.new()
 var _fps := ToggleSwitch.new()
 var _theme := Segmented.make(PackedStringArray(["THEME_LIGHT", "THEME_DARK"]))
 var _language := Segmented.make(PackedStringArray([I18n.LANGUAGE_NAMES.ru, I18n.LANGUAGE_NAMES.en]), false)
@@ -67,6 +70,7 @@ func _init() -> void:
 	rows.add_child(_volume_row(_music_volume))
 	rows.add_child(_divider())
 	rows.add_child(_row("HAPTICS", _haptics))
+	rows.add_child(_haptics_blocked_block())
 	col.add_child(card)
 
 	var card2 := Card.make(10, 36)
@@ -85,6 +89,20 @@ func _init() -> void:
 	col.add_child(card2)
 
 	col.add_child(_section("GAME_SETTINGS"))
+	var hints_card := Card.make(10, 36)
+	var hints_rows := VBoxContainer.new()
+	hints_rows.add_theme_constant_override("separation", 0)
+	hints_rows.add_child(_row("HINTS", _hints))
+	var hints_note := MarginContainer.new()
+	hints_note.add_theme_constant_override("margin_left", 34)
+	hints_note.add_theme_constant_override("margin_right", 30)
+	hints_note.add_theme_constant_override("margin_bottom", 20)
+	var hints_text := SkinLabel.make("HINTS_HINT", 24, Fonts.REGULAR, SkinLabel.Role.MUTED)
+	hints_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hints_note.add_child(hints_text)
+	hints_rows.add_child(hints_note)
+	hints_card.add_child(hints_rows)
+	col.add_child(hints_card)
 	var card3 := Card.make(28, 36)
 	var undo_box := VBoxContainer.new()
 	undo_box.add_theme_constant_override("separation", 8)
@@ -112,8 +130,11 @@ func _init() -> void:
 		_music_volume.dimmed = not on)
 	_sound_volume.changed.connect(func(step: int) -> void: _app.set_sound_volume(step))
 	_music_volume.changed.connect(func(step: int) -> void: _app.set_music_volume(step))
-	_haptics.toggled.connect(func(on: bool) -> void: _app.set_haptics(on))
+	_haptics.toggled.connect(func(on: bool) -> void:
+		_app.set_haptics(on)
+		_refresh_haptics_blocked())
 	_fps.toggled.connect(func(on: bool) -> void: _app.set_show_fps(on))
+	_hints.toggled.connect(func(on: bool) -> void: _app.set_hints(on))
 	_fps_limit.selected.connect(func(i: int) -> void: _app.set_fps_limit(_fps_limits[i]))
 	_theme.selected.connect(func(i: int) -> void: _app.set_theme_mode(SaveStore.ThemeMode.LIGHT if i == 0 else SaveStore.ThemeMode.DARK))
 	_language.selected.connect(func(i: int) -> void: _app.set_language(I18n.LANGUAGES[i]))
@@ -138,7 +159,9 @@ func refresh() -> void:
 	_sound_volume.dimmed = not s.sound_on
 	_music_volume.dimmed = not s.music_on
 	_haptics.set_on_silently(s.haptics_on)
+	_refresh_haptics_blocked()
 	_fps.set_on_silently(s.show_fps)
+	_hints.set_on_silently(s.hints_on)
 	_refresh_fps_limits()
 	_theme.set_index_silently(0 if s.theme == SaveStore.ThemeMode.LIGHT else 1)
 	_language.set_index_silently(I18n.LANGUAGES.find(s.language))
@@ -200,6 +223,29 @@ func _row(key: String, control: Control) -> Control:
 	pad_r.custom_minimum_size.x = 14
 	row.add_child(pad_r)
 	return row
+
+
+func _refresh_haptics_blocked() -> void:
+	_haptics_blocked.visible = _app.store.haptics_on and Haptics.blocked_by_system()
+
+
+## Why nothing buzzes although vibration is on here, and a shortcut to the phone setting.
+func _haptics_blocked_block() -> Control:
+	_haptics_blocked.add_theme_constant_override("margin_left", 34)
+	_haptics_blocked.add_theme_constant_override("margin_right", 30)
+	_haptics_blocked.add_theme_constant_override("margin_bottom", 20)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	var text := SkinLabel.make("HAPTICS_BLOCKED", 24, Fonts.REGULAR, SkinLabel.Role.MUTED)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(text)
+	var open := PillButton.make("OPEN_PHONE_SETTINGS", PillButton.Look.SECONDARY, Icons.Kind.NONE, 64.0)
+	open.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	open.pressed.connect(Haptics.open_system_settings)
+	box.add_child(open)
+	_haptics_blocked.add_child(box)
+	_haptics_blocked.visible = false
+	return _haptics_blocked
 
 
 ## Frame cap: title, hint, then the cap selector across the card.

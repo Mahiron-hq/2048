@@ -17,6 +17,11 @@ const UNDO_VANISH := 0.12
 const UNDO_SQUEEZE := 0.07
 const UNDO_SQUEEZE_SCALE := 0.9
 const UNDO_SLIDE := 0.19
+## Move hint: how far the tiles lean towards the suggested move, in cells (at most the margin
+## around the grid, so edge tiles stay on the board), and the timing of one push out and back.
+const HINT_PUSH := 0.16
+const HINT_OUT := 0.22
+const HINT_BACK := 0.28
 
 var cell_size := 100.0
 var gap := 12.0
@@ -33,6 +38,8 @@ var _rings: Array[MergeRing] = []
 var _move_tween: Tween
 var _fx_tweens: Array[Tween] = []
 var _nudge_tween: Tween
+var _hint_tween: Tween
+var _hint_glow := _MoveGlow.new()
 var _styles := {}
 var _font_sizes := {}
 var _font: Font = Fonts.sans(Fonts.BLACK)
@@ -42,6 +49,9 @@ var _cell_box := StyleBoxFlat.new()
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Under the tiles, so the light shows through the gaps and where the tiles lean away.
+	_hint_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_hint_glow)
 	for layer in [_layer, _fx_layer]:
 		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		layer.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -57,6 +67,34 @@ func _notification(what: int) -> void:
 
 func is_animating() -> bool:
 	return (_move_tween != null and _move_tween.is_valid()) or _fx_tweens.any(func(t: Tween) -> bool: return t.is_valid())
+
+
+## Suggests a move without making it: every tile leans towards [param dir] twice while the
+## board's edge on that side lights up softly.
+func show_move_hint(dir: Board.Dir) -> void:
+	stop_move_hint()
+	var off := _dir_vector(dir) * minf(cell_size * HINT_PUSH, gap * 0.85)
+	_hint_glow.setup(dir, board_rect.grow(-gap * 0.5))
+	_hint_tween = create_tween()
+	for push in 2:
+		_hint_tween.tween_property(_layer, "position", off, HINT_OUT).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_hint_tween.parallel().tween_property(_hint_glow, "strength", 1.0, HINT_OUT).set_trans(Tween.TRANS_SINE)
+		_hint_tween.tween_property(_layer, "position", Vector2.ZERO, HINT_BACK).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_hint_tween.parallel().tween_property(_hint_glow, "strength", 0.45 if push == 0 else 0.0, HINT_BACK).set_trans(Tween.TRANS_SINE)
+	_hint_tween.tween_property(_hint_glow, "strength", 0.0, 0.25)
+
+
+func is_showing_move_hint() -> bool:
+	return _hint_tween != null and _hint_tween.is_valid()
+
+
+## Ends a move hint at once, tiles back in place.
+func stop_move_hint() -> void:
+	if _hint_tween:
+		_hint_tween.kill()
+		_hint_tween = null
+		_layer.position = Vector2.ZERO
+	_hint_glow.strength = 0.0
 
 
 ## Rebuilds tiles from [param board] without replaying a move.
@@ -156,12 +194,8 @@ func is_hint_visible() -> bool:
 func nudge(dir: Board.Dir) -> void:
 	if _nudge_tween and _nudge_tween.is_valid():
 		return
-	var off := Vector2.ZERO
-	match dir:
-		Board.Dir.LEFT: off = Vector2.LEFT
-		Board.Dir.RIGHT: off = Vector2.RIGHT
-		Board.Dir.UP: off = Vector2.UP
-		Board.Dir.DOWN: off = Vector2.DOWN
+	stop_move_hint()
+	var off := _dir_vector(dir)
 	_nudge_tween = create_tween().set_trans(Tween.TRANS_SINE)
 	_nudge_tween.tween_property(_layer, "position", off * cell_size * 0.06, 0.06).set_ease(Tween.EASE_OUT)
 	_nudge_tween.tween_property(_layer, "position", Vector2.ZERO, 0.14).set_ease(Tween.EASE_IN_OUT)
@@ -169,6 +203,7 @@ func nudge(dir: Board.Dir) -> void:
 
 ## Jumps every running animation to its end state.
 func complete_animations() -> void:
+	stop_move_hint()
 	if _move_tween and _move_tween.is_valid():
 		_move_tween.custom_step(10.0)
 	_move_tween = null
@@ -177,6 +212,17 @@ func complete_animations() -> void:
 	for tw in running:
 		if tw.is_valid():
 			tw.custom_step(10.0)
+
+
+static func _dir_vector(dir: Board.Dir) -> Vector2:
+	match dir:
+		Board.Dir.LEFT:
+			return Vector2.LEFT
+		Board.Dir.RIGHT:
+			return Vector2.RIGHT
+		Board.Dir.UP:
+			return Vector2.UP
+	return Vector2.DOWN
 
 
 func cell_position(index: int) -> Vector2:
@@ -414,3 +460,57 @@ class MergeRing:
 		var r := _radius * (1.0 + 0.6 * t)
 		var a := (1.0 - t) * 0.8
 		draw_arc(Vector2.ZERO, r, 0.0, TAU, 48, Color(_color, a), _radius * 0.16 * (1.0 - t) + 1.0, true)
+
+
+## Soft pool of accent light rising from one edge of the board and fading towards the middle and
+## along the edge, clipped to the board.
+class _MoveGlow:
+	extends Control
+
+	## How far the light reaches into the board, as a share of its side.
+	const REACH := 0.5
+
+	var strength := 0.0:
+		set(v):
+			strength = v
+			queue_redraw()
+	var _dir := Board.Dir.LEFT
+	var _texture := GradientTexture2D.new()
+
+	func _init() -> void:
+		clip_contents = true
+		var g := Gradient.new()
+		g.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+		g.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CUBIC
+		_texture.gradient = g
+		_texture.fill = GradientTexture2D.FILL_RADIAL
+		_texture.fill_from = Vector2(0.5, 0.5)
+		_texture.fill_to = Vector2(1.0, 0.5)
+		_texture.width = 128
+		_texture.height = 128
+
+	func setup(dir: Board.Dir, rect: Rect2) -> void:
+		_dir = dir
+		position = rect.position
+		size = rect.size
+		queue_redraw()
+
+	func _draw() -> void:
+		if strength <= 0.0:
+			return
+		var edge := Vector2.ZERO
+		var extent := Vector2.ZERO
+		match _dir:
+			Board.Dir.LEFT:
+				edge = Vector2(0.0, size.y * 0.5)
+				extent = Vector2(size.x * REACH, size.y * 0.75)
+			Board.Dir.RIGHT:
+				edge = Vector2(size.x, size.y * 0.5)
+				extent = Vector2(size.x * REACH, size.y * 0.75)
+			Board.Dir.UP:
+				edge = Vector2(size.x * 0.5, 0.0)
+				extent = Vector2(size.x * 0.75, size.y * REACH)
+			Board.Dir.DOWN:
+				edge = Vector2(size.x * 0.5, size.y)
+				extent = Vector2(size.x * 0.75, size.y * REACH)
+		draw_texture_rect(_texture, Rect2(edge - extent, extent * 2.0), false, Color(Palette.current.accent, 0.42 * strength))

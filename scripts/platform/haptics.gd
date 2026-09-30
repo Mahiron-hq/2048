@@ -52,6 +52,7 @@ static var _merge_effects := {}
 static var _wave_effect = null
 static var _wave_built := false
 static var _android := AndroidState.UNKNOWN
+static var _system_blocked := false
 
 
 ## Plays a short UI feedback of [param kind].
@@ -76,6 +77,30 @@ static func merge(value: int) -> void:
 		_vibrate(_merge_effects[level])
 		return
 	Input.vibrate_handheld(merge_ms(strength), lerpf(0.25, 1.0, strength))
+
+
+## True when the phone itself silences app vibrations, so the game's buzzes cannot be felt.
+## Android 13+ drops every app vibration while the system-wide switch (Accessibility → Vibration
+## & haptics, Settings.System "vibrate_on") is off; no usage an app may legitimately pick gets
+## past it, so the settings screen points the player there instead.
+static func blocked_by_system() -> bool:
+	if OS.get_name() != "Android" or OS.get_version().to_int() < 13:
+		return false
+	_system_blocked = false
+	_read_system_block()
+	return _system_blocked
+
+
+## Opens the phone's accessibility settings, where Android keeps the vibration switch; there is
+## no public intent for the vibration page itself.
+static func open_system_settings() -> void:
+	if OS.get_name() != "Android" or not Engine.has_singleton("AndroidRuntime"):
+		return
+	var activity = Engine.get_singleton("AndroidRuntime").getActivity()
+	var intent_class = JavaClassWrapper.wrap("android.content.Intent")
+	if activity == null or intent_class == null:
+		return
+	activity.startActivity(intent_class.Intent("android.settings.ACCESSIBILITY_SETTINGS"))
 
 
 ## One second of soft, wavy vibration when the game is lost.
@@ -159,6 +184,15 @@ static func _vibrate(effect) -> void:
 		_vibrator.vibrate(effect, _attributes)
 	else:
 		_vibrator.vibrate(effect)
+
+
+static func _read_system_block() -> void:
+	var activity = Engine.get_singleton("AndroidRuntime").getActivity() if Engine.has_singleton("AndroidRuntime") else null
+	var settings = JavaClassWrapper.wrap("android.provider.Settings$System")
+	if activity == null or settings == null:
+		return
+	var vibrate_on: int = settings.getInt(activity.getContentResolver(), "vibrate_on", 1)
+	_system_blocked = vibrate_on == 0
 
 
 static func _android_available() -> bool:
