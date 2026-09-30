@@ -76,6 +76,24 @@ func _run() -> void:
 		app._game.request_move(rng.randi_range(0, 3))
 	check(consistent, "undo animation leaves the view identical to the board")
 
+	# A lost game left for the menu at once must not pop its summary over the menu later.
+	app._game.start_new(4, false)
+	board.from_dict({"size": 4, "values": [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 0], "score": 0, "moves": 3})
+	app._game._board_view.show_board(board)
+	app._game.request_move(Board.Dir.RIGHT)
+	app._on_back()
+	await _wait(1.0)
+	check(not app._game._game_over.is_open and not app._game._game_over.visible, "leaving right after losing keeps the summary off the menu")
+	app._show_screen(app._game)
+	await _wait(1.0)
+	check(app._game._game_over.is_open, "the summary shows once the player is back on the board")
+	app._game._game_over.close()
+
+	# Fixed spawns from here on, so the moves below never happen to lose the game.
+	# The checks below follow this game's score as the 4x4 record, so earlier games must not hold it.
+	app._game.start_new(4, false)
+	board.rng.seed = 2048
+	app.store._best.erase(4)
 	for i in 6:
 		for dir in [Board.Dir.LEFT, Board.Dir.DOWN, Board.Dir.RIGHT, Board.Dir.UP]:
 			app._game.request_move(dir)
