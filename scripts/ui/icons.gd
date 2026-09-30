@@ -2,7 +2,7 @@ class_name Icons
 extends RefCounted
 ## Vector UI glyphs drawn with canvas primitives, so they stay sharp at any density.
 
-enum Kind { NONE, MENU, UNDO, RESTART, BACK, GEAR, PLAY, TROPHY, CHECK, SPEAKER_LOW, SPEAKER_HIGH, GRID, CHART }
+enum Kind { NONE, MENU, UNDO, RESTART, BACK, GEAR, PLAY, TROPHY, CHECK, SPEAKER_LOW, SPEAKER_HIGH, GRID, CHART, BULB }
 
 
 ## Draws [param kind] centered on [param center], fitting a square of side [param s].
@@ -84,6 +84,21 @@ static func draw(ci: CanvasItem, kind: Kind, center: Vector2, s: float, color: C
 				var bh: float = s * heights[i]
 				var x := center.x + (i - 1) * s * 0.3 - bar * 0.5
 				ci.draw_rect(Rect2(Vector2(x, center.y + s * 0.43 - bh), Vector2(bar, bh)), color)
+		Kind.BULB:
+			# Glass as an open ring whose ends run down into the neck, then two base lines.
+			var r := s * 0.25
+			var glass := center + Vector2(0, -s * 0.1)
+			var open := 0.62
+			ci.draw_arc(glass, r, PI * 0.5 + open, PI * 2.5 - open, 36, color, w, true)
+			var left := glass + Vector2.from_angle(PI * 0.5 + open) * r
+			var right := glass + Vector2.from_angle(PI * 0.5 - open) * r
+			var neck := center.y + s * 0.2
+			ci.draw_line(left, Vector2(left.x, neck), color, w, true)
+			ci.draw_line(right, Vector2(right.x, neck), color, w, true)
+			ci.draw_line(Vector2(left.x, neck), Vector2(right.x, neck), color, w, true)
+			ci.draw_line(Vector2(left.x + w * 0.4, neck + s * 0.13), Vector2(right.x - w * 0.4, neck + s * 0.13), color, w, true)
+			for p in [left, right, Vector2(left.x, neck), Vector2(right.x, neck)]:
+				ci.draw_circle(p, w * 0.5, color, true, -1.0, true)
 		Kind.CHECK:
 			var pts := PackedVector2Array([
 				center + Vector2(-s * 0.28, 0),

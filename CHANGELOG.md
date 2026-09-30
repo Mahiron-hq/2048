@@ -2,6 +2,24 @@
 
 All notable changes to 2048 Merge. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.5] - 2026-09-30
+
+### 🇬🇧 English
+
+- **Move hints.** A round bulb button — right of the menu button in portrait, right of the best score in landscape — suggests one move. The tiles lean towards it twice while that edge of the board lights up softly; the move itself is left to you. When you have not moved for 15 seconds the bulb lights up by itself. Hints can be switched off in Game settings (on by default), which also removes the button; there is no limit on how many you take, and they do not affect records or statistics.
+- **The hints are strong:** an expectimax search over every move and every possible new tile, scoring positions like the best-known 2048 bots do (empty cells, pending merges, monotonic rows). It deepens as far as the phone manages in about a third of a second, in the background, so the game never stutters. Following the hints with only 0.1 s per move reaches the 4096 tile.
+- **Vibration on phones where the system switch is off.** Some phones (e.g. Xiaomi with MIUI) have a system-wide "Vibration & haptics" switch under Accessibility; while it is off, Android silences every app, and no app may override it. The game now detects this and explains it under Vibration in Settings, with a button that opens the phone's settings. Phones with the switch on keep vibrating exactly as before.
+- **Supply chain:** GitHub Actions updated to their current major versions (checkout 7, cache 6, setup-java 6, action-gh-release 3), still pinned to commit SHAs; Dependabot now sends one grouped weekly update.
+- Tested on two phones: Infinix (Android 16, XOS) and Xiaomi Redmi Note 10S (Android 13, MIUI) — hints, vibration, scrolling, landscape and a random-input stress run.
+
+### 🇷🇺 Русский
+
+- **Подсказка хода.** Круглая кнопка с лампочкой — справа от кнопки меню в вертикальном положении и справа от рекорда в горизонтальном — предлагает один ход. Плитки дважды плавно подаются в нужную сторону, а этот край поля мягко подсвечивается; сам ход делаете вы. Если не ходить 15 секунд, лампочка загорается сама. Подсказки выключаются одним касанием в «Настройках игры» (по умолчанию включены) — вместе с ними исчезает и кнопка. Ограничений нет, на рекорды и статистику подсказки не влияют.
+- **Подсказки сильные:** поиск expectimax перебирает все ходы и все возможные новые плитки и оценивает позиции так же, как лучшие боты для 2048 (пустые клетки, будущие слияния, монотонность рядов). Он углубляется настолько, насколько телефон успевает примерно за треть секунды, в фоне, так что игра не подтормаживает. Если просто следовать подсказкам, даже при 0,1 с на ход партия доходит до плитки 4096.
+- **Вибрация на телефонах с выключенным системным переключателем.** На некоторых телефонах (например, Xiaomi с MIUI) в «Специальных возможностях» есть общий переключатель «Вибрация и виброотклик»; пока он выключен, Android глушит вибрацию всех приложений, и обойти это приложение не может. Теперь игра это распознаёт и объясняет в настройках под пунктом «Вибрация», с кнопкой, открывающей настройки телефона. На телефонах, где переключатель включён, вибрация работает как прежде.
+- **Цепочка поставки:** GitHub Actions обновлены до актуальных мажорных версий (checkout 7, cache 6, setup-java 6, action-gh-release 3) и по-прежнему закреплены на SHA коммитов; Dependabot теперь присылает одно сгруппированное обновление в неделю.
+- Проверено на двух телефонах: Infinix (Android 16, XOS) и Xiaomi Redmi Note 10S (Android 13, MIUI) — подсказки, вибрация, прокрутка, горизонтальное положение и стресс-тест случайными действиями.
+
 ## [1.2.4] - 2026-09-29
 
 ### 🇬🇧 English

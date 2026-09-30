@@ -73,6 +73,12 @@ func _device(tag: String, px: Vector2i) -> void:
 	app._game._board_view.hide_hint(true)
 	app._game._refresh_scores(false)
 	await _capture(tag + "-4-game-6x6", 0.4)
+	app._game._board_view.show_move_hint(Board.Dir.RIGHT)
+	await _capture(tag + "-4e-move-hint", 0.2)
+	app._game._board_view.stop_move_hint()
+	app._game._set_hint_glow(true)
+	await _capture(tag + "-4f-hint-lit", 0.9)
+	app._game._set_hint_glow(false)
 
 	# The biggest score a 6x6 board can plausibly show must still fit the game-over card.
 	app._game._game_over.present(137438953472, 1 << 37, 99999, true)

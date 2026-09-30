@@ -208,6 +208,7 @@ func _run() -> void:
 
 	await _new_features(app)
 	await _fixes_121(app)
+	await _hints(app)
 	await _landscape(app)
 
 	app.queue_free()
@@ -364,10 +365,54 @@ func _board_rect(g: GameScreen) -> Rect2:
 
 ## Landscape game screen invariants: the board is large, visible and clear of every control,
 ## the controls are on screen and apart, and the board is centered unless all controls share one side.
+func _hints(app: App) -> void:
+	var g := app._game
+	app._game.start_new(4, false)
+	app._show_screen(g)
+	await _wait(0.5)
+	var menu := g._menu_btn.get_global_rect()
+	var hint := g._hint_btn.get_global_rect()
+	check(app.store.hints_on and g._hint_btn.visible, "the hint button is shown by default")
+	check(hint.position.x > menu.end.x and hint.position.x - menu.end.x < 30.0 and absf(hint.get_center().y - menu.get_center().y) < 2.0,
+			"portrait: hint button right next to the menu (%s vs %s)" % [hint, menu])
+	var values := g.board.values.duplicate()
+	g._hint_btn.pressed.emit()
+	check(g.is_hint_busy(), "pressing the bulb starts thinking")
+	for i in 120:
+		if not g.is_hint_busy():
+			break
+		await _frames(1)
+	await _frames(2)
+	check(g._board_view.is_showing_move_hint(), "the suggestion plays on the board")
+	check(g.board.values == values, "a hint never makes the move itself")
+	var leaned := false
+	for i in 30:
+		await _frames(1)
+		leaned = leaned or g._board_view._layer.position.length() > 1.0
+	check(leaned, "the tiles lean towards the suggested move")
+	await _wait(1.6)
+	check(not g._board_view.is_showing_move_hint() and g._board_view._layer.position == Vector2.ZERO, "the hint ends with every tile back in place")
+	g._idle = GameScreen.HINT_IDLE - 0.05
+	await _wait(0.4)
+	check(g._hint_btn.glow > 0.0, "the bulb lights up after %d idle seconds" % GameScreen.HINT_IDLE)
+	for dir in [Board.Dir.LEFT, Board.Dir.RIGHT, Board.Dir.UP, Board.Dir.DOWN]:
+		g.request_move(dir)
+	await _frames(2)
+	check(g._hint_btn.glow == 0.0 and g._idle < 1.0, "a move puts the bulb out and restarts the idle clock")
+	app.set_hints(false)
+	await _frames(2)
+	check(not g._hint_btn.visible and not app.store.hints_on, "turning hints off in settings hides the button")
+	g.request_hint()
+	check(not g.is_hint_busy(), "no hint is computed while hints are off")
+	app.set_hints(true)
+	await _frames(2)
+	check(g._hint_btn.visible, "turning hints back on shows the button")
+
+
 func _check_landscape_game(g: GameScreen, vp: Rect2, tag: String) -> void:
 	var board_rect := _board_rect(g)
 	check(_inside(board_rect, vp) and board_rect.size.x > vp.size.y * 0.6, "%s: board is large and fully visible (%s)" % [tag, board_rect])
-	var controls: Array[Control] = [g._logo, g._menu_btn, g._score_box, g._best_box, g._undo_btn, g._new_btn]
+	var controls: Array[Control] = [g._logo, g._menu_btn, g._score_box, g._best_box, g._hint_btn, g._undo_btn, g._new_btn]
 	for i in controls.size():
 		var r := controls[i].get_global_rect()
 		check(_inside(r, vp), "%s: %s is on screen (%s)" % [tag, controls[i].get_class(), r])
@@ -378,6 +423,10 @@ func _check_landscape_game(g: GameScreen, vp: Rect2, tag: String) -> void:
 		var center := g.get_global_rect().get_center().x
 		check(absf(board_rect.get_center().x - center) < 1.5, "%s: board centered on screen (%.0f vs %.0f)" % [tag, board_rect.get_center().x, center])
 	check(_view_matches(g), "%s: tiles follow the resized board" % tag)
+	var hint := g._hint_btn.get_global_rect()
+	var best := g._best_box.get_global_rect()
+	check(g._hint_btn.visible and hint.position.x >= best.end.x and hint.position.x - best.end.x < 30.0 			and hint.get_center().y > best.position.y and hint.get_center().y < best.end.y,
+			"%s: hint button right of the best score (%s vs %s)" % [tag, hint, best])
 	await _frames(1)
 
 

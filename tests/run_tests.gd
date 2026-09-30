@@ -47,6 +47,10 @@ func _initialize() -> void:
 		"test_tiles_grow_past_32_bits",
 		"test_fps_limit_options_follow_the_panel",
 		"test_fps_limit_persists",
+		"test_hint_solver_basics",
+		"test_hint_solver_respects_its_budget",
+		"test_hint_solver_plays_well",
+		"test_hints_setting_persists",
 	]
 	for t in tests:
 		_current = t
@@ -699,3 +703,65 @@ func test_fps_limit_persists() -> void:
 		u.fps_limit = 60
 		u.apply_dict({"settings": {"fps_limit": bad}})
 		check(u.fps_limit == 60, "invalid cap %s is ignored" % [bad])
+
+
+func test_hint_solver_basics() -> void:
+	var solver := HintSolver.new()
+	var only_left := board_from([[0, 2, 4, 8], [2, 4, 8, 16], [4, 8, 16, 32], [8, 16, 32, 64]])
+	check(solver.best_move(only_left.values, 4, 50) in [Board.Dir.LEFT, Board.Dir.UP], "picks one of the moves that change the board")
+	var stuck := board_from([[2, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 2]])
+	check(solver.best_move(stuck.values, 4, 50) == -1, "no hint when no move is possible")
+	var one := board_from([[2, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 0]])
+	var forced := solver.best_move(one.values, 4, 50)
+	check(forced == Board.Dir.RIGHT or forced == Board.Dir.DOWN, "the only moves that change the board are right and down (got %d)" % forced)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var illegal := 0
+	for n in [3, 4, 5, 6]:
+		for trial in 30:
+			var b := Board.new(rng.randi_range(0, 1 << 30), n)
+			b.new_game()
+			for step in rng.randi_range(0, 40):
+				if not b.can_move():
+					break
+				b.move(rng.randi_range(0, 3))
+			if not b.can_move():
+				continue
+			var dir := solver.best_move(b.values, n, 3)
+			var probe := Board.new(1, n)
+			probe.from_dict(b.to_dict())
+			if dir < 0 or not probe.move(dir).moved:
+				illegal += 1
+	check(illegal == 0, "every hint on random 3x3..6x6 boards is a legal move (%d illegal)" % illegal)
+
+
+func test_hint_solver_respects_its_budget() -> void:
+	var solver := HintSolver.new()
+	var b := Board.new(11, 6)
+	b.new_game()
+	for i in 60:
+		if b.can_move():
+			b.move(i % 4)
+	var t0 := Time.get_ticks_msec()
+	solver.best_move(b.values, 6, 60)
+	var took := Time.get_ticks_msec() - t0
+	check(took < 400, "a 60 ms budget on a 6x6 board ends in time (%d ms, depth %d)" % [took, solver.last_depth])
+
+
+func test_hint_solver_plays_well() -> void:
+	# Following the hints with a tiny budget still gets far, so they are genuinely good moves.
+	var solver := HintSolver.new()
+	var b := Board.new(2026, 4)
+	b.new_game()
+	while b.can_move() and b.best_tile < 1024:
+		b.move(solver.best_move(b.values, 4, 8))
+	check(b.best_tile >= 1024, "following the hints reaches 1024 (best tile %d after %d moves)" % [b.best_tile, b.move_count])
+
+
+func test_hints_setting_persists() -> void:
+	var s := SaveStore.new("user://unused.json")
+	check(s.hints_on, "move hints are on by default")
+	s.hints_on = false
+	var t := SaveStore.new("user://unused.json")
+	t.apply_dict(JSON.parse_string(s.serialize()))
+	check(not t.hints_on, "turning hints off survives a restart")
