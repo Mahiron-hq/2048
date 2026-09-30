@@ -184,6 +184,8 @@ func _notification(what: int) -> void:
 			_apply_layout(wide)
 		_banner.rest_y = 128.0
 		_confetti.position = Vector2(size.x * 0.5, size.y * 0.55)
+	elif what == NOTIFICATION_VISIBILITY_CHANGED and is_visible_in_tree() and _pending_over:
+		_on_settled()
 
 
 func _on_skin_changed() -> void:
@@ -384,7 +386,9 @@ func _on_settled() -> void:
 	if not _pending_over or _game_over.is_open:
 		return
 	await get_tree().create_timer(0.35).timeout
-	if not _pending_over or _game_over.is_open:
+	# Leaving for the menu or settings in that moment must not pop the summary over them; it
+	# shows when the player comes back to the board instead.
+	if not _pending_over or _game_over.is_open or not _app.is_current(self):
 		return
 	_app.sfx.play(Sfx.Kind.LOSE)
 	_app.haptic_game_over()
