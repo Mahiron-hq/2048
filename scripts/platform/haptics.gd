@@ -1,32 +1,46 @@
 class_name Haptics
 extends RefCounted
-## Tactile feedback that is actually felt on phones.
+## Tactile feedback that is actually felt on phones, whatever the phone's own vibration settings.
 ##
-## Android 12+ files a vibration without attributes under a usage the user may have muted
-## (touch or notification feedback), so the game's buzzes could be dropped entirely. Everything
-## therefore goes through the system Vibrator with VibrationAttributes.USAGE_MEDIA, which Android
-## documents as the usage for games and interactive media. UI taps use the device's predefined
-## effects (tuned per actuator); merges and the game-over wave are one-shots and waveforms whose
-## amplitude and length both grow, so the steps are felt with or without amplitude control.
-## Other platforms use Input.vibrate_handheld.
+## Channel: Android 12+ files a vibration without attributes under touch feedback, which many
+## players switch off, so vibrations go through the system Vibrator with
+## VibrationAttributes.USAGE_MEDIA, the usage Android documents for games. Android 13+ drops even
+## those while the system-wide "Vibration & haptics" switch (Settings.System "vibrate_on") is off
+## and lets only USAGE_ACCESSIBILITY through; the game then uses that, so its own Vibration
+## switch is the one that decides.
 ##
-## A JNI call that fails aborts only the GDScript function making it, so every optional effect is
-## built in its own function and falls back to a predefined click; the base path never depends
-## on it.
+## Feel: most phones cannot vary vibration strength (no amplitude control, no composition
+## primitives), and on them long pulses become a harsh buzz. Effects are therefore picked per
+## actuator: composed clicks scaled by strength where primitives exist, amplitude-scaled pulses
+## where amplitude control exists, and otherwise the maker's tuned predefined effects, graded from
+## the lightest texture tick to the heavy click. The game-over wave falls back to short spaced
+## pulses whose duty cycle follows the wave.
+##
+## A JNI call that fails aborts only the GDScript function making it, so every optional query or
+## effect is made in its own function and has a safe default; the base path never depends on it.
 
 enum Kind { TICK, LIGHT }
 
 enum AndroidState { UNKNOWN, READY, FAILED }
 
+## How merges and the game-over wave are rendered on this phone's actuator.
+enum Actuator { PREDEFINED_ONLY, AMPLITUDE, PRIMITIVES }
+
 ## VibrationEffect.EFFECT_TICK and EFFECT_CLICK.
 const PREDEFINED := {Kind.TICK: 2, Kind.LIGHT: 0}
+## Merge tiers on actuators without strength control, lightest first: EFFECT_TEXTURE_TICK,
+## EFFECT_TICK, EFFECT_CLICK, EFFECT_HEAVY_CLICK.
+const MERGE_TIERS := [21, 2, 0, 5]
+## VibrationEffect.Composition.PRIMITIVE_CLICK.
+const PRIMITIVE_CLICK := 1
 ## Fallback pulse lengths; anything much shorter than ~20 ms is not reliably perceptible.
 const PULSE_MS := {Kind.TICK: 20, Kind.LIGHT: 30}
 const MIN_PULSE_MS := 20
 ## VibrationEffect.DEFAULT_AMPLITUDE: let the device pick its natural strength.
 const DEFAULT_AMPLITUDE := -1
-## VibrationAttributes.USAGE_MEDIA.
+## VibrationAttributes.USAGE_MEDIA and USAGE_ACCESSIBILITY.
 const USAGE_MEDIA := 19
+const USAGE_ACCESSIBILITY := 66
 
 ## Merging two tiles of this value is the weakest felt merge; merging 2s is silent.
 const MERGE_FIRST_FELT := 4
@@ -36,6 +50,8 @@ const MERGE_STRONGEST := 65536
 ## carries the strength on actuators without amplitude control.
 const MERGE_AMPLITUDE := Vector2i(60, 255)
 const MERGE_MS := Vector2i(20, 60)
+## Composed click scale for the weakest and the strongest merge.
+const MERGE_SCALE := Vector2(0.3, 1.0)
 
 ## Game over: one second of medium-soft vibration in two swells, the second 1.5 times as long,
 ## with a short pause between them.
@@ -43,16 +59,20 @@ const WAVE_SWELL_SEGMENTS := [12, 18]
 const WAVE_SEGMENT_MS := 32
 const WAVE_PAUSE_MS := 40
 const WAVE_AMPLITUDE := Vector2i(50, 120)
+## Pulse length range of the spaced-pulse wave, per segment, for actuators without amplitude.
+const WAVE_PULSE_MS := Vector2i(6, 15)
 
 static var _vibrator = null
-static var _attributes = null
+static var _media_attributes = null
+static var _accessibility_attributes = null
 static var _effect_class = null
 static var _effects := {}
 static var _merge_effects := {}
 static var _wave_effect = null
 static var _wave_built := false
 static var _android := AndroidState.UNKNOWN
-static var _system_blocked := false
+static var _actuator := Actuator.PREDEFINED_ONLY
+static var _system_switch_off := false
 
 
 ## Plays a short UI feedback of [param kind].
@@ -73,34 +93,10 @@ static func merge(value: int) -> void:
 		if not _merge_effects.has(level):
 			# Stored before building so a failing build is not retried on every merge.
 			_merge_effects[level] = null
-			_merge_effects[level] = _make_merge_effect(strength)
+			_merge_effects[level] = _make_merge_effect(level, strength)
 		_vibrate(_merge_effects[level])
 		return
 	Input.vibrate_handheld(merge_ms(strength), lerpf(0.25, 1.0, strength))
-
-
-## True when the phone itself silences app vibrations, so the game's buzzes cannot be felt.
-## Android 13+ drops every app vibration while the system-wide switch (Accessibility → Vibration
-## & haptics, Settings.System "vibrate_on") is off; no usage an app may legitimately pick gets
-## past it, so the settings screen points the player there instead.
-static func blocked_by_system() -> bool:
-	if OS.get_name() != "Android" or OS.get_version().to_int() < 13:
-		return false
-	_system_blocked = false
-	_read_system_block()
-	return _system_blocked
-
-
-## Opens the phone's accessibility settings, where Android keeps the vibration switch; there is
-## no public intent for the vibration page itself.
-static func open_system_settings() -> void:
-	if OS.get_name() != "Android" or not Engine.has_singleton("AndroidRuntime"):
-		return
-	var activity = Engine.get_singleton("AndroidRuntime").getActivity()
-	var intent_class = JavaClassWrapper.wrap("android.content.Intent")
-	if activity == null or intent_class == null:
-		return
-	activity.startActivity(intent_class.Intent("android.settings.ACCESSIBILITY_SETTINGS"))
 
 
 ## One second of soft, wavy vibration when the game is lost.
@@ -112,6 +108,14 @@ static func game_over() -> void:
 		_vibrate(_wave_effect)
 		return
 	Input.vibrate_handheld(1000, WAVE_AMPLITUDE.y / 255.0)
+
+
+## Re-reads the system vibration switch; call when the game returns to the foreground, since the
+## player may have changed it meanwhile.
+static func refresh_system_state() -> void:
+	if _android == AndroidState.READY:
+		_system_switch_off = false
+		_read_system_switch()
 
 
 ## Strength step for merging two [param value] tiles: 0 (none) for 2s, 1 for 4s, up to
@@ -144,6 +148,12 @@ static func merge_ms(strength: float) -> int:
 	return roundi(lerpf(MERGE_MS.x, MERGE_MS.y, strength))
 
 
+## Predefined effect id for a merge of [param level] on actuators without strength control.
+static func merge_tier(level: int) -> int:
+	var tier := int(merge_strength(level) * MERGE_TIERS.size())
+	return MERGE_TIERS[mini(tier, MERGE_TIERS.size() - 1)]
+
+
 ## Segment lengths of the game-over waveform: each swell's segments, with a pause between swells.
 static func wave_timings() -> PackedInt64Array:
 	var out := PackedInt64Array()
@@ -168,11 +178,41 @@ static func wave_amplitudes() -> PackedInt32Array:
 	return out
 
 
-static func _make_merge_effect(strength: float):
-	return _effect_class.createOneShot(merge_ms(strength), merge_amplitude(strength))
+## The same wave for actuators that only switch on and off: every segment becomes a short pulse
+## and a gap, the pulse longer where the wave is stronger. Returns alternating off/on durations
+## starting with an off one, as VibrationEffect.createWaveform(long[], int) expects.
+static func pulse_wave_timings() -> PackedInt64Array:
+	var out := PackedInt64Array([0])
+	var timings := wave_timings()
+	var amplitudes := wave_amplitudes()
+	var carried_off := 0
+	for i in timings.size():
+		if amplitudes[i] == 0:
+			carried_off += timings[i]
+			continue
+		var share := inverse_lerp(WAVE_AMPLITUDE.x, WAVE_AMPLITUDE.y, amplitudes[i])
+		var on := roundi(lerpf(WAVE_PULSE_MS.x, WAVE_PULSE_MS.y, clampf(share, 0.0, 1.0)))
+		out[out.size() - 1] += carried_off
+		out.append(on)
+		out.append(timings[i] - on)
+		carried_off = 0
+	return out
+
+
+static func _make_merge_effect(level: int, strength: float):
+	match _actuator:
+		Actuator.PRIMITIVES:
+			var composition = _effect_class.startComposition()
+			composition.addPrimitive(PRIMITIVE_CLICK, lerpf(MERGE_SCALE.x, MERGE_SCALE.y, strength))
+			return composition.compose()
+		Actuator.AMPLITUDE:
+			return _effect_class.createOneShot(merge_ms(strength), merge_amplitude(strength))
+	return _effect_class.createPredefined(merge_tier(level))
 
 
 static func _make_wave_effect():
+	if _actuator == Actuator.PREDEFINED_ONLY:
+		return _effect_class.createWaveform(pulse_wave_timings(), -1)
 	return _effect_class.createWaveform(wave_timings(), wave_amplitudes(), -1)
 
 
@@ -180,19 +220,12 @@ static func _make_wave_effect():
 static func _vibrate(effect) -> void:
 	if effect == null:
 		effect = _effects[Kind.LIGHT]
-	if _attributes != null:
-		_vibrator.vibrate(effect, _attributes)
+	var attributes = _accessibility_attributes if _system_switch_off and _accessibility_attributes != null \
+			else _media_attributes
+	if attributes != null:
+		_vibrator.vibrate(effect, attributes)
 	else:
 		_vibrator.vibrate(effect)
-
-
-static func _read_system_block() -> void:
-	var activity = Engine.get_singleton("AndroidRuntime").getActivity() if Engine.has_singleton("AndroidRuntime") else null
-	var settings = JavaClassWrapper.wrap("android.provider.Settings$System")
-	if activity == null or settings == null:
-		return
-	var vibrate_on: int = settings.getInt(activity.getContentResolver(), "vibrate_on", 1)
-	_system_blocked = vibrate_on == 0
 
 
 static func _android_available() -> bool:
@@ -201,6 +234,8 @@ static func _android_available() -> bool:
 		_android = AndroidState.FAILED
 		if _init_android():
 			_android = AndroidState.READY
+			_detect_actuator()
+			refresh_system_state()
 	return _android == AndroidState.READY
 
 
@@ -232,7 +267,33 @@ static func _init_android() -> bool:
 		_effects[kind] = effect
 	var attributes_class = JavaClassWrapper.wrap("android.os.VibrationAttributes")
 	if attributes_class != null and attributes_class.has_java_method("createForUsage"):
-		_attributes = attributes_class.createForUsage(USAGE_MEDIA)
+		_media_attributes = attributes_class.createForUsage(USAGE_MEDIA)
+		_accessibility_attributes = attributes_class.createForUsage(USAGE_ACCESSIBILITY)
 	_effect_class = effect_class
 	_vibrator = vibrator
 	return true
+
+
+## Leaves PREDEFINED_ONLY in place if a query fails, the choice that suits every actuator.
+static func _detect_actuator() -> void:
+	if not _effect_class.has_java_method("createPredefined"):
+		_actuator = Actuator.AMPLITUDE
+		return
+	if _vibrator.has_java_method("areAllPrimitivesSupported") \
+			and _vibrator.areAllPrimitivesSupported(PackedInt32Array([PRIMITIVE_CLICK])):
+		_actuator = Actuator.PRIMITIVES
+	elif _vibrator.hasAmplitudeControl():
+		_actuator = Actuator.AMPLITUDE
+
+
+## Android 13+ silences every usage but accessibility while "vibrate_on" is 0; earlier versions
+## do not use the setting for app vibrations.
+static func _read_system_switch() -> void:
+	if OS.get_version().to_int() < 13 or _accessibility_attributes == null:
+		return
+	var activity = Engine.get_singleton("AndroidRuntime").getActivity()
+	var settings = JavaClassWrapper.wrap("android.provider.Settings$System")
+	if activity == null or settings == null:
+		return
+	var vibrate_on: int = settings.getInt(activity.getContentResolver(), "vibrate_on", 1)
+	_system_switch_off = vibrate_on == 0

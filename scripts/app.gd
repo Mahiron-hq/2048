@@ -178,9 +178,8 @@ func _notification(what: int) -> void:
 			# The system refresh rate setting may have changed while the game was away.
 			DisplayRate.apply(store.fps_limit)
 			_apply_safe_area()
-			# The player may be back from turning vibration on in the phone's settings.
-			if _current == _settings:
-				_settings.refresh()
+			# The system vibration switch may have changed while the game was away.
+			Haptics.refresh_system_state()
 
 
 func _unhandled_input(event: InputEvent) -> void:
