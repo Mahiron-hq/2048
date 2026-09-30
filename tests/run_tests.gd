@@ -51,6 +51,7 @@ func _initialize() -> void:
 		"test_hint_solver_respects_its_budget",
 		"test_hint_solver_plays_well",
 		"test_hints_setting_persists",
+		"test_haptics_without_strength_control",
 	]
 	for t in tests:
 		_current = t
@@ -765,3 +766,33 @@ func test_hints_setting_persists() -> void:
 	var t := SaveStore.new("user://unused.json")
 	t.apply_dict(JSON.parse_string(s.serialize()))
 	check(not t.hints_on, "turning hints off survives a restart")
+
+
+func test_haptics_without_strength_control() -> void:
+	# Merges step through the maker's tuned effects from the lightest to the heaviest.
+	var tiers: Array = []
+	for level in range(1, Haptics.merge_level_count() + 1):
+		var tier := Haptics.merge_tier(level)
+		check(Haptics.MERGE_TIERS.has(tier), "level %d maps to a predefined effect" % level)
+		if tiers.is_empty() or tiers[-1] != tier:
+			tiers.append(tier)
+	check(tiers == Haptics.MERGE_TIERS, "merges climb through every tier in order: %s" % [tiers])
+	check(Haptics.merge_tier(1) == Haptics.MERGE_TIERS[0] and Haptics.merge_tier(Haptics.merge_level_count()) == Haptics.MERGE_TIERS[-1], "4s get the lightest, 65536 the heaviest")
+	# The game-over wave becomes short spaced pulses with the same one-second two-swell shape.
+	var timings := Haptics.pulse_wave_timings()
+	check(timings[0] == 0 and timings.size() % 2 == 1, "pattern starts with a zero-length pause, then on/off pairs")
+	var total := 0
+	var longest := 0
+	var swells: Array[int] = [0]
+	for i in timings.size():
+		total += timings[i]
+		if i % 2 == 1:
+			longest = maxi(longest, timings[i])
+			check(timings[i] >= Haptics.WAVE_PULSE_MS.x and timings[i] <= Haptics.WAVE_PULSE_MS.y, "pulse %d is short (%d ms)" % [i, timings[i]])
+		if i > 0 and i % 2 == 0 and timings[i] >= Haptics.WAVE_PAUSE_MS:
+			swells.append(0)
+		elif i > 0:
+			swells[-1] += timings[i]
+	check(total == 1000, "still one second in total (%d ms)" % total)
+	check(swells.size() == 2, "two swells separated by the pause: %s" % [swells])
+	check(longest <= Haptics.WAVE_PULSE_MS.y, "no long continuous buzz (longest pulse %d ms)" % longest)
