@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://drgg6lfllc3cp"
-path="res://.godot/imported/Roboto.ttf-dc0667870842ceadec80fa3edb93aeb5.fontdata"
+uid="uid://c86qir32jm2bk"
+path="res://.godot/imported/Manrope.ttf-ecfd2e896dbe43e438bf404172bc1e6d.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/Roboto.ttf"
-dest_files=["res://.godot/imported/Roboto.ttf-dc0667870842ceadec80fa3edb93aeb5.fontdata"]
+source_file="res://assets/fonts/Manrope.ttf"
+dest_files=["res://.godot/imported/Manrope.ttf-ecfd2e896dbe43e438bf404172bc1e6d.fontdata"]
 
 [params]
 

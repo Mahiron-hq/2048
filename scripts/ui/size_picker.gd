@@ -5,12 +5,13 @@ extends Control
 
 signal chosen(size: int)
 
-const ROW_HEIGHT := 84.0
-const MIN_WIDTH := 300.0
+const ROW_HEIGHT := Design.CONTROL_MD
+const MIN_WIDTH := Design.CONTROL_LG * 3.0
+const INSET := Design.SPACE_XS
 
 var is_open := false
 
-var _card := Card.make(10, 30)
+var _card := Card.make(INSET, Design.RADIUS_LG, 2)
 var _list := VBoxContainer.new()
 var _tween: Tween
 
@@ -19,7 +20,8 @@ func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
-	_list.add_theme_constant_override("separation", 4)
+	_card.raised = true
+	_list.add_theme_constant_override("separation", int(Design.SPACE_2XS))
 	_card.add_child(_list)
 	_card.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_card)
@@ -37,7 +39,7 @@ func open_at(anchor: Rect2, current: int) -> void:
 	var width := maxf(anchor.size.x, MIN_WIDTH)
 	for row: _Row in _list.get_children():
 		row.selected = row.grid == current
-		row.custom_minimum_size = Vector2(width - 20.0, ROW_HEIGHT)
+		row.custom_minimum_size = Vector2(width - INSET * 2.0, ROW_HEIGHT)
 		row.queue_redraw()
 	is_open = true
 	show()
@@ -47,25 +49,25 @@ func open_at(anchor: Rect2, current: int) -> void:
 	_card.size = card_size
 	var local := get_global_transform().affine_inverse() * anchor.position
 	var area := get_rect().size
-	var space_above := local.y - 12.0
-	var space_below := area.y - (local.y + anchor.size.y + 12.0)
+	var space_above := local.y - Design.SPACE_SM
+	var space_below := area.y - (local.y + anchor.size.y + Design.SPACE_SM)
 	var above := space_above >= card_size.y or space_above >= space_below
-	var y := local.y - card_size.y - 12.0 if above else local.y + anchor.size.y + 12.0
-	y = clampf(y, 8.0, maxf(8.0, area.y - card_size.y - 8.0))
-	var x := clampf(local.x, 8.0, maxf(8.0, area.x - card_size.x - 8.0))
+	var y := local.y - card_size.y - Design.SPACE_SM if above else local.y + anchor.size.y + Design.SPACE_SM
+	y = clampf(y, Design.SPACE_XS, maxf(Design.SPACE_XS, area.y - card_size.y - Design.SPACE_XS))
+	var x := clampf(local.x, Design.SPACE_XS, maxf(Design.SPACE_XS, area.x - card_size.x - Design.SPACE_XS))
 	_card.position = Vector2(x, y)
 	# Short landscape screens: shrink the card rather than let it leave the screen.
-	var fit := minf(1.0, (area.y - 16.0) / card_size.y)
+	var fit := minf(1.0, (area.y - Design.SPACE_MD) / card_size.y)
 	_card.pivot_offset = Vector2(card_size.x * 0.2, card_size.y if above else 0.0)
 	if fit < 1.0:
-		_card.position.y = 8.0
+		_card.position.y = Design.SPACE_XS
 		_card.pivot_offset = Vector2(card_size.x * 0.2, 0.0)
-	_card.scale = Vector2(0.92, 0.92) * fit
+	_card.scale = Vector2(0.94, 0.94) * fit
 	if _tween:
 		_tween.kill()
-	_tween = create_tween().set_parallel()
-	_tween.tween_property(_card, "modulate:a", 1.0, 0.14)
-	_tween.tween_property(_card, "scale", Vector2(fit, fit), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(_card, "modulate:a", 1.0, Design.DUR_FAST)
+	_tween.tween_property(_card, "scale", Vector2(fit, fit), Design.DUR_BASE)
 
 
 func close() -> void:
@@ -75,8 +77,8 @@ func close() -> void:
 	if _tween:
 		_tween.kill()
 	_tween = create_tween().set_parallel()
-	_tween.tween_property(_card, "modulate:a", 0.0, 0.12)
-	_tween.tween_property(_card, "scale", Vector2(0.95, 0.95), 0.12)
+	_tween.tween_property(_card, "modulate:a", 0.0, Design.DUR_FAST)
+	_tween.tween_property(_card, "scale", Vector2(0.96, 0.96), Design.DUR_FAST)
 	_tween.chain().tween_callback(hide)
 
 
@@ -97,7 +99,7 @@ class _Row:
 
 	var grid := 4
 	var selected := false
-	var _font: Font = Fonts.sans(Fonts.BOLD)
+	var _font: Font = Fonts.sans(Design.WEIGHT_BOLD)
 	var _box := StyleBoxFlat.new()
 
 	func _init() -> void:
@@ -112,22 +114,19 @@ class _Row:
 	func _draw() -> void:
 		var p := Palette.current
 		if selected or is_hovered() or button_pressed:
-			_box.bg_color = Color(p.accent, 0.16 if selected else 0.08)
-			_box.set_corner_radius_all(20)
-			_box.corner_detail = 8
+			_box = Design.surface_box(p.accent_soft if selected else p.track, Design.RADIUS_LG - INSET)
 			draw_style_box(_box, Rect2(Vector2.ZERO, size))
-		var preview := size.y * 0.56
-		var origin := Vector2(18.0, (size.y - preview) * 0.5)
-		var cell_gap := preview * 0.06
+		var preview := Design.ICON_MD + Design.SPACE_XS
+		var origin := Vector2(Design.SPACE_MD, (size.y - preview) * 0.5)
+		var cell_gap := maxf(1.0, preview * 0.06)
 		var cell := (preview - cell_gap * (grid - 1)) / grid
 		for gy in grid:
 			for gx in grid:
 				var value := 2 << ((gx + gy * 2) % 6)
 				var pos := origin + Vector2(gx, gy) * (cell + cell_gap)
 				draw_rect(Rect2(pos, Vector2(cell, cell)), p.tile_bg(value))
-		var label := I18n.grid(grid)
-		var fs := 30
-		draw_string(_font, Vector2(origin.x + preview + 22.0, size.y * 0.5 + fs * 0.36), label,
+		var fs := Design.TEXT_BODY
+		draw_string(_font, Vector2(origin.x + preview + Design.SPACE_MD, Fonts.baseline(size.y * 0.5, fs)), I18n.grid(grid),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, fs, p.accent if selected else p.text)
 		if selected:
-			Icons.draw(self, Icons.Kind.CHECK, Vector2(size.x - 34.0, size.y * 0.5), 30.0, p.accent)
+			Icons.draw(self, Icons.Kind.CHECK, Vector2(size.x - Design.SPACE_MD - Design.ICON_SM * 0.5, size.y * 0.5), Design.ICON_SM, p.accent)

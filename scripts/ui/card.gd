@@ -2,15 +2,21 @@ class_name Card
 extends PanelContainer
 ## Rounded surface panel that follows the palette.
 
-var radius := 36
-var padding := 32
-var elevated := true
+var radius := Design.RADIUS_LG
+var padding := Design.SPACE_LG
+## Top and bottom padding when it differs from the sides; negative keeps [member padding].
+var padding_v := -1.0
+## 0 flat, 1 raised (cards), 2 dialog.
+var depth := 1
+## Fill role: false uses the surface color, true the raised one (popovers, dialogs).
+var raised := false
 
 
-static func make(p_padding := 32, p_radius := 36) -> Card:
+static func make(p_padding := Design.SPACE_LG, p_radius := Design.RADIUS_LG, p_depth := 1) -> Card:
 	var c := Card.new()
 	c.padding = p_padding
 	c.radius = p_radius
+	c.depth = p_depth
 	return c
 
 
@@ -20,15 +26,8 @@ func _ready() -> void:
 
 func _on_skin_changed() -> void:
 	var p := Palette.current
-	var box := StyleBoxFlat.new()
-	box.bg_color = p.surface
-	box.set_corner_radius_all(radius)
-	box.corner_detail = 12
-	box.set_content_margin_all(padding)
-	box.border_color = p.surface_border
-	box.set_border_width_all(0 if p.dark else 1)
-	if elevated:
-		box.shadow_color = p.shadow
-		box.shadow_size = 18
-		box.shadow_offset = Vector2(0, 8)
+	var box := Design.surface_box(p.surface_raised if raised else p.surface, radius, depth, padding)
+	if padding_v >= 0.0:
+		box.content_margin_top = padding_v
+		box.content_margin_bottom = padding_v
 	add_theme_stylebox_override("panel", box)

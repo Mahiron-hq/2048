@@ -25,6 +25,12 @@ const STRINGS := {
 		"THEME": "Theme",
 		"THEME_LIGHT": "Light",
 		"THEME_DARK": "Dark",
+		"THEME_SYSTEM": "Auto",
+		"QUALITY": "Graphics quality",
+		"QUALITY_LOW": "Low",
+		"QUALITY_MEDIUM": "Medium",
+		"QUALITY_HIGH": "High",
+		"QUALITY_HINT": "Rendering at %s. Lower quality saves battery on sharp screens.",
 		"LANGUAGE": "Language",
 		"SHOW_FPS": "Show FPS",
 		"FPS_LIMIT": "Frame rate limit",
@@ -82,6 +88,12 @@ const STRINGS := {
 		"THEME": "Тема",
 		"THEME_LIGHT": "Светлая",
 		"THEME_DARK": "Тёмная",
+		"THEME_SYSTEM": "Авто",
+		"QUALITY": "Качество графики",
+		"QUALITY_LOW": "Низкое",
+		"QUALITY_MEDIUM": "Среднее",
+		"QUALITY_HIGH": "Высокое",
+		"QUALITY_HINT": "Сейчас картинка %s. На чётких экранах качество пониже бережёт батарею.",
 		"LANGUAGE": "Язык",
 		"SHOW_FPS": "Показывать FPS",
 		"FPS_LIMIT": "Ограничение FPS",
@@ -145,12 +157,12 @@ static func duration(seconds: float) -> String:
 	return t("TIME_S") % total
 
 
-## Groups thousands with a thin space: 12480 -> "12 480".
+## Groups thousands with a no-break space (the font has no thin one): 12480 -> "12 480".
 static func number(n: int) -> String:
 	var digits := str(absi(n))
 	var out := ""
 	while digits.length() > 3:
-		out = " " + digits.right(3) + out
+		out = " " + digits.right(3) + out
 		digits = digits.left(digits.length() - 3)
 	return ("-" if n < 0 else "") + digits + out
 

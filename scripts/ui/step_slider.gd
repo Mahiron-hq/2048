@@ -4,9 +4,9 @@ extends Control
 
 signal changed(value: int)
 
-const KNOB_RADIUS := 17.0
+const KNOB_RADIUS := 18.0
 const TRACK_WIDTH := 8.0
-const TICK_RADIUS := 3.5
+const TICK_RADIUS := 3.0
 ## Finger travel, in screen units, that decides between dragging the knob and scrolling past.
 const TAP_SLOP := 12.0
 
@@ -31,7 +31,7 @@ var _press_x := 0.0
 
 
 func _init() -> void:
-	custom_minimum_size = Vector2(220, 56)
+	custom_minimum_size = Vector2(Design.CONTROL_LG * 2.0, Design.CONTROL_SM)
 	focus_mode = Control.FOCUS_NONE
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
@@ -54,8 +54,7 @@ func _on_skin_changed() -> void:
 
 ## A touch only moves the knob once it is clearly a tap or a sideways drag; a vertical swipe that
 ## starts on the slider scrolls the page and leaves the value alone. Screen positions are
-## compared because the slider scrolls along with the finger. Only a sideways drag keeps its
-## motion from the scroll container.
+## compared because the slider scrolls along with the finger.
 func _gui_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb and mb.button_index == MOUSE_BUTTON_LEFT:
@@ -94,7 +93,7 @@ func _pick(x: float) -> void:
 	if _tween:
 		_tween.kill()
 	_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(self, "_pos", float(index), 0.14)
+	_tween.tween_property(self, "_pos", float(index), Design.DUR_FAST)
 	changed.emit(value)
 
 
@@ -104,17 +103,15 @@ func _draw() -> void:
 	var x0 := KNOB_RADIUS
 	var x1 := size.x - KNOB_RADIUS
 	var knob_x := lerpf(x0, x1, _pos / float(steps - 1))
-	var off := p.surface_border if not p.dark else p.surface_pressed.lightened(0.08)
-	_capsule(x0, x1, y, off)
+	_capsule(x0, x1, y, p.track)
 	_capsule(x0, knob_x, y, p.accent)
 	for i in steps:
 		var tx := lerpf(x0, x1, i / float(steps - 1))
 		var on := tx <= knob_x + 0.5
-		draw_circle(Vector2(tx, y), TICK_RADIUS, Color(p.accent_text, 0.85) if on else p.text_muted, true, -1.0, true)
-	draw_circle(Vector2(knob_x, y + 2.0), KNOB_RADIUS, Color(0, 0, 0, 0.18), true, -1.0, true)
-	draw_circle(Vector2(knob_x, y), KNOB_RADIUS, Color.WHITE, true, -1.0, true)
-	draw_arc(Vector2(knob_x, y), KNOB_RADIUS - 1.0, 0.0, TAU, 32, Color(p.accent, 0.45), 2.0, true)
-	draw_circle(Vector2(knob_x, y), KNOB_RADIUS * 0.34, p.accent, true, -1.0, true)
+		draw_circle(Vector2(tx, y), TICK_RADIUS, Color(p.on_accent, 0.7) if on else p.text_tertiary, true, -1.0, true)
+	draw_circle(Vector2(knob_x, y + 1.5), KNOB_RADIUS, Color(p.shadow, p.shadow.a * 2.0), true, -1.0, true)
+	draw_circle(Vector2(knob_x, y), KNOB_RADIUS, Color.WHITE if not p.dark else p.text, true, -1.0, true)
+	draw_circle(Vector2(knob_x, y), KNOB_RADIUS * 0.3, p.accent, true, -1.0, true)
 
 
 func _capsule(a: float, b: float, y: float, color: Color) -> void:

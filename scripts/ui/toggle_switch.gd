@@ -1,8 +1,8 @@
 class_name ToggleSwitch
 extends BaseButton
-## iOS/Material-style on/off switch with an animated knob.
+## On/off switch with a sliding knob.
 
-const TRACK := Vector2(88, 50)
+const KNOB_INSET := 5.0
 
 var _t := 0.0:
 	set(v):
@@ -15,7 +15,7 @@ var _box := StyleBoxFlat.new()
 func _init() -> void:
 	toggle_mode = true
 	focus_mode = Control.FOCUS_NONE
-	custom_minimum_size = TRACK
+	custom_minimum_size = Design.SWITCH_SIZE
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	toggled.connect(_on_toggled)
 
@@ -33,25 +33,23 @@ func _on_skin_changed() -> void:
 func _on_toggled(on: bool) -> void:
 	if _tween:
 		_tween.kill()
-	_tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(self, "_t", 1.0 if on else 0.0, 0.22)
+	_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(self, "_t", 1.0 if on else 0.0, Design.DUR_BASE)
 	if App.instance:
 		App.instance.feedback_click()
 
 
 func _draw() -> void:
 	var p := Palette.current
-	var origin := (size - TRACK) * 0.5
-	var r := TRACK.y * 0.5
-	var off := p.surface_border if not p.dark else p.surface_pressed.lightened(0.08)
-	var track_color := off.lerp(p.accent, clampf(_t, 0.0, 1.0))
-	var box := _box
-	box.bg_color = track_color
-	box.set_corner_radius_all(int(r))
-	box.corner_detail = 12
-	draw_style_box(box, Rect2(origin, TRACK))
-	var knob_r := r - 5.0
-	var x := lerpf(origin.x + r, origin.x + TRACK.x - r, _t)
-	var c := Vector2(x, origin.y + r)
-	draw_circle(c + Vector2(0, 2), knob_r, Color(0, 0, 0, 0.18), true, -1.0, true)
-	draw_circle(c, knob_r, Color.WHITE, true, -1.0, true)
+	var track := Design.SWITCH_SIZE
+	var origin := (size - track) * 0.5
+	var r := track.y * 0.5
+	_box.bg_color = p.track.lerp(p.accent, clampf(_t, 0.0, 1.0))
+	_box.set_corner_radius_all(int(r))
+	_box.corner_detail = 12
+	_box.anti_aliasing = true
+	draw_style_box(_box, Rect2(origin, track))
+	var knob_r := r - KNOB_INSET
+	var c := Vector2(lerpf(origin.x + r, origin.x + track.x - r, _t), origin.y + r)
+	draw_circle(c + Vector2(0, 1.5), knob_r, Color(p.shadow, p.shadow.a * 2.0), true, -1.0, true)
+	draw_circle(c, knob_r, Color.WHITE if not p.dark else p.text, true, -1.0, true)

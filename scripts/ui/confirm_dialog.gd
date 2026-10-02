@@ -2,8 +2,8 @@ class_name ConfirmDialog
 extends Modal
 ## Yes/cancel question. The confirm callback is supplied per [method ask] call.
 
-var _title := SkinLabel.make("CONFIRM_NEW_TITLE", 40, Fonts.BOLD)
-var _text := SkinLabel.make("CONFIRM_NEW_BODY", 28, Fonts.REGULAR, SkinLabel.Role.MUTED)
+var _title := SkinLabel.make("CONFIRM_NEW_TITLE", Design.TEXT_HEADLINE, Design.WEIGHT_HEAVY)
+var _text := SkinLabel.make("CONFIRM_NEW_BODY", Design.TEXT_CALLOUT, Design.WEIGHT_REGULAR, SkinLabel.Role.MUTED)
 var _yes := PillButton.make("YES_NEW", PillButton.Look.PRIMARY)
 var _no := PillButton.make("CANCEL", PillButton.Look.SECONDARY)
 var _on_yes := Callable()
@@ -17,9 +17,7 @@ func _init() -> void:
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(_title)
 	body.add_child(_text)
-	var spacer := Control.new()
-	spacer.custom_minimum_size.y = 8
-	body.add_child(spacer)
+	body.add_child(Modal.gap(Design.SPACE_MD))
 	body.add_child(Modal.button_row([_no, _yes]))
 	_yes.pressed.connect(_confirm)
 	_no.pressed.connect(close)

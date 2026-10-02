@@ -1,6 +1,6 @@
 class_name Modal
 extends Control
-## Full-screen scrim with a centered card that scales in. Subclasses fill [member body].
+## Dimmed backdrop with a centered dialog card that eases in. Subclasses fill [member body].
 
 signal closed
 
@@ -8,10 +8,10 @@ var body := VBoxContainer.new()
 var is_open := false
 
 var _scrim := ColorRect.new()
-var _card := Card.make(44, 44)
+var _card := Card.make(Design.SPACE_XL + Design.SPACE_XS, Design.RADIUS_XL, 2)
 var _center := CenterContainer.new()
 var _tween: Tween
-## Pop-in progress multiplied into the card's fit-to-screen scale.
+## Entry progress multiplied into the card's fit-to-screen scale.
 var _pop := 1.0:
 	set(v):
 		_pop = v
@@ -28,10 +28,11 @@ func _init() -> void:
 	_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_center)
-	_card.custom_minimum_size = Vector2(560, 0)
+	_card.raised = true
+	_card.custom_minimum_size = Vector2(Design.DIALOG_WIDTH, 0)
 	_center.add_child(_card)
 	_card.resized.connect(_apply_scale)
-	body.add_theme_constant_override("separation", 22)
+	body.add_theme_constant_override("separation", int(Design.SPACE_MD))
 	body.alignment = BoxContainer.ALIGNMENT_CENTER
 	_card.add_child(body)
 
@@ -52,11 +53,11 @@ func open() -> void:
 	_scrim.modulate.a = 0.0
 	_card.modulate.a = 0.0
 	_fit_card()
-	_pop = 0.86
-	_tween = create_tween().set_parallel()
-	_tween.tween_property(_scrim, "modulate:a", 1.0, 0.24)
-	_tween.tween_property(_card, "modulate:a", 1.0, 0.2).set_delay(0.05)
-	_tween.tween_property(self, "_pop", 1.0, 0.36).set_delay(0.05).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_pop = 0.94
+	_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(_scrim, "modulate:a", 1.0, Design.DUR_SLOW)
+	_tween.tween_property(_card, "modulate:a", 1.0, Design.DUR_BASE).set_delay(Design.DUR_INSTANT * 0.5)
+	_tween.tween_property(self, "_pop", 1.0, Design.DUR_SLOW).set_delay(Design.DUR_INSTANT * 0.5)
 
 
 func close() -> void:
@@ -65,10 +66,10 @@ func close() -> void:
 	is_open = false
 	if _tween:
 		_tween.kill()
-	_tween = create_tween().set_parallel().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_tween.tween_property(_scrim, "modulate:a", 0.0, 0.18)
-	_tween.tween_property(_card, "modulate:a", 0.0, 0.15)
-	_tween.tween_property(self, "_pop", 0.94, 0.18)
+	_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	_tween.tween_property(_scrim, "modulate:a", 0.0, Design.DUR_BASE)
+	_tween.tween_property(_card, "modulate:a", 0.0, Design.DUR_FAST)
+	_tween.tween_property(self, "_pop", 0.96, Design.DUR_FAST)
 	_tween.chain().tween_callback(hide)
 	closed.emit()
 
@@ -101,7 +102,7 @@ func _notification(what: int) -> void:
 
 
 func _fit_card() -> void:
-	_card.custom_minimum_size.x = minf(600.0, size.x - 64.0)
+	_card.custom_minimum_size.x = minf(Design.DIALOG_WIDTH, size.x - Design.GUTTER * 2.0)
 	_apply_scale()
 
 
@@ -111,16 +112,24 @@ func _apply_scale() -> void:
 	_card.pivot_offset = _card.size * 0.5
 	# Short landscape screens: shrink the card to fit instead of letting it spill off screen.
 	var fit := 1.0
-	if size.y > 64.0 and _card.size.y > 0.0:
-		fit = minf(1.0, (size.y - 32.0) / _card.size.y)
+	if size.y > Design.SPACE_3XL and _card.size.y > 0.0:
+		fit = minf(1.0, (size.y - Design.SPACE_XL) / _card.size.y)
 	_card.scale = Vector2.ONE * (fit * _pop)
 
 
 static func button_row(buttons: Array) -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
+	row.add_theme_constant_override("separation", int(Design.SPACE_SM))
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	for b in buttons:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(b)
 	return row
+
+
+## Fixed vertical space inside a dialog body.
+static func gap(height: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size.y = height
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c

@@ -2,16 +2,20 @@ class_name App
 extends Control
 ## Root controller: owns persistence, audio, theme and language, and routes between screens.
 
-const TRANSITION_OUT := 0.14
-const TRANSITION_IN := 0.24
-const SIDE_PADDING := 28.0
-const VERTICAL_PADDING := 24.0
+const TRANSITION_OUT := Design.DUR_FAST
+const TRANSITION_IN := Design.DUR_BASE + Design.DUR_INSTANT * 0.5
+const THEME_FADE := Design.DUR_SLOW + Design.DUR_INSTANT
+const SIDE_PADDING := Design.GUTTER
+const VERTICAL_PADDING := Design.SPACE_LG
 ## Idle loop pacing while nothing animates; input still wakes the loop immediately.
 const IDLE_SLEEP_USEC := 8000
 ## Stretch base per orientation: the short side is always 720 units, so controls keep the same
 ## physical size when the device turns.
 const BASE_PORTRAIT := Vector2i(720, 1280)
 const BASE_LANDSCAPE := Vector2i(1280, 720)
+## Short side of the rendered picture for each [enum SaveStore.Quality]; screens with fewer
+## pixels render at their own resolution.
+const QUALITY_SHORT_SIDE: Array[int] = [720, 1080, 1440]
 
 static var instance: App
 
@@ -59,10 +63,10 @@ func _init() -> void:
 func _ready() -> void:
 	store.load_from_disk()
 	if not store.existed:
-		store.theme = SaveStore.ThemeMode.DARK if DisplayServer.is_dark_mode() else SaveStore.ThemeMode.LIGHT
 		store.language = I18n.detect()
 	I18n.current = store.language
-	Palette.current = Palette.make(store.theme == SaveStore.ThemeMode.DARK)
+	Palette.current = Palette.make(_wants_dark())
+	DisplayServer.set_system_theme_change_callback(_on_system_theme_changed)
 
 	OS.low_processor_usage_mode_sleep_usec = IDLE_SLEEP_USEC
 	get_tree().set_auto_accept_quit(false)
@@ -90,9 +94,9 @@ func _ready() -> void:
 	add_overlay(_confirm)
 	add_overlay(_picker)
 
-	_fps_label.add_theme_font_override("font", Fonts.sans(Fonts.BOLD, true))
-	_fps_label.add_theme_font_size_override("font_size", 22)
-	_fps_label.add_theme_constant_override("outline_size", 6)
+	_fps_label.add_theme_font_override("font", Fonts.sans(Design.WEIGHT_BOLD, true))
+	_fps_label.add_theme_font_size_override("font_size", Design.TEXT_CAPTION)
+	_fps_label.add_theme_constant_override("outline_size", int(Design.SPACE_XS))
 	_fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fps_label.z_index = 100
 	add_child(_fps_label)
@@ -126,6 +130,7 @@ func _exit_tree() -> void:
 	_flush_save()
 	# Static caches would otherwise outlive the scene tree and show up as leaks at exit.
 	Fonts.clear_cache()
+	TileArt.clear_cache()
 	if instance == self:
 		instance = null
 
@@ -173,8 +178,10 @@ func _notification(what: int) -> void:
 			_flush_save()
 		NOTIFICATION_APPLICATION_FOCUS_IN:
 			_focused = true
+			_follow_system_theme()
 		NOTIFICATION_APPLICATION_RESUMED:
 			_focused = true
+			_follow_system_theme()
 			# The system refresh rate setting may have changed while the game was away.
 			DisplayRate.apply(store.fps_limit)
 			_apply_safe_area()
@@ -350,15 +357,61 @@ func set_fps_limit(limit: int) -> void:
 	save_now()
 
 
-## Swaps the palette with a crossfade from a snapshot of the old frame.
+## Stores the theme choice and crossfades to it if the look changes.
 func set_theme_mode(mode: SaveStore.ThemeMode) -> void:
 	if store.theme == mode:
 		return
 	store.theme = mode
 	save_now()
+	_apply_palette()
+
+
+## Picture quality: renders at a lower resolution to save power, or up to 2K.
+func set_quality(quality: SaveStore.Quality) -> void:
+	store.quality = quality
+	save_now()
+	_update_content_scale()
+
+
+## Resolution the picture is rendered at, in pixels.
+func render_resolution() -> Vector2i:
+	var vp := get_viewport()
+	if vp is SubViewport:
+		return (vp as SubViewport).size
+	var window := vp as Window
+	if window.content_scale_mode == Window.CONTENT_SCALE_MODE_VIEWPORT:
+		return window.content_scale_size
+	return window.size
+
+
+func _wants_dark() -> bool:
+	match store.theme:
+		SaveStore.ThemeMode.DARK:
+			return true
+		SaveStore.ThemeMode.LIGHT:
+			return false
+	return DisplayServer.is_dark_mode()
+
+
+func _on_system_theme_changed() -> void:
+	_follow_system_theme.call_deferred()
+
+
+func _follow_system_theme() -> void:
+	if store.theme == SaveStore.ThemeMode.SYSTEM:
+		_apply_palette()
+
+
+## Swaps the palette when the wanted look differs, crossfading from a snapshot of the old frame
+## so nothing flashes.
+func _apply_palette() -> void:
+	var dark := _wants_dark()
+	if dark == Palette.current.dark:
+		return
 	# The captured frame already shows any crossfade in progress, so one snapshot is enough.
 	_clear_theme_fade()
-	var img := get_viewport().get_texture().get_image()
+	# The headless test runs render nothing to capture.
+	var img := get_viewport().get_texture().get_image() if DisplayServer.get_name() != "headless" else null
 	if img:
 		_theme_snapshot = TextureRect.new()
 		_theme_snapshot.texture = ImageTexture.create_from_image(img)
@@ -370,11 +423,11 @@ func set_theme_mode(mode: SaveStore.ThemeMode) -> void:
 		_theme_snapshot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_theme_snapshot.z_index = 90
 		add_child(_theme_snapshot)
-	Palette.current = Palette.make(mode == SaveStore.ThemeMode.DARK)
+	Palette.current = Palette.make(dark)
 	_broadcast("_on_skin_changed")
 	if _theme_snapshot:
 		_theme_fade = create_tween()
-		_theme_fade.tween_property(_theme_snapshot, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE)
+		_theme_fade.tween_property(_theme_snapshot, "modulate:a", 0.0, THEME_FADE).set_trans(Tween.TRANS_SINE)
 		_theme_fade.tween_callback(_clear_theme_fade)
 
 
@@ -395,10 +448,12 @@ func set_language(lang: String) -> void:
 
 
 func _broadcast(method: StringName) -> void:
+	if method == &"_on_skin_changed":
+		theme = Design.make_theme()
 	propagate_call(method, [], true)
 	_fps_label.add_theme_color_override("font_color", Palette.current.text)
-	_fps_label.add_theme_color_override("font_outline_color", Palette.current.bg_bottom)
-	RenderingServer.set_default_clear_color(Palette.current.bg_bottom)
+	_fps_label.add_theme_color_override("font_outline_color", Palette.current.bg)
+	RenderingServer.set_default_clear_color(Palette.current.bg_deep)
 
 
 func _on_viewport_resized() -> void:
@@ -406,14 +461,28 @@ func _on_viewport_resized() -> void:
 	_apply_safe_area()
 
 
+## Lays the UI out on a 720-unit short side and renders it at the chosen quality: at the
+## screen's own resolution, or into a smaller canvas that the window scales up.
 func _update_content_scale() -> void:
 	var window := get_window()
 	if window == null or window != get_tree().root:
 		return
 	var px := Vector2(window.size)
+	if px.x < 1.0 or px.y < 1.0:
+		return
 	var base := BASE_LANDSCAPE if px.x > px.y * 1.1 else BASE_PORTRAIT
-	if window.content_scale_size != base:
+	var target := float(QUALITY_SHORT_SIDE[store.quality])
+	if minf(px.x, px.y) <= target:
+		window.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 		window.content_scale_size = base
+		window.content_scale_factor = 1.0
+		return
+	# Same layout units as the canvas mode gives, drawn into a canvas that much smaller.
+	var render := target / minf(px.x, px.y)
+	var stretch := minf(px.x / base.x, px.y / base.y)
+	window.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+	window.content_scale_size = Vector2i((px * render).round())
+	window.content_scale_factor = stretch * render
 
 
 func _apply_safe_area() -> void:

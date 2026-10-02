@@ -1,13 +1,14 @@
 class_name ScoreBox
 extends Control
-## Caption + number panel. The number counts up smoothly and gains float up as "+N".
+## Caption over a number on a surface panel. The number counts smoothly, gains float up as "+N",
+## and a new record lights the panel with the accent for a moment.
+
+const COUNT_TIME := 0.3
+const GAIN_TIME := 0.6
+const FLASH_TIME := 0.9
 
 var caption_key := ""
 var value := 0
-var highlight := false:
-	set(v):
-		highlight = v
-		queue_redraw()
 
 var _shown := 0.0:
 	set(v):
@@ -19,9 +20,10 @@ var _flash := 0.0:
 		_flash = v
 		queue_redraw()
 var _flash_tween: Tween
-var _box := StyleBoxFlat.new()
-var _caption_font: Font = Fonts.sans(Fonts.BOLD)
-var _value_font: Font = Fonts.sans(Fonts.BLACK, true)
+var _box: StyleBoxFlat
+var _ring: StyleBoxFlat
+var _caption_font: Font = Fonts.sans(Design.WEIGHT_BOLD, false, Design.CAPTION_TRACKING)
+var _value_font: Font = Fonts.sans(Design.WEIGHT_HEAVY, true)
 var _popups: Array[Label] = []
 
 
@@ -32,7 +34,7 @@ static func make(p_caption_key: String) -> ScoreBox:
 
 
 func _init() -> void:
-	custom_minimum_size = Vector2(150, 96)
+	custom_minimum_size = Vector2(Design.CONTROL_LG * 1.6, Design.CONTROL_LG)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
@@ -45,34 +47,39 @@ func set_value(v: int, animate := true) -> void:
 		_shown = v
 		return
 	_count_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_count_tween.tween_property(self, "_shown", float(v), 0.35)
+	_count_tween.tween_property(self, "_shown", float(v), COUNT_TIME)
 
 
-## Floats "+[param amount]" up from the box.
+## Floats "+[param amount]" up from below the box.
 func pop_gain(amount: int) -> void:
 	var l := _take_popup()
 	l.text = "+%d" % amount
 	l.add_theme_color_override("font_color", Palette.current.accent)
-	l.size = Vector2(size.x, 40)
-	l.position = Vector2(0, size.y + 22.0)
+	l.size = Vector2(size.x, Design.SPACE_XL)
+	l.position = Vector2(0, size.y + Design.SPACE_MD)
 	l.modulate.a = 1.0
 	l.visible = true
-	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "position:y", size.y - 16.0, 0.6)
-	tw.tween_property(l, "modulate:a", 0.0, 0.6).set_ease(Tween.EASE_IN)
+	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "position:y", size.y - Design.SPACE_XS, GAIN_TIME)
+	tw.tween_property(l, "modulate:a", 0.0, GAIN_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.chain().tween_callback(l.hide)
 
 
-## Brief glow, used when the best score is beaten.
+## Accent outline that fades, used when the best score is beaten.
 func flash() -> void:
 	if _flash_tween:
 		_flash_tween.kill()
 	_flash = 1.0
 	_flash_tween = create_tween()
-	_flash_tween.tween_property(self, "_flash", 0.0, 0.8).set_trans(Tween.TRANS_SINE)
+	_flash_tween.tween_property(self, "_flash", 0.0, FLASH_TIME).set_trans(Tween.TRANS_SINE)
 
 
 func _on_skin_changed() -> void:
+	var p := Palette.current
+	_box = Design.surface_box(p.surface, Design.RADIUS_LG, 1)
+	_ring = Design.surface_box(Color(p.accent, 0.0), Design.RADIUS_LG)
+	_ring.border_color = p.accent
+	_ring.set_border_width_all(Design.HAIRLINE + 1)
 	queue_redraw()
 
 
@@ -81,27 +88,22 @@ func _on_language_changed() -> void:
 
 
 func _draw() -> void:
+	if _box == null:
+		_on_skin_changed()
 	var p := Palette.current
-	_box.bg_color = p.board if not highlight else p.board.lerp(p.accent, 0.18)
-	_box.set_corner_radius_all(24)
-	_box.corner_detail = 10
+	var rect := Rect2(Vector2.ZERO, size)
+	draw_style_box(_box, rect)
 	if _flash > 0.0:
-		_box.shadow_color = Color(p.accent, 0.55 * _flash)
-		_box.shadow_size = int(16 * _flash)
-	else:
-		_box.shadow_size = 0
-	draw_style_box(_box, Rect2(Vector2.ZERO, size))
+		_ring.border_color = Color(p.accent, _flash)
+		draw_style_box(_ring, rect)
+	var room := size.x - Design.SPACE_MD * 2.0
 	var cap := I18n.t(caption_key).to_upper()
-	var cap_size := 20
-	var cw := _caption_font.get_string_size(cap, HORIZONTAL_ALIGNMENT_LEFT, -1, cap_size).x
-	draw_string(_caption_font, Vector2((size.x - cw) * 0.5, size.y * 0.33), cap, HORIZONTAL_ALIGNMENT_LEFT, -1, cap_size, p.text_muted)
-	var txt := str(int(round(_shown)))
-	var fs := 40
-	var w := _value_font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	while w > size.x - 20 and fs > 18:
-		fs -= 2
-		w = _value_font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	draw_string(_value_font, Vector2((size.x - w) * 0.5, size.y * 0.78), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, p.text)
+	var cap_size := Fonts.fit(_caption_font, cap, Design.TEXT_CAPTION, room)
+	var cap_color := p.text_secondary.lerp(p.accent, _flash)
+	Fonts.draw_centered(self, _caption_font, cap, Vector2(size.x * 0.5, size.y * 0.3), cap_size, cap_color)
+	var txt := I18n.number(int(round(_shown)))
+	var fs := Fonts.fit(_value_font, txt, Design.TEXT_HEADLINE, room, Design.TEXT_CAPTION)
+	Fonts.draw_centered(self, _value_font, txt, Vector2(size.x * 0.5, size.y * 0.66), fs, p.text)
 
 
 func _take_popup() -> Label:
@@ -110,8 +112,8 @@ func _take_popup() -> Label:
 			return l
 	var l := Label.new()
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_override("font", Fonts.sans(Fonts.BLACK, true))
-	l.add_theme_font_size_override("font_size", 30)
+	l.add_theme_font_override("font", Fonts.sans(Design.WEIGHT_HEAVY, true))
+	l.add_theme_font_size_override("font_size", Design.TEXT_CALLOUT)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	l.z_index = 5
 	add_child(l)

@@ -1,7 +1,9 @@
 class_name SettingsScreen
 extends Control
-## App settings (sound, music, vibration, theme, language, FPS overlay and cap) and game settings
-## (move hints, undo depth). Changes apply immediately.
+## App settings (sound, music, vibration, theme, language, graphics, FPS overlay and cap) and
+## game settings (move hints, undo depth). Changes apply immediately.
+##
+## Switches sit at the end of their row; selectors span the card under their title.
 
 signal back_requested
 
@@ -13,8 +15,10 @@ var _music_volume := StepSlider.new()
 var _haptics := ToggleSwitch.new()
 var _hints := ToggleSwitch.new()
 var _fps := ToggleSwitch.new()
-var _theme := Segmented.make(PackedStringArray(["THEME_LIGHT", "THEME_DARK"]))
+var _theme := Segmented.make(PackedStringArray(["THEME_SYSTEM", "THEME_LIGHT", "THEME_DARK"]))
 var _language := Segmented.make(PackedStringArray([I18n.LANGUAGE_NAMES.ru, I18n.LANGUAGE_NAMES.en]), false)
+var _quality := Segmented.make(PackedStringArray(["QUALITY_LOW", "QUALITY_MEDIUM", "QUALITY_HIGH"]))
+var _quality_hint := SkinLabel.make("QUALITY_HINT", Design.TEXT_CALLOUT, Design.WEIGHT_REGULAR, SkinLabel.Role.MUTED)
 var _undo := Segmented.make(PackedStringArray(["UNDO_OFF", "1", "2", "3", "4", "5"]))
 ## Options depend on the display, so they are filled in by [method refresh].
 var _fps_limit := Segmented.make(PackedStringArray(["∞"]), false)
@@ -22,8 +26,6 @@ var _fps_limit := Segmented.make(PackedStringArray(["∞"]), false)
 var _fps_limits: Array[int] = [0]
 var _dividers: Array[ColorRect] = []
 var _columns: Array[Control] = []
-
-const COLUMN_MAX_WIDTH := 760.0
 
 
 func setup(app: App) -> void:
@@ -34,90 +36,38 @@ func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 24)
+	root.add_theme_constant_override("separation", int(Design.SPACE_LG))
 	add_child(root)
-
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 22)
-	var back := PillButton.make_icon(Icons.Kind.BACK, 76)
-	back.pressed.connect(func() -> void: back_requested.emit())
-	header.add_child(back)
-	var title := SkinLabel.make("SETTINGS", 52, Fonts.BLACK)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title.custom_minimum_size.y = 76
-	header.add_child(title)
-	root.add_child(_centered(header))
+	root.add_child(_centered(ScreenHeader.make("SETTINGS", func() -> void: back_requested.emit())))
 
 	var scroll := TouchScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(scroll)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 22)
+	col.add_theme_constant_override("separation", int(Design.SPACE_MD))
 	scroll.add_child(_centered(col, true))
 
 	col.add_child(_section("APP_SETTINGS"))
-	var card := Card.make(10, 36)
-	var rows := VBoxContainer.new()
-	rows.add_theme_constant_override("separation", 0)
-	card.add_child(rows)
-	rows.add_child(_row("SOUND", _sound))
-	rows.add_child(_volume_row(_sound_volume))
-	rows.add_child(_divider())
-	rows.add_child(_row("MUSIC", _music))
-	rows.add_child(_volume_row(_music_volume))
-	rows.add_child(_divider())
-	rows.add_child(_row("HAPTICS", _haptics))
-	col.add_child(card)
-
-	var card2 := Card.make(10, 36)
-	var rows2 := VBoxContainer.new()
-	rows2.add_theme_constant_override("separation", 0)
-	card2.add_child(rows2)
-	_theme.custom_minimum_size = Vector2(320, 64)
-	_language.custom_minimum_size = Vector2(320, 64)
-	rows2.add_child(_row("THEME", _theme))
-	rows2.add_child(_divider())
-	rows2.add_child(_row("LANGUAGE", _language))
-	rows2.add_child(_divider())
-	rows2.add_child(_row("SHOW_FPS", _fps))
-	rows2.add_child(_divider())
-	rows2.add_child(_fps_limit_block())
-	col.add_child(card2)
+	col.add_child(_card([
+		_row("SOUND", _sound), _volume_row(_sound_volume), _divider(),
+		_row("MUSIC", _music), _volume_row(_music_volume), _divider(),
+		_row("HAPTICS", _haptics),
+	]))
+	_quality_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_card([
+		_block("THEME", null, _theme), _divider(),
+		_block("LANGUAGE", null, _language), _divider(),
+		_block("QUALITY", _quality_hint, _quality), _divider(),
+		_row("SHOW_FPS", _fps), _divider(),
+		_block("FPS_LIMIT", _note("FPS_LIMIT_HINT"), _fps_limit),
+	]))
 
 	col.add_child(_section("GAME_SETTINGS"))
-	var hints_card := Card.make(10, 36)
-	var hints_rows := VBoxContainer.new()
-	hints_rows.add_theme_constant_override("separation", 0)
-	hints_rows.add_child(_row("HINTS", _hints))
-	var hints_note := MarginContainer.new()
-	hints_note.add_theme_constant_override("margin_left", 34)
-	hints_note.add_theme_constant_override("margin_right", 30)
-	hints_note.add_theme_constant_override("margin_bottom", 20)
-	var hints_text := SkinLabel.make("HINTS_HINT", 24, Fonts.REGULAR, SkinLabel.Role.MUTED)
-	hints_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hints_note.add_child(hints_text)
-	hints_rows.add_child(hints_note)
-	hints_card.add_child(hints_rows)
-	col.add_child(hints_card)
-	var card3 := Card.make(28, 36)
-	var undo_box := VBoxContainer.new()
-	undo_box.add_theme_constant_override("separation", 8)
-	var undo_title := SkinLabel.make("UNDO_LIMIT", 32, Fonts.SEMIBOLD)
-	undo_box.add_child(undo_title)
-	var undo_hint := SkinLabel.make("UNDO_LIMIT_HINT", 24, Fonts.REGULAR, SkinLabel.Role.MUTED)
-	undo_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	undo_box.add_child(undo_hint)
-	var gap := Control.new()
-	gap.custom_minimum_size.y = 8
-	undo_box.add_child(gap)
-	_undo.custom_minimum_size = Vector2(0, 64)
-	undo_box.add_child(_undo)
-	card3.add_child(undo_box)
-	col.add_child(card3)
-	var tail := Control.new()
-	tail.custom_minimum_size.y = 24
-	col.add_child(tail)
+	col.add_child(_card([
+		_row("HINTS", _hints), _note_row("HINTS_HINT"), _divider(),
+		_block("UNDO_LIMIT", _note("UNDO_LIMIT_HINT"), _undo),
+	]))
+	col.add_child(Modal.gap(Design.SPACE_LG))
 
 	_sound.toggled.connect(func(on: bool) -> void:
 		_app.set_sound(on)
@@ -131,17 +81,22 @@ func _init() -> void:
 	_fps.toggled.connect(func(on: bool) -> void: _app.set_show_fps(on))
 	_hints.toggled.connect(func(on: bool) -> void: _app.set_hints(on))
 	_fps_limit.selected.connect(func(i: int) -> void: _app.set_fps_limit(_fps_limits[i]))
-	_theme.selected.connect(func(i: int) -> void: _app.set_theme_mode(SaveStore.ThemeMode.LIGHT if i == 0 else SaveStore.ThemeMode.DARK))
+	_theme.selected.connect(func(i: int) -> void: _app.set_theme_mode(i as SaveStore.ThemeMode))
 	_language.selected.connect(func(i: int) -> void: _app.set_language(I18n.LANGUAGES[i]))
+	_quality.selected.connect(func(i: int) -> void:
+		_app.set_quality(i as SaveStore.Quality)
+		_refresh_quality_hint())
 	_undo.selected.connect(func(i: int) -> void: _app.set_undo_limit(i))
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		# One readable column, centered on wide (landscape, tablet) screens.
-		var w := minf(size.x, COLUMN_MAX_WIDTH)
+		var w := minf(size.x, Design.COLUMN_MAX)
 		for c in _columns:
 			c.custom_minimum_size.x = w
+		if _app:
+			_refresh_quality_hint.call_deferred()
 
 
 ## Syncs controls with the stored settings without triggering their handlers.
@@ -157,9 +112,22 @@ func refresh() -> void:
 	_fps.set_on_silently(s.show_fps)
 	_hints.set_on_silently(s.hints_on)
 	_refresh_fps_limits()
-	_theme.set_index_silently(0 if s.theme == SaveStore.ThemeMode.LIGHT else 1)
+	_theme.set_index_silently(s.theme)
 	_language.set_index_silently(I18n.LANGUAGES.find(s.language))
+	_quality.set_index_silently(s.quality)
+	_refresh_quality_hint()
 	_undo.set_index_silently(s.undo_limit)
+
+
+func _on_language_changed() -> void:
+	_refresh_quality_hint()
+
+
+func _refresh_quality_hint() -> void:
+	if _app == null:
+		return
+	var px := _app.render_resolution()
+	_quality_hint.set_key("QUALITY_HINT", "%d × %d" % [px.x, px.y])
 
 
 ## Offers only the caps this display can show evenly; a stored cap it cannot is dropped.
@@ -177,10 +145,10 @@ func _refresh_fps_limits() -> void:
 
 func _on_skin_changed() -> void:
 	for d in _dividers:
-		d.color = Palette.current.surface_border
+		d.color = Palette.current.outline
 
 
-## Wraps [param c] so it stays a centered column no wider than COLUMN_MAX_WIDTH.
+## Wraps [param c] so it stays a centered column no wider than Design.COLUMN_MAX.
 func _centered(c: Control, fill := false) -> Control:
 	var wrap := HBoxContainer.new()
 	wrap.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -193,63 +161,77 @@ func _centered(c: Control, fill := false) -> Control:
 
 
 func _section(key: String) -> Control:
-	var label := SkinLabel.make(key, 26, Fonts.BOLD, SkinLabel.Role.MUTED)
-	label.custom_minimum_size.y = 40
-	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	return label
+	var wrap := MarginContainer.new()
+	wrap.add_theme_constant_override("margin_left", int(Design.SPACE_LG))
+	wrap.add_theme_constant_override("margin_top", int(Design.SPACE_MD))
+	wrap.add_child(SkinLabel.caption(key))
+	return wrap
 
 
+func _card(rows: Array) -> Card:
+	var card := Card.make(Design.SPACE_LG)
+	card.padding_v = Design.SPACE_XS
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	for r: Control in rows:
+		box.add_child(r)
+	card.add_child(box)
+	return card
+
+
+## Label on the left, [param control] at the end of the row.
 func _row(key: String, control: Control) -> Control:
 	var row := HBoxContainer.new()
-	row.custom_minimum_size.y = 104
-	row.add_theme_constant_override("separation", 16)
-	var pad_l := Control.new()
-	pad_l.custom_minimum_size.x = 18
-	row.add_child(pad_l)
-	var label := SkinLabel.make(key, 32, Fonts.SEMIBOLD)
+	row.custom_minimum_size.y = Design.ROW_HEIGHT
+	row.add_theme_constant_override("separation", int(Design.SPACE_MD))
+	var label := SkinLabel.make(key, Design.TEXT_BODY, Design.WEIGHT_MEDIUM)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.clip_text = true
 	row.add_child(label)
 	control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(control)
-	var pad_r := Control.new()
-	pad_r.custom_minimum_size.x = 14
-	row.add_child(pad_r)
 	return row
 
 
-## Frame cap: title, hint, then the cap selector across the card.
-func _fps_limit_block() -> Control:
-	# Same insets as the label and control of a _row (padding plus row separation).
+## Title, optional note, then [param control] across the card.
+func _block(key: String, note: Control, control: Control) -> Control:
 	var wrap := MarginContainer.new()
-	wrap.add_theme_constant_override("margin_left", 34)
-	wrap.add_theme_constant_override("margin_right", 30)
-	wrap.add_theme_constant_override("margin_top", 22)
-	wrap.add_theme_constant_override("margin_bottom", 18)
+	wrap.add_theme_constant_override("margin_top", int(Design.SPACE_LG))
+	wrap.add_theme_constant_override("margin_bottom", int(Design.SPACE_LG))
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
-	box.add_child(SkinLabel.make("FPS_LIMIT", 32, Fonts.SEMIBOLD))
-	var hint := SkinLabel.make("FPS_LIMIT_HINT", 24, Fonts.REGULAR, SkinLabel.Role.MUTED)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(hint)
-	var gap := Control.new()
-	gap.custom_minimum_size.y = 8
-	box.add_child(gap)
-	_fps_limit.custom_minimum_size = Vector2(0, 64)
-	box.add_child(_fps_limit)
+	box.add_theme_constant_override("separation", int(Design.SPACE_XS))
+	box.add_child(SkinLabel.make(key, Design.TEXT_BODY, Design.WEIGHT_MEDIUM))
+	if note:
+		box.add_child(note)
+	box.add_child(Modal.gap(Design.SPACE_XS))
+	control.custom_minimum_size = Vector2(0, Design.CONTROL_SM)
+	box.add_child(control)
 	wrap.add_child(box)
 	return wrap
 
 
-## Volume slider line under a toggle row: quiet speaker, slider, loud speaker.
+func _note(key: String) -> SkinLabel:
+	var l := SkinLabel.make(key, Design.TEXT_CALLOUT, Design.WEIGHT_REGULAR, SkinLabel.Role.MUTED)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
+
+
+## Note under a switch row, ending the row's block.
+func _note_row(key: String) -> Control:
+	var wrap := MarginContainer.new()
+	wrap.add_theme_constant_override("margin_bottom", int(Design.SPACE_LG))
+	wrap.add_theme_constant_override("margin_right", int(Design.SWITCH_SIZE.x + Design.SPACE_MD))
+	wrap.add_child(_note(key))
+	return wrap
+
+
+## Volume slider line under a switch row: quiet speaker, slider, loud speaker.
 func _volume_row(slider: StepSlider) -> Control:
 	var wrap := MarginContainer.new()
-	wrap.add_theme_constant_override("margin_left", 18)
-	wrap.add_theme_constant_override("margin_right", 14)
-	wrap.add_theme_constant_override("margin_bottom", 16)
+	wrap.add_theme_constant_override("margin_bottom", int(Design.SPACE_MD))
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+	row.add_theme_constant_override("separation", int(Design.SPACE_SM))
 	row.add_child(_Glyph.make(Icons.Kind.SPEAKER_LOW))
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(slider)
@@ -259,18 +241,15 @@ func _volume_row(slider: StepSlider) -> Control:
 
 
 func _divider() -> Control:
-	var wrap := MarginContainer.new()
-	wrap.add_theme_constant_override("margin_left", 22)
-	wrap.add_theme_constant_override("margin_right", 22)
 	var line := ColorRect.new()
-	line.custom_minimum_size.y = 2
+	line.custom_minimum_size.y = Design.HAIRLINE
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	line.color = Palette.current.outline
 	_dividers.append(line)
-	wrap.add_child(line)
-	return wrap
+	return line
 
 
-## Muted vector glyph beside a slider.
+## Secondary line icon beside a slider.
 class _Glyph:
 	extends Control
 
@@ -279,7 +258,7 @@ class _Glyph:
 	static func make(p_kind: Icons.Kind) -> _Glyph:
 		var g := _Glyph.new()
 		g.kind = p_kind
-		g.custom_minimum_size = Vector2(44, 56)
+		g.custom_minimum_size = Vector2(Design.ICON_MD, Design.CONTROL_SM)
 		g.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		return g
 
@@ -287,4 +266,4 @@ class _Glyph:
 		queue_redraw()
 
 	func _draw() -> void:
-		Icons.draw(self, kind, size * 0.5, 34.0, Palette.current.text_muted)
+		Icons.draw(self, kind, size * 0.5, Design.ICON_MD, Palette.current.text_secondary)
