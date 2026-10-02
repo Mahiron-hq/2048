@@ -33,8 +33,6 @@ const CAPTION_TRACKING := 1
 
 # Radii. Controls are full pills; containers use this scale, and nested shapes keep the
 # outer radius = inner radius + inset, so their curves stay parallel.
-const RADIUS_SM := 12.0
-const RADIUS_MD := 20.0
 const RADIUS_LG := 28.0
 const RADIUS_XL := 36.0
 ## Tile corner as a share of the tile side; the board adds its padding on top.
