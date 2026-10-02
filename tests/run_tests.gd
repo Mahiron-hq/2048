@@ -52,6 +52,8 @@ func _initialize() -> void:
 		"test_hint_solver_plays_well",
 		"test_hints_setting_persists",
 		"test_haptics_without_strength_control",
+		"test_theme_and_quality_persist",
+		"test_palette_roles_and_tiles",
 	]
 	for t in tests:
 		_current = t
@@ -622,7 +624,7 @@ func test_game_over_wave() -> void:
 func test_formatting() -> void:
 	var saved := I18n.current
 	I18n.current = "en"
-	check(I18n.number(1234567) == "1 234 567" and I18n.number(999) == "999", "thousands grouping: %s" % I18n.number(1234567))
+	check(I18n.number(1234567) == "1 234 567" and I18n.number(999) == "999", "thousands grouping: %s" % I18n.number(1234567))
 	check(I18n.duration(45) == "45 s" and I18n.duration(125) == "2 min 5 s" and I18n.duration(3 * 3600 + 7 * 60) == "3 h 7 min", "durations")
 	check(I18n.grid(5) == "5×5", "grid label")
 	I18n.current = "ru"
@@ -796,3 +798,57 @@ func test_haptics_without_strength_control() -> void:
 	check(total == 1000, "still one second in total (%d ms)" % total)
 	check(swells.size() == 2, "two swells separated by the pause: %s" % [swells])
 	check(longest <= Haptics.WAVE_PULSE_MS.y, "no long continuous buzz (longest pulse %d ms)" % longest)
+
+
+func test_theme_and_quality_persist() -> void:
+	var fresh := SaveStore.new("user://unused.json")
+	check(fresh.theme == SaveStore.ThemeMode.SYSTEM and fresh.quality == SaveStore.Quality.HIGH, "new players follow the system theme at high quality")
+	var path := "user://test_theme.json"
+	var s := SaveStore.new(path)
+	s.theme = SaveStore.ThemeMode.SYSTEM
+	s.quality = SaveStore.Quality.LOW
+	check(s.save_to_disk() == OK, "save ok")
+	var t := SaveStore.new(path)
+	t.theme = SaveStore.ThemeMode.DARK
+	check(t.load_from_disk() and t.theme == SaveStore.ThemeMode.SYSTEM and t.quality == SaveStore.Quality.LOW, "system theme and low quality restored")
+	DirAccess.remove_absolute(path)
+	var legacy := SaveStore.new("user://unused.json")
+	legacy.apply_dict({"settings": {"theme": "dark"}})
+	check(legacy.theme == SaveStore.ThemeMode.DARK and legacy.quality == SaveStore.Quality.HIGH, "an older save keeps its chosen theme and gets high quality")
+	var junk := SaveStore.new("user://unused.json")
+	junk.apply_dict({"settings": {"theme": "sepia", "quality": 7}})
+	check(junk.theme == SaveStore.ThemeMode.SYSTEM and junk.quality == SaveStore.Quality.HIGH, "unknown theme and quality values fall back to defaults")
+
+
+## Every tile number stays readable: WCAG large-text contrast (3:1) on its tile, in both themes;
+## and neighbouring values never share a color.
+func test_palette_roles_and_tiles() -> void:
+	for dark in [false, true]:
+		var p := Palette.make(dark)
+		var worst := 99.0
+		var value := 2
+		var previous := Color.TRANSPARENT
+		var distinct := true
+		for i in 17:
+			worst = minf(worst, _contrast(p.tile_bg(value), p.tile_fg(value)))
+			distinct = distinct and p.tile_bg(value) != previous
+			previous = p.tile_bg(value)
+			value *= 2
+		check(worst >= 3.0, "tile numbers keep 3:1 contrast (%s theme, worst %.2f)" % ["dark" if dark else "light", worst])
+		check(distinct, "neighbouring tiles differ in color")
+		check(_contrast(p.text, p.bg) >= 7.0 and _contrast(p.text_secondary, p.surface) >= 4.5, "body and secondary text meet AA on their surfaces")
+		check(_contrast(p.on_accent, p.accent) >= 4.5, "accent buttons keep 4.5:1 for their labels")
+	check(Palette.make(false).tile_bg(1 << 40) == Palette.make(false).tile_bg(1 << 17), "tiles past the ramp keep its last color")
+
+
+## WCAG contrast ratio, from the relative luminance of the linearized colors.
+func _contrast(a: Color, b: Color) -> float:
+	var la := _relative_luminance(a)
+	var lb := _relative_luminance(b)
+	return (maxf(la, lb) + 0.05) / (minf(la, lb) + 0.05)
+
+
+func _relative_luminance(c: Color) -> float:
+	var l := c.srgb_to_linear()
+	return 0.2126 * l.r + 0.7152 * l.g + 0.0722 * l.b
+

@@ -1,8 +1,9 @@
 class_name GameScreen
 extends Control
-## The play screen: header with scores, action row, board, swipe/keyboard input, milestones,
-## undo, the start-of-game swipe hint and the game-over summary. Portrait stacks header,
-## actions and board; landscape centers the board and places the controls around it.
+## The play screen: header with scores, board, action bar, swipe/keyboard input, milestones,
+## undo, the start-of-game swipe hint and the game-over summary. Portrait puts the scores on
+## top, the board in the middle and the buttons at the bottom, under the thumb; landscape
+## centers the board and places the controls around it.
 
 signal menu_requested
 
@@ -12,13 +13,15 @@ const SWIPE_COMMIT := 44.0
 const SWIPE_FLICK := 22.0
 const FLICK_TIME_MS := 220
 ## Landscape: scores sit this close to the board's edges.
-const BOARD_GAP := 18.0
+const BOARD_GAP := Design.SPACE_LG
 ## Landscape: minimum room between the menu button and the score beside it.
-const BRAND_GAP := 24.0
-const STACK_GAP := 14.0
+const BRAND_GAP := Design.SPACE_LG
+const STACK_GAP := Design.SPACE_MD
+const SCORE_SIZE := Vector2(Design.CONTROL_LG * 1.6, Design.CONTROL_LG)
 ## Landscape arrangements take the board size of the best one if within this share of it,
 ## so a slightly larger board never wins over the preferred layout.
 const LAYOUT_TOLERANCE := 0.97
+const CONFETTI := 70
 
 ## Seconds without a move before the hint button lights up on its own.
 const HINT_IDLE := 15.0
@@ -36,11 +39,11 @@ var _app: App
 var _board_view := BoardView.new()
 var _score_box := ScoreBox.make("SCORE")
 var _best_box := ScoreBox.make("BEST")
-var _undo_btn := PillButton.make("UNDO", PillButton.Look.SECONDARY, Icons.Kind.UNDO, 76)
-var _new_btn := PillButton.make("NEW", PillButton.Look.SECONDARY, Icons.Kind.RESTART, 76)
-var _menu_btn := PillButton.make_icon(Icons.Kind.MENU, 76)
-var _hint_btn := PillButton.make_icon(Icons.Kind.BULB, 76)
-var _logo := TileBadge.make(2048, 112, "2048")
+var _undo_btn := PillButton.make("UNDO", PillButton.Look.SECONDARY, Icons.Kind.UNDO)
+var _new_btn := PillButton.make("NEW", PillButton.Look.SECONDARY, Icons.Kind.RESTART)
+var _menu_btn := PillButton.make_icon(Icons.Kind.MENU)
+var _hint_btn := PillButton.make_icon(Icons.Kind.BULB)
+var _logo := TileBadge.make(2048, Design.CONTROL_LG, "2048")
 var _banner := MilestoneBanner.new()
 var _confetti := CPUParticles2D.new()
 var _game_over := GameOverOverlay.new()
@@ -84,13 +87,12 @@ func setup(app: App) -> void:
 func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	_logo.text_ratio = 0.3
-	_score_box.custom_minimum_size = Vector2(172, 112)
-	_best_box.custom_minimum_size = Vector2(172, 112)
+	_score_box.custom_minimum_size = SCORE_SIZE
+	_best_box.custom_minimum_size = SCORE_SIZE
 	for row in [_header, _actions, _brand]:
-		row.add_theme_constant_override("separation", 14)
-	_side_actions.add_theme_constant_override("h_separation", 14)
-	_side_actions.add_theme_constant_override("v_separation", 14)
+		row.add_theme_constant_override("separation", int(Design.SPACE_SM))
+	_side_actions.add_theme_constant_override("h_separation", int(STACK_GAP))
+	_side_actions.add_theme_constant_override("v_separation", int(STACK_GAP))
 	_menu_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_hint_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
@@ -98,7 +100,7 @@ func _init() -> void:
 	_board_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	_portrait.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_portrait.add_theme_constant_override("separation", 26)
+	_portrait.add_theme_constant_override("separation", int(Design.SPACE_LG))
 	add_child(_portrait)
 	_landscape.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_landscape.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -112,18 +114,18 @@ func _init() -> void:
 
 	_confetti.emitting = false
 	_confetti.one_shot = true
-	_confetti.amount = 90
-	_confetti.lifetime = 1.8
+	_confetti.amount = CONFETTI
+	_confetti.lifetime = 1.6
 	_confetti.explosiveness = 0.92
 	_confetti.direction = Vector2.UP
-	_confetti.spread = 65.0
-	_confetti.initial_velocity_min = 620.0
-	_confetti.initial_velocity_max = 1150.0
+	_confetti.spread = 55.0
+	_confetti.initial_velocity_min = 560.0
+	_confetti.initial_velocity_max = 1000.0
 	_confetti.gravity = Vector2(0, 1500)
 	_confetti.damping_min = 40.0
 	_confetti.damping_max = 90.0
-	_confetti.scale_amount_min = 9.0
-	_confetti.scale_amount_max = 16.0
+	_confetti.scale_amount_min = 7.0
+	_confetti.scale_amount_max = 12.0
 	_confetti.angle_min = -180.0
 	_confetti.angle_max = 180.0
 	_confetti.angular_velocity_min = -540.0
@@ -182,7 +184,8 @@ func _notification(what: int) -> void:
 		var wide := size.x > size.y * 1.1
 		if wide != _landscape_mode:
 			_apply_layout(wide)
-		_banner.rest_y = 128.0
+		_fit_actions()
+		_banner.rest_y = SCORE_SIZE.y + Design.SPACE_LG
 		_confetti.position = Vector2(size.x * 0.5, size.y * 0.55)
 	elif what == NOTIFICATION_VISIBILITY_CHANGED and is_visible_in_tree() and _pending_over:
 		_on_settled()
@@ -191,8 +194,9 @@ func _notification(what: int) -> void:
 func _on_skin_changed() -> void:
 	var p := Palette.current
 	var ramp := Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 0.25, 0.5, 0.75, 1.0])
-	ramp.colors = PackedColorArray([p.tile_bg(16), p.tile_bg(128), p.accent, p.tile_bg(4096), p.tile_bg(64)])
+	ramp.offsets = PackedFloat32Array([0.0, 0.33, 0.66, 1.0])
+	ramp.colors = PackedColorArray([p.tile_bg(8), p.tile_bg(256), p.tile_bg(2048), p.tile_bg(32)])
+	ramp.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
 	_confetti.color_initial_ramp = ramp
 
 
@@ -202,7 +206,27 @@ func set_hints_enabled(on: bool) -> void:
 	if not on:
 		_set_hint_glow(false)
 		_board_view.stop_move_hint()
+	_fit_actions()
 	_layout_landscape()
+
+
+func _on_language_changed() -> void:
+	# Buttons measure their new labels in their own handler, which runs after this one.
+	_fit_actions.call_deferred()
+
+
+## Portrait action bar: full buttons when they fit, then tighter ones, then labels without
+## icons, and icons alone only as the last resort.
+func _fit_actions() -> void:
+	if _landscape_mode or size.x < 1.0:
+		return
+	for step in 4:
+		for b: PillButton in [_undo_btn, _new_btn]:
+			b.compact = step >= 1
+			b.hide_icon = step == 2
+			b.icon_only = step >= 3
+		if _actions.get_combined_minimum_size().x <= size.x:
+			return
 
 
 ## Works out the best move in the background, then shows it on the board without playing it.
@@ -378,7 +402,7 @@ func _on_moved(result: Board.MoveResult) -> void:
 func _celebrate(value: int) -> void:
 	_banner.celebrate(value)
 	_app.sfx.play(Sfx.Kind.MILESTONE, 1.0, -1.0)
-	_confetti.amount = 90 if value < 2048 else 160
+	_confetti.amount = CONFETTI if value < 2048 else CONFETTI * 2
 	_confetti.restart()
 
 
@@ -451,14 +475,16 @@ func _menu_from_over() -> void:
 	menu_requested.emit()
 
 
-## Portrait: header row (logo, scores) and action row (menu, undo, new) above the board.
-## Landscape: board in the middle of the screen, controls placed around it by
+## Portrait: header row (logo, scores) above the board, action bar (menu, hint, undo, new)
+## below it. Landscape: board in the middle of the screen, controls placed around it by
 ## [method _layout_landscape].
 func _apply_layout(wide: bool) -> void:
 	_landscape_mode = wide
 	# Narrower buttons leave the board more room beside them.
-	_undo_btn.compact = wide
-	_new_btn.compact = wide
+	for b: PillButton in [_undo_btn, _new_btn]:
+		b.compact = wide
+		b.hide_icon = false
+		b.icon_only = false
 	if _board_view.get_parent():
 		_board_view.get_parent().remove_child(_board_view)
 	if wide:
@@ -474,7 +500,7 @@ func _apply_layout(wide: bool) -> void:
 				node.get_parent().remove_child(node)
 		_fill(_header, [_logo, null, _score_box, _best_box])
 		_fill(_actions, [_menu_btn, _hint_btn, null, _undo_btn, _new_btn])
-		_fill(_portrait, [_header, _actions, _board_view])
+		_fill(_portrait, [_header, _board_view, _actions])
 	_portrait.visible = not wide
 	_landscape.visible = wide
 	_layout_landscape()
@@ -650,24 +676,25 @@ func _input(event: InputEvent) -> void:
 
 
 ## Swipes may start anywhere on the game screen except over the scores and buttons (the header
-## in portrait; beside the board, the band of top controls and the bottom buttons in landscape)
-## or the screen edge outside it, so glancing at the status bar or pulling the notification
-## shade never moves the tiles.
+## and the action bar in portrait; beside the board, the band of top controls and the bottom
+## buttons in landscape) or the screen edge outside it, so glancing at the status bar or
+## pulling the notification shade never moves the tiles.
 func _in_swipe_area(point: Vector2) -> bool:
 	if not get_global_rect().has_point(point):
 		return false
 	if not _landscape_mode:
-		return point.y > _actions.get_global_rect().end.y + 8.0
-	if _side_actions.get_global_rect().grow(12.0).has_point(point):
+		return point.y > _header.get_global_rect().end.y + Design.SPACE_XS \
+				and point.y < _actions.get_global_rect().position.y - Design.SPACE_XS
+	if _side_actions.get_global_rect().grow(Design.SPACE_SM).has_point(point):
 		return false
 	var board := _board_view.get_global_rect()
-	if point.x >= board.position.x - 8.0 and point.x <= board.end.x + 8.0:
+	if point.x >= board.position.x - Design.SPACE_XS and point.x <= board.end.x + Design.SPACE_XS:
 		return true
 	var top_end := 0.0
 	for node: Control in [_brand, _score_box, _best_box, _hint_btn]:
 		if node.visible:
 			top_end = maxf(top_end, node.get_global_rect().end.y)
-	return point.y > top_end + 12.0
+	return point.y > top_end + Design.SPACE_SM
 
 
 func _unhandled_input(event: InputEvent) -> void:

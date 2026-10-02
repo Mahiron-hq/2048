@@ -2,7 +2,7 @@ class_name SkinLabel
 extends Label
 ## Label that follows the active palette and language.
 
-enum Role { TEXT, MUTED, ACCENT, ON_ACCENT }
+enum Role { TEXT, MUTED, ACCENT, ON_ACCENT, FAINT }
 
 var role: Role = Role.TEXT
 ## Translation key; when empty, [member text] is used verbatim.
@@ -11,7 +11,8 @@ var key := ""
 var arg: Variant = null
 
 
-static func make(p_key: String, p_size: int, p_weight := Fonts.MEDIUM, p_role := Role.TEXT, tabular := false) -> SkinLabel:
+## [param p_size] and [param p_weight] come from the Design type scale.
+static func make(p_key: String, p_size: int, p_weight := Design.WEIGHT_REGULAR, p_role := Role.TEXT, tabular := false) -> SkinLabel:
 	var l := SkinLabel.new()
 	l.key = p_key
 	l.role = p_role
@@ -21,6 +22,14 @@ static func make(p_key: String, p_size: int, p_weight := Fonts.MEDIUM, p_role :=
 	l.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	l._refresh_text()
 	l._on_skin_changed()
+	return l
+
+
+## Caption style: small capitals in the secondary color.
+static func caption(p_key: String) -> SkinLabel:
+	var l := make(p_key, Design.TEXT_CAPTION, Design.WEIGHT_BOLD, Role.MUTED)
+	l.uppercase = true
+	l.add_theme_font_override("font", Fonts.sans(Design.WEIGHT_BOLD, false, Design.CAPTION_TRACKING))
 	return l
 
 
@@ -39,11 +48,13 @@ func _on_skin_changed() -> void:
 	var c: Color
 	match role:
 		Role.MUTED:
-			c = p.text_muted
+			c = p.text_secondary
+		Role.FAINT:
+			c = p.text_tertiary
 		Role.ACCENT:
 			c = p.accent
 		Role.ON_ACCENT:
-			c = p.accent_text
+			c = p.on_accent
 		_:
 			c = p.text
 	add_theme_color_override("font_color", c)

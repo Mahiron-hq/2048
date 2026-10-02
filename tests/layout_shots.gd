@@ -26,12 +26,15 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	var only := OS.get_environment("LAYOUT_DEVICES")
 	for device in DEVICES:
-		await _device(device, DEVICES[device])
+		if only.is_empty() or device in only.split(","):
+			for dark in [true, false]:
+				await _device(device + ("-dark" if dark else "-light"), DEVICES[device], dark)
 	quit(0)
 
 
-func _device(tag: String, px: Vector2i) -> void:
+func _device(tag: String, px: Vector2i, dark: bool) -> void:
 	DirAccess.remove_absolute(SAVE)
 	_vp = SubViewport.new()
 	_vp.size = px
@@ -47,7 +50,8 @@ func _device(tag: String, px: Vector2i) -> void:
 	await _frames(3)
 	app.sfx.music_enabled = false
 	app.set_language("ru")
-	app.set_theme_mode(SaveStore.ThemeMode.DARK)
+	var theme_mode := SaveStore.ThemeMode.DARK if dark else SaveStore.ThemeMode.LIGHT
+	app.set_theme_mode(theme_mode)
 	app.store.submit_score(20932, 4)
 	app._to_menu()
 	await _capture(tag + "-1-menu", 1.0)
@@ -100,7 +104,8 @@ func _device(tag: String, px: Vector2i) -> void:
 	await _capture(tag + "-4b-theme-fade", 0.05)
 	app.set_show_fps(false)
 
-	app.set_theme_mode(SaveStore.ThemeMode.LIGHT)
+	app.set_theme_mode(theme_mode)
+	await _wait(0.5)
 	app._open_settings()
 	await _capture(tag + "-5-settings", 0.6)
 	var scroll: ScrollContainer = app._settings.find_children("*", "ScrollContainer", true, false)[0]

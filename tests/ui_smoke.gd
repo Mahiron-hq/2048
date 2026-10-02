@@ -157,15 +157,15 @@ func _run() -> void:
 	# A swipe scrolls the page wherever it starts: on a card's text, on a selector or on a switch.
 	var theme_label: Control = app._settings.find_children("*", "SkinLabel", true, false).filter(
 			func(l: SkinLabel) -> bool: return l.key == "THEME")[0]
-	var before := {"theme": app.store.theme, "fps": app.store.show_fps, "lang": app.store.language}
-	for start: Control in [theme_label, app._settings._language, app._settings._fps]:
+	var before := {"theme": app.store.theme, "haptics": app.store.haptics_on, "lang": app.store.language}
+	for start: Control in [theme_label, app._settings._language, app._settings._haptics]:
 		scroll.scroll_vertical = 0
 		await _frames(3)
 		var at := start.size * 0.5
 		await _gesture(start, at, Vector2(0, -260))
 		await _wait(0.2)
 		check(scroll.scroll_vertical > 100, "a swipe that starts on %s scrolls the settings (%d)" % [start.get_class(), scroll.scroll_vertical])
-	var after := {"theme": app.store.theme, "fps": app.store.show_fps, "lang": app.store.language}
+	var after := {"theme": app.store.theme, "haptics": app.store.haptics_on, "lang": app.store.language}
 	check(before == after, "scrolling changes no setting: %s -> %s" % [before, after])
 	scroll.scroll_vertical = 0
 	for i in 6:
@@ -227,6 +227,7 @@ func _run() -> void:
 	await _new_features(app)
 	await _fixes_121(app)
 	await _hints(app)
+	await _quality(app)
 	await _landscape(app)
 
 	app.queue_free()
@@ -329,6 +330,7 @@ func _fixes_121(app: App) -> void:
 	var g := app._game
 
 	# The swipe hint keeps pulsing until the first move and covers the whole board.
+	app._show_screen(g)
 	g.start_new(4, false)
 	await _wait(2.5)
 	var hint: SwipeHint = g._board_view._hint
@@ -425,6 +427,34 @@ func _hints(app: App) -> void:
 	app.set_hints(true)
 	await _frames(2)
 	check(g._hint_btn.visible, "turning hints back on shows the button")
+
+
+## Each quality level renders at its own resolution while the layout keeps the same units;
+## a screen below the level renders at its own size.
+func _quality(app: App) -> void:
+	var original := root.size
+	root.size = Vector2i(1440, 3200)
+	await _frames(4)
+	var layout := root.get_visible_rect().size
+	var expected := {SaveStore.Quality.LOW: Vector2i(720, 1600), SaveStore.Quality.MEDIUM: Vector2i(1080, 2400)}
+	for q: SaveStore.Quality in expected:
+		app.set_quality(q)
+		await _frames(4)
+		check(app.render_resolution() == expected[q], "quality %d renders at %s (got %s)" % [q, expected[q], app.render_resolution()])
+		check(root.get_visible_rect().size.is_equal_approx(layout), "quality %d keeps the layout (%s vs %s)" % [q, root.get_visible_rect().size, layout])
+	app.set_quality(SaveStore.Quality.HIGH)
+	await _frames(4)
+	check(app.render_resolution() == Vector2i(1440, 3200) and root.content_scale_mode == Window.CONTENT_SCALE_MODE_CANVAS_ITEMS,
+			"high quality draws a 1440-pixel screen at full resolution")
+	root.size = Vector2i(2160, 4800)
+	await _frames(4)
+	check(app.render_resolution() == Vector2i(1440, 3200), "high quality caps a sharper screen at 2K (%s)" % app.render_resolution())
+	var picked := SaveStore.new(SAVE)
+	app.save_now()
+	app._wait_for_save()
+	check(picked.load_from_disk() and picked.quality == SaveStore.Quality.HIGH, "the quality choice is saved")
+	root.size = original
+	await _frames(4)
 
 
 func _check_landscape_game(g: GameScreen, vp: Rect2, tag: String) -> void:

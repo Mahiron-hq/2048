@@ -9,10 +9,13 @@ signal settled
 
 enum Appear { NONE, POP, FADE }
 
-const SLIDE_TIME := 0.105
-const MERGE_TIME := 0.17
-const SPAWN_TIME := 0.2
-const RING_MIN_VALUE := 64
+const SLIDE_TIME := 0.1
+const MERGE_TIME := 0.16
+const SPAWN_TIME := 0.18
+## Merges from the first milestone up send out a soft ring.
+const RING_MIN_VALUE := Board.FIRST_MILESTONE
+## Merge accent: the new tile swells to this scale and settles back.
+const MERGE_SCALE := 1.12
 const UNDO_VANISH := 0.12
 const UNDO_SQUEEZE := 0.07
 const UNDO_SQUEEZE_SCALE := 0.9
@@ -26,6 +29,8 @@ const HINT_BACK := 0.28
 var cell_size := 100.0
 var gap := 12.0
 var board_rect := Rect2()
+## Where the board sits in spare height: 0 top, 0.5 centered, 1 bottom.
+var vertical_bias := 0.5
 ## Side length of the grid currently shown.
 var grid_size := Board.DEFAULT_SIZE
 
@@ -42,7 +47,6 @@ var _hint_tween: Tween
 var _hint_glow := _MoveGlow.new()
 var _styles := {}
 var _font_sizes := {}
-var _font: Font = Fonts.sans(Fonts.BLACK)
 var _board_box := StyleBoxFlat.new()
 var _cell_box := StyleBoxFlat.new()
 
@@ -231,54 +235,17 @@ func cell_position(index: int) -> Vector2:
 	return board_rect.position + Vector2(gap + x * (cell_size + gap), gap + y * (cell_size + gap))
 
 
-func tile_depth() -> float:
-	return roundf(cell_size * 0.045)
-
-
-func tile_font() -> Font:
-	return _font
-
-
-## [base, face] style boxes for a tile of [param value].
+## Cached [method TileArt.styles] for the current cell size.
 func tile_styles(value: int) -> Array:
-	if _styles.has(value):
-		return _styles[value]
-	var p := Palette.current
-	var bg := p.tile_bg(value)
-	var radius := int(cell_size * 0.15)
-	var base := StyleBoxFlat.new()
-	base.bg_color = bg.darkened(0.16 if not p.dark else 0.3)
-	base.set_corner_radius_all(radius)
-	base.corner_detail = 10
-	if p.tile_glows(value):
-		base.shadow_color = Color(bg, 0.55 if p.dark else 0.45)
-		base.shadow_size = int(cell_size * 0.16)
-	else:
-		base.shadow_color = p.shadow
-		base.shadow_size = int(cell_size * 0.05)
-		base.shadow_offset = Vector2(0, cell_size * 0.02)
-	var face := StyleBoxFlat.new()
-	face.bg_color = bg
-	face.set_corner_radius_all(radius)
-	face.corner_detail = 10
-	face.border_color = bg.lightened(0.18)
-	face.border_width_top = maxi(1, int(cell_size * 0.012))
-	face.border_blend = true
-	_styles[value] = [base, face]
+	if not _styles.has(value):
+		_styles[value] = TileArt.styles(value, cell_size)
 	return _styles[value]
 
 
 func tile_font_size(value: int) -> int:
-	if _font_sizes.has(value):
-		return _font_sizes[value]
-	var txt := str(value)
-	var ratios := [0.5, 0.5, 0.44, 0.36, 0.3, 0.25, 0.21]
-	var fs := int(cell_size * ratios[mini(txt.length(), ratios.size() - 1)])
-	var limit := cell_size * 0.82
-	while fs > 8 and _font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > limit:
-		fs -= 1
-	_font_sizes[value] = fs
-	return fs
+	if not _font_sizes.has(value):
+		_font_sizes[value] = TileArt.font_size(str(value), cell_size)
+	return _font_sizes[value]
 
 
 func _on_skin_changed() -> void:
@@ -299,13 +266,12 @@ func _layout() -> void:
 	var s := minf(size.x, size.y)
 	if s < 40.0:
 		return
-	# Sit above center: the thumb zone below the board stays free and the layout feels less floaty.
 	var free := size - Vector2(s, s)
-	board_rect = Rect2(Vector2(free.x * 0.5, free.y * 0.28), Vector2(s, s))
+	board_rect = Rect2((Vector2(free.x * 0.5, free.y * vertical_bias)).round(), Vector2(s, s))
 	# Gaps shrink a little on bigger grids so cells keep a usable size.
-	gap = roundf(s * 0.15 / (grid_size + 1))
+	gap = roundf(s * Design.BOARD_GAP / (grid_size + 1))
 	cell_size = (s - gap * (grid_size + 1)) / grid_size
-	_hint.board_radius = cell_size * 0.22
+	_hint.board_radius = board_radius()
 	_hint.board_rect = board_rect
 	_styles.clear()
 	_font_sizes.clear()
@@ -322,17 +288,15 @@ func _layout() -> void:
 	queue_redraw()
 
 
+## Board corner: the tile corner plus the gap, so the two curves run parallel.
+func board_radius() -> float:
+	return roundf(cell_size * Design.TILE_RADIUS) + gap
+
+
 func _update_boxes() -> void:
 	var p := Palette.current
-	_board_box.bg_color = p.board
-	_board_box.set_corner_radius_all(int(cell_size * 0.22))
-	_board_box.corner_detail = 12
-	_board_box.shadow_color = p.shadow
-	_board_box.shadow_size = int(cell_size * 0.18)
-	_board_box.shadow_offset = Vector2(0, cell_size * 0.06)
-	_cell_box.bg_color = p.cell
-	_cell_box.set_corner_radius_all(int(cell_size * 0.15))
-	_cell_box.corner_detail = 10
+	_board_box = Design.surface_box(p.board, board_radius())
+	_cell_box = Design.surface_box(p.cell, roundf(cell_size * Design.TILE_RADIUS))
 
 
 func _after_slide(result: Board.MoveResult) -> void:
@@ -348,8 +312,8 @@ func _after_slide(result: Board.MoveResult) -> void:
 		survivor.set_value(m[3])
 		survivor.z_index = 2
 		var tw := _fx_tween()
-		tw.tween_property(survivor, "scale", Vector2(1.2, 1.2), MERGE_TIME * 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tw.tween_property(survivor, "scale", Vector2.ONE, MERGE_TIME * 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(survivor, "scale", Vector2.ONE * MERGE_SCALE, MERGE_TIME * 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(survivor, "scale", Vector2.ONE, MERGE_TIME * 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		tw.tween_callback(survivor.set.bind("z_index", 0))
 		if m[3] >= RING_MIN_VALUE:
 			_ring_at(m[2], Palette.current.tile_bg(m[3]))
@@ -362,7 +326,7 @@ func _after_slide(result: Board.MoveResult) -> void:
 		t.scale = Vector2.ZERO
 		var tw := _fx_tween()
 		tw.tween_interval(0.03)
-		tw.tween_property(t, "scale", Vector2.ONE, SPAWN_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(t, "scale", Vector2.ONE, SPAWN_TIME).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	_watch_settle()
 
 
@@ -457,9 +421,9 @@ class MergeRing:
 		show()
 
 	func _draw() -> void:
-		var r := _radius * (1.0 + 0.6 * t)
-		var a := (1.0 - t) * 0.8
-		draw_arc(Vector2.ZERO, r, 0.0, TAU, 48, Color(_color, a), _radius * 0.16 * (1.0 - t) + 1.0, true)
+		var r := _radius * (1.0 + 0.45 * t)
+		var a := (1.0 - t) * 0.5
+		draw_arc(Vector2.ZERO, r, 0.0, TAU, 48, Color(_color, a), _radius * 0.08 * (1.0 - t) + 1.0, true)
 
 
 ## Soft pool of accent light rising from one edge of the board and fading towards the middle and
@@ -513,4 +477,4 @@ class _MoveGlow:
 			Board.Dir.DOWN:
 				edge = Vector2(size.x * 0.5, size.y)
 				extent = Vector2(size.x * 0.75, size.y * REACH)
-		draw_texture_rect(_texture, Rect2(edge - extent, extent * 2.0), false, Color(Palette.current.accent, 0.42 * strength))
+		draw_texture_rect(_texture, Rect2(edge - extent, extent * 2.0), false, Color(Palette.current.accent, 0.32 * strength))
