@@ -521,13 +521,15 @@ func _apply_safe_area() -> void:
 		_fps_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
 		_fps_label.offset_right = -right
 		_fps_label.offset_left = -right
-		_fps_label.offset_bottom = -maxf(4.0, bottom - 30.0)
+		_fps_label.offset_bottom = -maxf(Design.SPACE_2XS, bottom - _fps_label.get_combined_minimum_size().y)
 		_fps_label.offset_top = _fps_label.offset_bottom
 	else:
 		_fps_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		_fps_label.grow_horizontal = Control.GROW_DIRECTION_END
 		_fps_label.grow_vertical = Control.GROW_DIRECTION_END
-		_fps_label.position = Vector2(left, maxf(4.0, top - 30.0))
+		# Above the content, in the status bar's band where there is one.
+		var h := _fps_label.get_combined_minimum_size().y
+		_fps_label.position = Vector2(left, maxf(0.0, top - h))
 		_fps_label.size = Vector2.ZERO
 
 
