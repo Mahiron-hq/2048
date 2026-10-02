@@ -24,7 +24,7 @@ jobs:
       contents: read
 
   apk:
-    name: Build and publish APKs
+    name: Build and publish packages
     needs: tests
     runs-on: ubuntu-24.04
     permissions:
@@ -96,7 +96,7 @@ jobs:
 
       - name: Import project and install the Gradle build template
         run: |
-          timeout 600 ~/godot/godot --headless --path . --import || true
+          timeout 600 ~/godot/godot --headless --path . --import
           mkdir -p android/build
           unzip -q -o ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip -d android/build
           echo "${GODOT_VERSION}.stable" > android/.build_version
@@ -114,23 +114,26 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
 
-      - name: Export APKs
+      - name: Export APKs and the Play bundle
         env:
           GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ runner.temp }}/release.jks
           GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_KEY_ALIAS }}
           GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           mkdir -p build
-          export_apk() {
+          export_preset() {
             # Fresh Gradle intermediates per preset: switching ABIs must not reuse old outputs.
             rm -rf android/build/build
-            timeout 1500 ~/godot/godot --headless --path . --export-release "$1" "$2" || true
+            if ! timeout 1500 ~/godot/godot --headless --path . --export-release "$1" "$2"; then
+              echo "::error::Export of '$1' failed"; exit 1
+            fi
             test -s "$2" || { echo "::error::Export of '$1' produced no file"; exit 1; }
           }
-          export_apk "Android" build/2048-merge-arm64.apk
-          export_apk "Android armeabi-v7a" build/2048-merge-armv7.apk
+          export_preset "Android" build/2048-merge-arm64.apk
+          export_preset "Android armeabi-v7a" build/2048-merge-armv7.apk
+          export_preset "Android AAB" build/2048-merge.aab
 
-      - name: Verify APKs
+      - name: Verify packages
         run: |
           tools="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS"
           version=${GITHUB_REF_NAME#v}
@@ -144,15 +147,22 @@ jobs:
           }
           check build/2048-merge-arm64.apk arm64-v8a
           check build/2048-merge-armv7.apk armeabi-v7a
+          # The bundle is jar-signed; keytool prints the fingerprint with colons.
+          want=$(echo "$RELEASE_CERT_SHA256" | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
+          keytool -printcert -jarfile build/2048-merge.aab | grep -q "SHA256: $want" || {
+            echo "::error::The AAB is not signed with the release certificate"; exit 1; }
           mv build/2048-merge-arm64.apk "build/2048-Merge-${GITHUB_REF_NAME}-arm64-v8a.apk"
           mv build/2048-merge-armv7.apk "build/2048-Merge-${GITHUB_REF_NAME}-armeabi-v7a.apk"
+          mv build/2048-merge.aab "build/2048-Merge-${GITHUB_REF_NAME}.aab"
           rm -f "$RUNNER_TEMP/release.jks"
-          (cd build && sha256sum 2048-Merge-*.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          (cd build && sha256sum 2048-Merge-*.apk 2048-Merge-*.aab > SHA256SUMS.txt && cat SHA256SUMS.txt)
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: build/2048-Merge-${{ github.ref_name }}-*.apk
+          subject-path: |
+            build/2048-Merge-${{ github.ref_name }}-*.apk
+            build/2048-Merge-${{ github.ref_name }}.aab
 
       - name: Release notes from the changelog
         run: |
@@ -170,5 +180,6 @@ jobs:
           body_path: release-notes.md
           files: |
             build/2048-Merge-${{ github.ref_name }}-*.apk
+            build/2048-Merge-${{ github.ref_name }}.aab
             build/SHA256SUMS.txt
           make_latest: true
