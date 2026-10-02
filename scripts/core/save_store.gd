@@ -10,7 +10,12 @@ const FORMAT_VERSION := 3
 ## Volume steps were 1..5 before format 3; they now span 1..Sfx.LEVEL_COUNT.
 const LEGACY_VOLUME_STEPS := 5
 
-enum ThemeMode { LIGHT, DARK }
+enum ThemeMode { SYSTEM, LIGHT, DARK }
+## Render resolution: short side 720, 1080 or 1440 pixels, never above the screen's own.
+enum Quality { LOW, MEDIUM, HIGH }
+
+const THEME_NAMES := ["system", "light", "dark"]
+const QUALITY_NAMES := ["low", "medium", "high"]
 
 var sound_on := true
 var music_on := true
@@ -23,7 +28,8 @@ var music_volume := 6
 var show_fps := false
 ## Frame cap in frames per second, one of [constant DisplayRate.LIMITS]; 0 means no cap.
 var fps_limit := 0
-var theme: ThemeMode = ThemeMode.DARK
+var theme: ThemeMode = ThemeMode.SYSTEM
+var quality: Quality = Quality.HIGH
 ## Two-letter UI language code, one of [constant I18n.LANGUAGES].
 var language := "en"
 ## Moves that can be undone in a row, 0..Board.MAX_UNDO.
@@ -172,7 +178,8 @@ func to_dict() -> Dictionary:
 			"volume_steps": Sfx.LEVEL_COUNT,
 			"show_fps": show_fps,
 			"fps_limit": fps_limit,
-			"theme": "light" if theme == ThemeMode.LIGHT else "dark",
+			"theme": THEME_NAMES[theme],
+			"quality": QUALITY_NAMES[quality],
 			"language": language,
 			"undo_limit": undo_limit,
 		},
@@ -219,11 +226,12 @@ func apply_dict(d: Dictionary) -> void:
 		var limit = s.get("fps_limit")
 		if (limit is int or limit is float) and (limit == 0 or DisplayRate.LIMITS.has(int(limit))) and int(limit) == limit:
 			fps_limit = int(limit)
-		match s.get("theme"):
-			"light":
-				theme = ThemeMode.LIGHT
-			"dark":
-				theme = ThemeMode.DARK
+		var theme_index := THEME_NAMES.find(s.get("theme"))
+		if theme_index >= 0:
+			theme = theme_index as ThemeMode
+		var quality_index := QUALITY_NAMES.find(s.get("quality"))
+		if quality_index >= 0:
+			quality = quality_index as Quality
 		var lang = s.get("language")
 		if lang is String and I18n.LANGUAGES.has(lang):
 			language = lang
