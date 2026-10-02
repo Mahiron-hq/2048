@@ -1,0 +1,37 @@
+# Godot
+/.godot/
+/android/
+*.tmp
+*.translation
+export_credentials.cfg
+.mono/
+*.TMP
+
+# Build output, captures and local test artifacts
+/build/
+/screenshots/
+*.log
+
+# Lossless music master, published as a release asset
+/assets/music/*.flac
+
+# Signing material
+*.jks
+*.keystore
+*.pem
+*.p12
+local.properties
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
