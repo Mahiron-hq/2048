@@ -2,6 +2,34 @@
 
 All notable changes to 2048 Merge. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-10-02
+
+### 🇬🇧 English
+
+- **A new look, built on one design system.** Every size, gap, radius, color and animation now comes from one set of tokens: a 4-unit spacing grid, six text sizes, pill-shaped controls and containers whose corners run parallel. Menu, game, settings, statistics, dialogs and pop-ups all speak the same language.
+- **Manrope font** with tabular digits, so scores never jitter while they count.
+- **Calmer, richer tiles.** Three color families — warm 2–64, golden 128–2048, deep 4096+ — get heavier as the numbers grow, with neighbours always easy to tell apart. Every number keeps at least 3:1 contrast against its tile in both themes. Glows gave way to a thin edge for depth and a fine highlight from 128 up.
+- **Game buttons under your thumb:** scores on top, the board in the middle, menu, hint, undo and new game at the bottom.
+- **Auto theme:** follows the phone's light or dark mode, even while you play. Light and dark are new palettes on the same color roles: a warm paper light theme and a soft graphite dark one.
+- **Graphics quality:** low (720p), medium (1080p) or high (up to 2K) in Settings. The picture renders at that resolution, never above the screen's own; the current resolution is shown next to the choice.
+- **One line-icon set,** dialogs that dim the screen behind them, a new launcher icon in the new palette.
+- **Releases include the Google Play bundle (AAB),** checksummed and attested like the APKs; any Godot export error now fails the release build.
+- **Repository:** full Apache 2.0 license text and a NOTICE file; credit to the original 2048 by Gabriele Cirulli; the lossless music master moved to a [release asset](https://github.com/Mahiron-hq/2048/releases/tag/soundtrack); commits and tags are signed.
+- Tested on two phones: Infinix (Android 16, XOS) and Xiaomi Redmi Note 10S (Android 13, MIUI) — every screen in both themes and orientations, quality levels, the Auto theme following the system, and a random-input stress run.
+
+### 🇷🇺 Русский
+
+- **Новый облик на единой дизайн-системе.** Все размеры, отступы, скругления, цвета и анимации теперь берутся из одного набора токенов: сетка отступов с шагом 4, шесть размеров текста, кнопки-«таблетки» и контейнеры с параллельными скруглениями. Меню, игра, настройки, статистика, диалоги и всплывающие окна говорят на одном языке.
+- **Шрифт Manrope** с цифрами одинаковой ширины — счёт больше не «прыгает», пока растёт.
+- **Спокойнее и богаче плитки.** Три цветовых семейства — тёплое 2–64, золотое 128–2048, глубокое 4096+ — «тяжелеют» с ростом числа, а соседние значения легко различить. Контраст каждого числа с плиткой не ниже 3:1 в обеих темах. Вместо свечений — тонкий край для объёма и лёгкий блик начиная со 128.
+- **Кнопки игры под большим пальцем:** счёт сверху, поле в центре, меню, подсказка, отмена и новая игра внизу.
+- **Тема «Авто»:** следует за светлой или тёмной темой телефона, даже во время игры. Светлая и тёмная — новые палитры на общих цветовых ролях: тёплая «бумажная» светлая и мягкая графитовая тёмная.
+- **Качество графики:** низкое (720p), среднее (1080p) или высокое (до 2K) в настройках. Картинка рисуется в этом разрешении и никогда выше родного разрешения экрана; текущее разрешение показано рядом с выбором.
+- **Единый набор линейных иконок,** диалоги затемняют экран под собой, новая иконка приложения в новой палитре.
+- **В релизах есть пакет для Google Play (AAB)** с контрольными суммами и аттестацией, как у APK; любая ошибка экспорта Godot теперь останавливает сборку релиза.
+- **Репозиторий:** полный текст лицензии Apache 2.0 и файл NOTICE; благодарность автору оригинальной 2048 Габриэле Чирулли; FLAC-мастер музыки перенесён в [релиз](https://github.com/Mahiron-hq/2048/releases/tag/soundtrack); коммиты и теги подписаны.
+- Проверено на двух телефонах: Infinix (Android 16, XOS) и Xiaomi Redmi Note 10S (Android 13, MIUI) — все экраны в обеих темах и ориентациях, уровни качества, тема «Авто» вслед за системой и стресс-тест случайными действиями.
+
 ## [1.2.5] - 2026-09-30
 
 ### 🇬🇧 English
