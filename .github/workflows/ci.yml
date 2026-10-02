@@ -46,7 +46,7 @@ jobs:
           mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
 
       - name: Import project
-        run: timeout 600 ~/godot/godot --headless --path . --import || true
+        run: timeout 600 ~/godot/godot --headless --path . --import
 
       - name: Logic tests
         run: timeout 600 ~/godot/godot --headless --path . --script res://tests/run_tests.gd
