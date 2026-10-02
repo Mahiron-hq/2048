@@ -99,7 +99,7 @@ The GPU draws the same picture every frame, so its work falls in proportion to t
 The soundtrack, **"2048 Quiet Tiles"**, was written for the game by [mahiron-hq](https://github.com/Mahiron-hq).
 
 - ▶️ Listen on YouTube: https://youtu.be/hd3Zw0SmdUE
-- 💿 Download in full quality (FLAC, 44.1 kHz): [`assets/music/2048_Quiet_Tiles.flac`](assets/music/2048_Quiet_Tiles.flac?raw=1)
+- 💿 Download in full quality (FLAC, 44.1 kHz): [`2048_Quiet_Tiles.flac`](https://github.com/Mahiron-hq/2048/releases/download/soundtrack/2048_Quiet_Tiles.flac) — kept as a release asset to keep the repository light; put it in `assets/music/` to rebuild the game MP3
 
 The track ends exactly on a bar line, so the game loops it with no gap and no rhythm drift. The in-game MP3 is built from the FLAC by [`tools/make_game_music.py`](tools/make_game_music.py): the track stays whole, and a short fading tail after the loop point — a continuation of the ringing bass — overlaps softly onto the next bar. An automated test checks the seam against a reference excerpt of the master.
 
@@ -230,7 +230,7 @@ godot --headless --path . --script res://tests/ui_smoke.gd    # the whole UI flo
 Саундтрек **«2048 Quiet Tiles»** написан специально для игры — автор [mahiron-hq](https://github.com/Mahiron-hq).
 
 - ▶️ Послушать на YouTube: https://youtu.be/hd3Zw0SmdUE
-- 💿 Скачать в исходном качестве (FLAC, 44,1 кГц): [`assets/music/2048_Quiet_Tiles.flac`](assets/music/2048_Quiet_Tiles.flac?raw=1)
+- 💿 Скачать в исходном качестве (FLAC, 44,1 кГц): [`2048_Quiet_Tiles.flac`](https://github.com/Mahiron-hq/2048/releases/download/soundtrack/2048_Quiet_Tiles.flac) — лежит в релизе, чтобы репозиторий оставался лёгким; для пересборки игрового MP3 положите его в `assets/music/`
 
 Трек заканчивается ровно на границе такта, поэтому игра зацикливает его без паузы и без сдвига ритма. Игровой MP3 собирается из FLAC скриптом [`tools/make_game_music.py`](tools/make_game_music.py): трек остаётся целым, а за точкой стыка добавляется короткий затухающий «хвост» — продолжение звучащего баса, которое мягко накладывается на начало следующего такта. Точность стыка проверяет автотест по эталонному фрагменту мастера.
 
