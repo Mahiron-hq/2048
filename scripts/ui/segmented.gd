@@ -73,9 +73,8 @@ func _gui_input(event: InputEvent) -> void:
 		_tracking = true
 		_press_at = mb.global_position
 		return
-	# Selecting on release, and only for a tap, keeps a scroll that starts on the control from
-	# changing the setting. Screen positions are compared because the control scrolls along
-	# with the finger.
+	# Select on release and only for a tap, so a scroll that starts here changes nothing. Screen
+	# positions, because the control moves with the scroll.
 	var tap := _tracking and mb.global_position.distance_to(_press_at) <= TAP_SLOP
 	_tracking = false
 	if tap and Rect2(Vector2.ZERO, size).has_point(mb.position):

@@ -2,24 +2,22 @@ class_name Fonts
 extends RefCounted
 ## The bundled Manrope variable font at fixed weights, cached.
 ##
-## Shipped with the game rather than taken from the system: some Android skins (e.g. Infinix
-## XOS) map bold "sans-serif" to a serif face. System fonts only fill in glyphs Manrope lacks.
+## Bundled because some Android skins (e.g. Infinix XOS) map bold "sans-serif" to a serif face;
+## system fonts only fill in missing glyphs.
 
 const FONT_PATH := "res://assets/fonts/Manrope.ttf"
 const FALLBACK_FAMILIES := ["Roboto", "Google Sans", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"]
 ## Capital height of Manrope as a share of the font size; centers numerals optically.
 const CAP_HEIGHT := 0.72
 
-## Replaces the bundled font in layout tests with a wider face (e.g. DejaVu Sans) to prove the
-## layouts tolerate it. Null in the game.
+## A wider face (e.g. DejaVu Sans) for layout tests; null in the game.
 static var override_font: Font = null
 static var _cache := {}
 static var _file: FontFile
 
 
-## Manrope at [param weight] (one of the Design.WEIGHT_* values). With [param tabular], digits
-## share one width so counters do not jitter while they change; [param tracking] adds space
-## between letters.
+## Manrope at [param weight] (a Design.WEIGHT_* value). [param tabular] gives equal-width digits
+## so counters do not jitter; [param tracking] spaces the letters.
 static func sans(weight: int, tabular := false, tracking := 0) -> Font:
 	var key := (weight * 2 + int(tabular)) * 16 + tracking
 	if _cache.has(key):

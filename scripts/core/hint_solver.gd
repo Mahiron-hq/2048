@@ -1,16 +1,9 @@
 class_name HintSolver
 extends RefCounted
-## Picks the strongest next move for a 2048 board with expectimax search.
-##
-## The search alternates the player's four moves with every possible spawn (a 2 with 90%, a 4
-## with 10%, in each empty cell) and scores the leaves with the row/column heuristic of
-## nneonneo's 2048 AI: reward empty cells and pending merges, penalize rows that are not
-## monotonic and large tiles spread across the board. It deepens one ply at a time until the
-## time budget runs out and keeps the answer of the deepest search that finished, so it plays
-## stronger on faster phones and never stalls the game. Branches whose probability falls below
-## [constant MIN_PROBABILITY] are cut short.
-##
-## Holds caches between calls, so one instance must only be used by one thread at a time.
+## Picks the strongest move with expectimax search: the player's moves against every spawn,
+## leaves scored with nneonneo's row heuristic (empty cells, merges, monotonic rows).
+## Deepens until the time budget runs out, so faster phones look further ahead.
+## Keeps caches between calls: one instance per thread.
 
 const LOST_PENALTY := 200000.0
 const MONOTONICITY_POWER := 4.0
@@ -40,9 +33,8 @@ var _deadline := 0
 var _timed_out := false
 
 
-## Returns the best [enum Board.Dir] for [param values] (tile values, row by row) on a board of
-## side [param size], thinking for about [param budget_ms] milliseconds, or -1 when no move
-## changes the board.
+## Best [enum Board.Dir] for [param values] on a [param size] board within about
+## [param budget_ms] ms, or -1 when no move changes the board.
 func best_move(values: PackedInt64Array, size: int, budget_ms: int) -> int:
 	_prepare(size)
 	var state := _ranks(values)

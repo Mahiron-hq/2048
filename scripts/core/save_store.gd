@@ -1,9 +1,7 @@
 class_name SaveStore
 extends RefCounted
-## Local persistence: best scores, statistics, settings and the unfinished game, in one JSON file.
-##
-## Writes go to a temporary file that is then renamed over the real one, so a process kill
-## mid-write leaves the previous save intact instead of a truncated file.
+## Best scores, statistics, settings and the unfinished game, in one JSON file.
+## Written to a temp file and renamed over the save, so a kill mid-write keeps the old one.
 
 const DEFAULT_PATH := "user://save.json"
 const FORMAT_VERSION := 3
@@ -50,8 +48,8 @@ func _init(path: String = DEFAULT_PATH) -> void:
 	_path = path
 
 
-## Reads the save file. A missing file keeps defaults; a corrupt file keeps defaults for
-## whatever could not be parsed. Returns false only when the file existed but was unreadable.
+## Reads the save file; anything missing or unreadable keeps its default. Returns false only
+## when the file exists but is not valid JSON.
 func load_from_disk() -> bool:
 	if not FileAccess.file_exists(_path):
 		return true
@@ -75,8 +73,7 @@ func serialize() -> String:
 	return JSON.stringify(to_dict())
 
 
-## Writes [param text] as the save file atomically. Touches no store state, so it may run on a
-## worker thread while the game keeps playing.
+## Writes [param text] as the save file atomically. Touches no state, so a worker thread may call it.
 func write_text(text: String) -> Error:
 	var tmp := _path + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
@@ -114,8 +111,7 @@ func game_size() -> int:
 	return int(n) if (n is int or n is float) else 0
 
 
-## Counts a move; an undone move is taken back with [param delta] = -1, so the total matches
-## the moves that actually stand.
+## Counts a move; an undo passes [param delta] = -1, so the total matches the moves that stand.
 func record_move(size: int, delta := 1) -> void:
 	var s := _stat(size)
 	s.moves = maxi(0, s.moves + delta)
@@ -250,8 +246,7 @@ static func _size_key(key) -> int:
 	return n if Board.is_valid_size(n) else 0
 
 
-## Reads a volume step saved on a scale of [param steps] and maps it onto the current scale,
-## keeping both ends (quietest and loudest) fixed.
+## Maps a volume step saved on a [param steps]-step scale onto the current one, ends kept fixed.
 static func _volume_step(value, steps: int, fallback: int) -> int:
 	var v := _int_in(value, 1, steps, -1)
 	if v < 0:

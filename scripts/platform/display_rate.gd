@@ -1,16 +1,10 @@
 class_name DisplayRate
 extends RefCounted
-## Refresh-rate discovery and the game's frame-rate request.
+## Refresh rate discovery and the game's frame rate request.
 ##
-## Android can keep an app at 60 Hz on 90/120/144 Hz panels unless the app votes for a rate.
-## Godot 4.7 exposes no setting for this with the Compatibility renderer, so the vote goes
-## through JNI: Surface.setFrameRate (API 30+) on the render view's surface. The system still
-## clamps every app to the user's peak refresh rate setting, which is read so the FPS overlay can
-## show the ceiling that really applies. On iOS the equivalent of the vote is the
-## display/window/ios/allow_high_refresh_rate project setting.
-##
-## A JNI call that fails aborts only the GDScript function making it, so optional lookups run in
-## their own functions and write their result to a static field.
+## Android keeps apps at 60 Hz on faster panels unless they ask, and Godot has no setting for that
+## with the Compatibility renderer, so the request goes through Surface.setFrameRate (API 30+).
+## Each JNI lookup runs in its own function, since a failed call aborts only that function.
 
 const FRAME_RATE_COMPATIBILITY_DEFAULT := 0
 const CHANGE_FRAME_RATE_ALWAYS := 1
@@ -31,8 +25,7 @@ static var _panel_rates := PackedFloat32Array()
 static var _system_peak := 0.0
 
 
-## Caps the game at [param limit] frames per second (0: as fast as the display allows) and asks
-## the OS for a matching refresh rate. Safe to call on any platform and again after resume.
+## Caps the game at [param limit] FPS (0: no cap) and asks the OS for a matching refresh rate.
 static func apply(limit: int) -> void:
 	_limit = limit
 	Engine.max_fps = limit
@@ -46,8 +39,7 @@ static func apply(limit: int) -> void:
 	activity.runOnUiThread(runnable)
 
 
-## Refresh rates of the panel's modes, highest first; on platforms without the Android query,
-## just the current rate. Empty when unknown.
+## Refresh rates of the panel's modes, highest first; empty when unknown.
 static func panel_rates() -> PackedFloat32Array:
 	_lock.lock()
 	var rates := _panel_rates.duplicate()
@@ -79,9 +71,8 @@ static func limit_options() -> Array[int]:
 	return options_for(panel_rates())
 
 
-## Caps worth offering for a panel with [param rates]: 30 and 60 always, a higher cap only when
-## some mode runs at a whole multiple of it (a 90 cap on a 120 Hz panel would stutter). Ends
-## with 0, meaning no cap.
+## Caps for a panel with [param rates]: 30 and 60 always, a higher one only when a mode runs at
+## a whole multiple of it (90 on a 120 Hz panel would stutter). Ends with 0, no cap.
 static func options_for(rates: PackedFloat32Array) -> Array[int]:
 	var out: Array[int] = []
 	for limit: int in LIMITS:
@@ -145,8 +136,8 @@ static func _read_panel_rates(display) -> void:
 	_lock.unlock()
 
 
-## Settings.System "peak_refresh_rate" is the AOSP key behind the refresh rate choice in the
-## display settings; vendors without it simply leave the peak unknown.
+## "peak_refresh_rate" is the AOSP key behind the system refresh rate choice; vendors without it
+## leave the peak unknown.
 static func _read_system_peak(activity) -> void:
 	_set_system_peak(0.0)
 	var settings = JavaClassWrapper.wrap("android.provider.Settings$System")

@@ -4,7 +4,6 @@ extends RefCounted
 ## every measure from here; units are canvas units on the 720-wide base.
 
 # Spacing: multiples of a 4-unit step.
-const UNIT := 4.0
 const SPACE_2XS := 4.0
 const SPACE_XS := 8.0
 const SPACE_SM := 12.0
@@ -116,8 +115,3 @@ static func make_theme() -> Theme:
 	t.set_stylebox("grabber_pressed", "VScrollBar", grabber_hot)
 	t.set_stylebox("panel", "ScrollContainer", StyleBoxEmpty.new())
 	return t
-
-
-## Ease-out curve shared by every enter and settle animation.
-static func ease_out(tw: Tweener) -> Tweener:
-	return (tw as PropertyTweener).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

@@ -1,29 +1,17 @@
 class_name Haptics
 extends RefCounted
-## Tactile feedback that is actually felt on phones, whatever the phone's own vibration settings.
+## Haptics that reach the player whatever the phone's vibration settings.
 ##
-## Channel: Android 12+ files a vibration without attributes under touch feedback, which many
-## players switch off, so vibrations go through the system Vibrator with
-## VibrationAttributes.USAGE_MEDIA, the usage Android documents for games. Android 13+ drops even
-## those while the system-wide "Vibration & haptics" switch (Settings.System "vibrate_on") is off
-## and lets only USAGE_ACCESSIBILITY through; the game then uses that, so its own Vibration
-## switch is the one that decides.
-##
-## Feel: most phones cannot vary vibration strength (no amplitude control, no composition
-## primitives), and on them long pulses become a harsh buzz. Effects are therefore picked per
-## actuator: composed clicks scaled by strength where primitives exist, amplitude-scaled pulses
-## where amplitude control exists, and otherwise the maker's tuned predefined effects, graded from
-## the lightest texture tick to the heavy click. The game-over wave falls back to short spaced
-## pulses whose duty cycle follows the wave.
-##
-## A JNI call that fails aborts only the GDScript function making it, so every optional query or
-## effect is made in its own function and has a safe default; the base path never depends on it.
+## Plays through the system Vibrator with USAGE_MEDIA, or USAGE_ACCESSIBILITY while Android 13+'s
+## "vibrate_on" switch is off (the only usage it lets through then). Effects suit the motor:
+## composed clicks, amplitude pulses or the maker's predefined effects.
+## Each JNI call sits in its own function, since a failed call aborts only that function.
 
 enum Kind { TICK, LIGHT }
 
 enum AndroidState { UNKNOWN, READY, FAILED }
 
-## How merges and the game-over wave are rendered on this phone's actuator.
+## What the phone's motor can do; decides how effects are built.
 enum Actuator { PREDEFINED_ONLY, AMPLITUDE, PRIMITIVES }
 
 ## VibrationEffect.EFFECT_TICK and EFFECT_CLICK.
@@ -46,15 +34,14 @@ const USAGE_ACCESSIBILITY := 66
 const MERGE_FIRST_FELT := 4
 ## Merging two tiles of this value or more gives the strongest buzz.
 const MERGE_STRONGEST := 65536
-## Amplitude grows geometrically (equal perceived steps); length grows with it, which is what
-## carries the strength on actuators without amplitude control.
+## Amplitude grows by a constant ratio so the steps feel even; length grows too, for motors
+## without amplitude control.
 const MERGE_AMPLITUDE := Vector2i(60, 255)
 const MERGE_MS := Vector2i(20, 60)
 ## Composed click scale for the weakest and the strongest merge.
 const MERGE_SCALE := Vector2(0.3, 1.0)
 
-## Game over: one second of medium-soft vibration in two swells, the second 1.5 times as long,
-## with a short pause between them.
+## Game over: one second in two soft swells, the second 1.5 times as long.
 const WAVE_SWELL_SEGMENTS := [12, 18]
 const WAVE_SEGMENT_MS := 32
 const WAVE_PAUSE_MS := 40
@@ -110,8 +97,7 @@ static func game_over() -> void:
 	Input.vibrate_handheld(1000, WAVE_AMPLITUDE.y / 255.0)
 
 
-## Re-reads the system vibration switch; call when the game returns to the foreground, since the
-## player may have changed it meanwhile.
+## Re-reads the system vibration switch; call on resume, the player may have changed it.
 static func refresh_system_state() -> void:
 	if _android == AndroidState.READY:
 		_system_switch_off = false
@@ -178,9 +164,8 @@ static func wave_amplitudes() -> PackedInt32Array:
 	return out
 
 
-## The same wave for actuators that only switch on and off: every segment becomes a short pulse
-## and a gap, the pulse longer where the wave is stronger. Returns alternating off/on durations
-## starting with an off one, as VibrationEffect.createWaveform(long[], int) expects.
+## The wave for on/off-only motors: short pulses, longer where the wave is stronger.
+## Alternating off/on durations starting with off, as createWaveform(long[], int) expects.
 static func pulse_wave_timings() -> PackedInt64Array:
 	var out := PackedInt64Array([0])
 	var timings := wave_timings()
@@ -286,8 +271,8 @@ static func _detect_actuator() -> void:
 		_actuator = Actuator.AMPLITUDE
 
 
-## Android 13+ silences every usage but accessibility while "vibrate_on" is 0; earlier versions
-## do not use the setting for app vibrations.
+## Android 13+ mutes every usage but accessibility while "vibrate_on" is 0; older versions
+## ignore the switch for apps.
 static func _read_system_switch() -> void:
 	if OS.get_version().to_int() < 13 or _accessibility_attributes == null:
 		return

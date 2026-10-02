@@ -1,16 +1,11 @@
 """Builds the in-game music loop from the lossless master.
 
-The master ends on a bar line while the bass is still sounding, and the next
-bar starts from silence, so a raw end-to-start splice clicks. The loop stays
-exactly the master's length; instead, a short tail is appended after the loop
-point: the master's end continued by point reflection (continuous in value and
-slope) and faded out. Godot's MP3 beat loop mixes the frames that follow the
-loop point onto the restart with a 256-frame fade, so the bass rings smoothly
-into the downbeat, and the encoder never sees an abrupt edge at the seam.
+The loop keeps the master's exact length and gets a short faded tail past the loop point
+(the master's end continued by point reflection), which Godot mixes onto the restart, so the
+bass rings into the downbeat without a click. The MP3 is CBR without a Xing/LAME header, so
+its encoder delay is fixed and the game skips it (Sfx.MUSIC_DELAY_FRAMES).
 
-The MP3 is CBR without a Xing/LAME header, so every decoder yields the same
-stream with a fixed encoder delay that the game skips (Sfx.MUSIC_DELAY_FRAMES).
-
+The master is published with the GitHub releases; put it in assets/music/ first.
 Usage: python tools/make_game_music.py [path/to/ffmpeg]
 """
 

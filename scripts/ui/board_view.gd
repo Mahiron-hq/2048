@@ -1,9 +1,7 @@
 class_name BoardView
 extends Control
-## Draws the grid and animates tiles for moves reported by [Board].
-##
-## Tile nodes are pooled; a move only repositions, recolors and rescales existing nodes.
-## A new move arriving mid-animation fast-forwards the running one, so input is never dropped.
+## Draws the grid and animates the tiles of [Board] moves.
+## Tile nodes are pooled; a move arriving mid-animation fast-forwards the running one.
 
 signal settled
 
@@ -20,8 +18,8 @@ const UNDO_VANISH := 0.12
 const UNDO_SQUEEZE := 0.07
 const UNDO_SQUEEZE_SCALE := 0.9
 const UNDO_SLIDE := 0.19
-## Move hint: how far the tiles lean towards the suggested move, in cells (at most the margin
-## around the grid, so edge tiles stay on the board), and the timing of one push out and back.
+## Move hint: lean towards the suggested move, in cells (capped at the grid margin so edge
+## tiles stay on the board), and the timing of one push out and back.
 const HINT_PUSH := 0.16
 const HINT_OUT := 0.22
 const HINT_BACK := 0.28
@@ -73,8 +71,7 @@ func is_animating() -> bool:
 	return (_move_tween != null and _move_tween.is_valid()) or _fx_tweens.any(func(t: Tween) -> bool: return t.is_valid())
 
 
-## Suggests a move without making it: every tile leans towards [param dir] twice while the
-## board's edge on that side lights up softly.
+## Suggests a move without making it: the tiles lean towards [param dir] twice and that edge glows.
 func show_move_hint(dir: Board.Dir) -> void:
 	stop_move_hint()
 	var off := _dir_vector(dir) * minf(cell_size * HINT_PUSH, gap * 0.85)
@@ -142,8 +139,8 @@ func play_move(result: Board.MoveResult) -> void:
 	_move_tween.chain().tween_callback(_after_slide.bind(result))
 
 
-## Plays [param undone] backwards: the spawned tile shrinks away, merged tiles squeeze and split
-## into their halves, and every tile glides back to where it came from.
+## Plays [param undone] backwards: the spawned tile shrinks away, merged tiles split into their
+## halves and every tile glides back.
 func play_undo(undone: Board.MoveResult) -> void:
 	complete_animations()
 	var tw := create_tween().set_parallel()
@@ -426,8 +423,7 @@ class MergeRing:
 		draw_arc(Vector2.ZERO, r, 0.0, TAU, 48, Color(_color, a), _radius * 0.08 * (1.0 - t) + 1.0, true)
 
 
-## Soft pool of accent light rising from one edge of the board and fading towards the middle and
-## along the edge, clipped to the board.
+## Soft accent light rising from one edge of the board, clipped to it.
 class _MoveGlow:
 	extends Control
 

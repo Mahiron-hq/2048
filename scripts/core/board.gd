@@ -1,9 +1,7 @@
 class_name Board
 extends RefCounted
-## Pure 2048-style board logic: slides, merges, spawns, a bounded undo history and serialization.
-##
-## Tiles carry stable integer ids so a view can animate the same tile across a move (and back
-## again on undo). Nothing here depends on frame time; a move is a discrete state change.
+## Board logic: slides, merges, spawns, bounded undo and serialization.
+## Tiles keep stable ids, so a view can animate the same tile through a move and its undo.
 
 enum Dir { UP, DOWN, LEFT, RIGHT }
 
@@ -111,9 +109,8 @@ func can_move() -> bool:
 	return false
 
 
-## Applies a move in [param dir]. When the board changes, a new tile is spawned and the
-## previous state is pushed onto the undo history. Returns what happened; [code]moved[/code]
-## is false (and nothing is mutated) when the move is a no-op.
+## Plays a move in [param dir]: spawns a tile and records undo when the board changes.
+## [code]moved[/code] is false and nothing changes for a no-op.
 func move(dir: Dir) -> MoveResult:
 	var slid := _slide(dir, values, ids)
 	var result: MoveResult = slid.result
@@ -140,11 +137,9 @@ func move(dir: Dir) -> MoveResult:
 	return result
 
 
-## Restores the state before the most recent move still in the history. Returns the move that
-## was undone, with the same tile ids the board has again afterwards, so a view can play it
-## backwards. When the move cannot be reconstructed (e.g. a save from an older version), the
-## result has [code]moved == false[/code] and a view should rebuild instead. Returns null when
-## there is nothing to undo.
+## Steps back one move. Returns it with the restored tile ids so a view can play it backwards,
+## with [code]moved == false[/code] when it cannot be rebuilt (old saves), or null with nothing
+## to undo.
 func undo() -> MoveResult:
 	if not can_undo():
 		return null
@@ -189,10 +184,8 @@ func to_dict() -> Dictionary:
 	return d
 
 
-## Loads state produced by [method to_dict] (or by 1.x saves with a single "undo" entry).
-## Returns false, leaving the board untouched, when the data is malformed: unsupported size,
-## wrong cell count, non power-of-two values or negative counters. Tile ids are optional:
-## without valid ids they are reissued and undo still works, just without a replayable move.
+## Loads [method to_dict] output (or a 1.x save). Returns false and leaves the board untouched
+## on malformed data. Missing tile ids are reissued; undo then works without animation.
 func from_dict(d: Dictionary) -> bool:
 	var n := int(d.get("size", 0)) if (d.get("size") is int or d.get("size") is float) else 0
 	if not is_valid_size(n):
@@ -285,8 +278,8 @@ func _reconstruct(snap: Dictionary) -> MoveResult:
 	return result
 
 
-## Pure slide/merge of one move over the given grid; does not touch the board.
-## Returns {values, ids, result} where result has no spawn or milestones filled in.
+## Slides and merges one move over the grid without touching the board.
+## Returns {values, ids, result}; result has no spawn or milestones yet.
 func _slide(dir: Dir, src_values: PackedInt64Array, src_ids: PackedInt32Array) -> Dictionary:
 	var result := MoveResult.new()
 	var new_values := PackedInt64Array()

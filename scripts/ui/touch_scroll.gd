@@ -1,12 +1,8 @@
 class_name TouchScroll
 extends ScrollContainer
-## Vertical scroll area that a finger can drag from anywhere on its content, controls included.
-##
-## ScrollContainer only sees a touch that its content lets through, and panels and plain Controls
-## stop touches by default, so the page scrolled only when a swipe started in a gap between
-## cards. Once built, every control inside is switched to pass touches on; buttons, selectors and
-## sliders then drop their press when the scroll begins. The deadzone keeps a slightly shaky tap
-## from turning into a scroll that would cancel it.
+## Vertical scroll area a finger can drag from anywhere, controls included.
+## ScrollContainer only gets touches its content passes on, so every control inside is switched
+## to pass; buttons and selectors drop their press once the scroll begins.
 
 const DEADZONE := 12
 
