@@ -1,0 +1,11 @@
+2048 Merge
+Copyright 2026 Lev Burmistrov (Mahiron-hq)
+
+This product includes software developed by the Godot Engine contributors
+(https://godotengine.org), licensed under the MIT License.
+
+The game is based on the idea of 2048 by Gabriele Cirulli
+(https://github.com/gabrielecirulli/2048, MIT License). No code from it is used.
+
+The bundled Roboto font is licensed under the SIL Open Font License 1.1
+(assets/fonts/OFL.txt). The music is licensed separately (LICENSE-MUSIC).
