@@ -2,9 +2,8 @@ class_name Palette
 extends RefCounted
 ## Semantic color roles. Both themes fill the same roles; screens never pick raw colors.
 ##
-## Tiles climb in three families: warm 2–64 (light sand to brick), golden 128–2048 (honey to
-## copper) and deep 4096+ (wine through indigo to teal). Lightness falls within a family, so a
-## bigger tile always reads heavier, and every family change marks a new milestone tier.
+## Tiles climb in three families: warm 2–64, golden 128–2048, deep 4096+. Lightness falls within
+## a family, and each family change marks a milestone tier.
 
 var dark: bool
 
@@ -133,6 +132,5 @@ func tile_is_milestone(value: int) -> bool:
 	return value >= Board.FIRST_MILESTONE
 
 
-## Palette in effect; UI nodes read it while drawing and are refreshed through
-## [code]_on_skin_changed[/code] when it is replaced.
+## Palette in effect; nodes redraw from it in [code]_on_skin_changed[/code].
 static var current: Palette = Palette.make(true)

@@ -52,9 +52,8 @@ func _on_skin_changed() -> void:
 	queue_redraw()
 
 
-## A touch only moves the knob once it is clearly a tap or a sideways drag; a vertical swipe that
-## starts on the slider scrolls the page and leaves the value alone. Screen positions are
-## compared because the slider scrolls along with the finger.
+## Moves the knob only for a tap or a sideways drag; a vertical swipe scrolls the page instead.
+## Screen positions, because the slider moves with the scroll.
 func _gui_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb and mb.button_index == MOUSE_BUTTON_LEFT:

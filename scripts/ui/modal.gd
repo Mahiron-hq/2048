@@ -74,9 +74,8 @@ func close() -> void:
 	closed.emit()
 
 
-## Draws the dialog for a couple of frames, practically transparent and click-through, so its
-## glyphs and styles are cached before the first real opening, which otherwise drops frames on
-## slow phones.
+## Draws the dialog invisibly for a couple of frames so its glyphs are cached before the first
+## real opening, which otherwise stutters on slow phones.
 func prime() -> void:
 	if is_open:
 		return
@@ -106,8 +105,7 @@ func _fit_card() -> void:
 	_apply_scale()
 
 
-## Scales the card about its center. Wrapped text settles its height over a few layout passes,
-## so this runs again on every card resize instead of trusting the size seen at open time.
+## Scales the card about its center; runs on every resize, as wrapped text settles over a few passes.
 func _apply_scale() -> void:
 	_card.pivot_offset = _card.size * 0.5
 	# Short landscape screens: shrink the card to fit instead of letting it spill off screen.

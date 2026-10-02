@@ -1,9 +1,8 @@
 class_name GameScreen
 extends Control
-## The play screen: header with scores, board, action bar, swipe/keyboard input, milestones,
-## undo, the start-of-game swipe hint and the game-over summary. Portrait puts the scores on
-## top, the board in the middle and the buttons at the bottom, under the thumb; landscape
-## centers the board and places the controls around it.
+## The play screen: scores, board, buttons, swipe and keyboard input, milestones, undo, hints
+## and the game-over summary. Portrait: scores on top, buttons at the bottom under the thumb;
+## landscape: the board in the middle, controls around it.
 
 signal menu_requested
 
@@ -18,8 +17,8 @@ const BOARD_GAP := Design.SPACE_LG
 const BRAND_GAP := Design.SPACE_LG
 const STACK_GAP := Design.SPACE_MD
 const SCORE_SIZE := Vector2(Design.CONTROL_LG * 1.6, Design.CONTROL_LG)
-## Landscape arrangements take the board size of the best one if within this share of it,
-## so a slightly larger board never wins over the preferred layout.
+## A landscape arrangement wins if its board is within this share of the largest one, so a
+## slightly bigger board never beats the preferred layout.
 const LAYOUT_TOLERANCE := 0.97
 const CONFETTI := 70
 
@@ -28,9 +27,8 @@ const HINT_IDLE := 15.0
 ## Thinking time for one hint; the search goes deeper on faster phones in the same time.
 const HINT_BUDGET_MS := 350
 
-## Landscape arrangements, preferred first. ROW: logo, menu and score in one line top-left,
-## best top-right. STACKED: score under logo and menu. ONE_SIDE: every control left of the
-## board, for near-square screens.
+## Landscape arrangements, preferred first. ROW: logo, menu and score in one line, best on the
+## right. STACKED: score under logo and menu. ONE_SIDE: everything left of the board.
 enum Arrangement { ROW, STACKED, ONE_SIDE }
 
 var board := Board.new()
@@ -73,7 +71,7 @@ var _solver := HintSolver.new()
 var _hint_task := -1
 ## Written by the search task; read once it has completed.
 var _hint_result := -1
-## Board the search was started for; its answer is dropped if the board has changed since.
+## Board the search started from; the answer is dropped if the board changed since.
 var _hint_values := PackedInt64Array()
 ## Seconds since the last move while a game is waiting for one.
 var _idle := 0.0
@@ -166,8 +164,7 @@ func _process(delta: float) -> void:
 		WorkerThreadPool.wait_for_task_completion(_hint_task)
 		_hint_task = -1
 		if _hint_result >= 0 and board.values == _hint_values and is_playing():
-			# The swipe tutorial would sit on top of the suggestion; asking for a hint shows the
-			# player already knows how to move.
+			# A player asking for a hint knows how to swipe; the tutorial would cover the suggestion.
 			_board_view.hide_hint()
 			_board_view.show_move_hint(_hint_result)
 	var waiting := _app.store.hints_on and is_playing() and _app.is_current(self) \
@@ -215,8 +212,8 @@ func _on_language_changed() -> void:
 	_fit_actions.call_deferred()
 
 
-## Portrait action bar: full buttons when they fit, then tighter ones, then labels without
-## icons, and icons alone only as the last resort.
+## Portrait action bar: full buttons if they fit, then tighter ones, then labels without icons,
+## then icons alone.
 func _fit_actions() -> void:
 	if _landscape_mode or size.x < 1.0:
 		return
@@ -247,7 +244,7 @@ func is_hint_busy() -> bool:
 	return _hint_task >= 0
 
 
-## The move waiting is over: the idle clock restarts and a lit hint button goes back to normal.
+## A move happened: the idle clock restarts and a lit hint button goes back to normal.
 func _reset_idle() -> void:
 	_idle = 0.0
 	_set_hint_glow(false)
@@ -285,8 +282,8 @@ func is_playing() -> bool:
 	return _active and not _pending_over and not _game_over.is_open
 
 
-## Starts a fresh game of side [param grid] (the current size when 0). With [param intro],
-## tiles pop in. An unfinished game that is replaced counts as played.
+## Starts a fresh game of side [param grid] (the current size when 0); tiles pop in with
+## [param intro]. A replaced unfinished game counts as played.
 func start_new(grid := 0, intro := true) -> void:
 	_record_abandoned()
 	board.new_game(grid if grid > 0 else board.size)
@@ -410,8 +407,7 @@ func _on_settled() -> void:
 	if not _pending_over or _game_over.is_open:
 		return
 	await get_tree().create_timer(0.35).timeout
-	# Leaving for the menu or settings in that moment must not pop the summary over them; it
-	# shows when the player comes back to the board instead.
+	# Not over the menu or settings if the player left meanwhile; it shows on return instead.
 	if not _pending_over or _game_over.is_open or not _app.is_current(self):
 		return
 	_app.sfx.play(Sfx.Kind.LOSE)
@@ -475,9 +471,8 @@ func _menu_from_over() -> void:
 	menu_requested.emit()
 
 
-## Portrait: header row (logo, scores) above the board, action bar (menu, hint, undo, new)
-## below it. Landscape: board in the middle of the screen, controls placed around it by
-## [method _layout_landscape].
+## Portrait: header above the board, action bar below. Landscape: board in the middle, controls
+## placed by [method _layout_landscape].
 func _apply_layout(wide: bool) -> void:
 	_landscape_mode = wide
 	# Narrower buttons leave the board more room beside them.
@@ -522,10 +517,9 @@ func _fill(box: Container, nodes: Array) -> void:
 		box.add_child(node)
 
 
-## Sizes the board and places the controls around it: logo and menu in the top-left corner, the
-## score against the board's left edge and the best score against its right edge with the hint
-## button beside it, undo and new game in the bottom-left corner. Falls back to stacked arrangements when the screen is too
-## narrow for that without shrinking the board.
+## Sizes the board and places the controls around it: logo and menu top-left, score against the
+## board's left edge, best score and hint against its right edge, undo and new game bottom-left.
+## Falls back to stacked arrangements when that would shrink the board.
 func _layout_landscape() -> void:
 	if not _landscape_mode:
 		return
@@ -570,8 +564,7 @@ func _layout_landscape() -> void:
 	_place(_hint_btn, _best_box.position + Vector2(best.x + STACK_GAP, (best.y - hint.y) * 0.5), hint)
 
 
-## Board side length [param arrangement] allows in [param area], or -1 when its controls do
-## not fit beside the board.
+## Board side [param arrangement] allows in [param area], or -1 when its controls do not fit.
 func _board_side(arrangement: Arrangement, area: Vector2) -> float:
 	var left := _left_width(arrangement)
 	var s := area.y
@@ -675,10 +668,8 @@ func _input(event: InputEvent) -> void:
 		_try_swipe(event.position - _touch_start, SWIPE_COMMIT)
 
 
-## Swipes may start anywhere on the game screen except over the scores and buttons (the header
-## and the action bar in portrait; beside the board, the band of top controls and the bottom
-## buttons in landscape) or the screen edge outside it, so glancing at the status bar or
-## pulling the notification shade never moves the tiles.
+## Swipes may start anywhere except on the scores and buttons or past the screen's edge, so
+## checking the time or pulling the notification shade never moves tiles.
 func _in_swipe_area(point: Vector2) -> bool:
 	if not get_global_rect().has_point(point):
 		return false
@@ -722,8 +713,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _try_swipe(delta: Vector2, threshold: float) -> void:
-	# _input receives positions already mapped to the base-resolution viewport, so thresholds
-	# are DPI-independent.
+	# Positions arrive in viewport units, so the thresholds do not depend on screen density.
 	if delta.length() < threshold:
 		return
 	_touch_used = true

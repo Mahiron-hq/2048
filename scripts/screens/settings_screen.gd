@@ -1,9 +1,7 @@
 class_name SettingsScreen
 extends Control
-## App settings (sound, music, vibration, theme, language, graphics, FPS overlay and cap) and
-## game settings (move hints, undo depth). Changes apply immediately.
-##
-## Switches sit at the end of their row; selectors span the card under their title.
+## App and game settings; changes apply at once. Switches end their row, selectors span the card
+## under their title.
 
 signal back_requested
 

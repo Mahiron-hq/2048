@@ -9,12 +9,11 @@ const SIDE_PADDING := Design.GUTTER
 const VERTICAL_PADDING := Design.SPACE_LG
 ## Idle loop pacing while nothing animates; input still wakes the loop immediately.
 const IDLE_SLEEP_USEC := 8000
-## Stretch base per orientation: the short side is always 720 units, so controls keep the same
-## physical size when the device turns.
+## Stretch base per orientation: the short side is always 720 units, so controls keep their size
+## when the device turns.
 const BASE_PORTRAIT := Vector2i(720, 1280)
 const BASE_LANDSCAPE := Vector2i(1280, 720)
-## Short side of the rendered picture for each [enum SaveStore.Quality]; screens with fewer
-## pixels render at their own resolution.
+## Short side of the rendered picture per [enum SaveStore.Quality]; smaller screens render natively.
 const QUALITY_SHORT_SIDE: Array[int] = [720, 1080, 1440]
 
 static var instance: App
@@ -121,7 +120,7 @@ func _ready() -> void:
 	sfx.music_enabled = store.music_on
 	DisplayRate.apply(store.fps_limit)
 	_to_menu()
-	# While the launch frames are still slow anyway, not in the middle of a game.
+	# Launch frames are slow anyway; better here than in the middle of a game.
 	_game.prime_overlays()
 	_confirm.prime()
 
@@ -213,9 +212,8 @@ func confirm(title_key: String, body_key: String, yes_key: String, on_yes: Calla
 	_confirm.ask(title_key, body_key, yes_key, on_yes)
 
 
-## Saves the game state. Normally the file is written on a worker thread: a slow flash write
-## (which can take seconds on a busy phone) must never stall a move. [param sync] writes on the
-## spot and is used when the app goes to the background or quits.
+## Saves the game, on a worker thread: a slow flash write can take seconds on a busy phone.
+## [param sync] writes on the spot, for going to the background or quitting.
 func save_now(sync := false) -> void:
 	_save_countdown = -1.0
 	var text := store.serialize()
@@ -246,8 +244,7 @@ func _wait_for_save() -> void:
 		_save_task = -1
 
 
-## Schedules a save shortly; repeated requests within SAVE_DEBOUNCE collapse into one. Going to
-## the background or quitting always flushes synchronously, so nothing is lost on a kill.
+## Schedules a save; requests within SAVE_DEBOUNCE collapse into one write.
 func request_save() -> void:
 	if _save_countdown < 0.0:
 		_save_countdown = SAVE_DEBOUNCE
@@ -402,8 +399,7 @@ func _follow_system_theme() -> void:
 		_apply_palette()
 
 
-## Swaps the palette when the wanted look differs, crossfading from a snapshot of the old frame
-## so nothing flashes.
+## Swaps the palette when the wanted look differs, crossfading from a snapshot of the old frame.
 func _apply_palette() -> void:
 	var dark := _wants_dark()
 	if dark == Palette.current.dark:
@@ -415,8 +411,7 @@ func _apply_palette() -> void:
 	if img:
 		_theme_snapshot = TextureRect.new()
 		_theme_snapshot.texture = ImageTexture.create_from_image(img)
-		# The frame is in physical pixels; keeping its size as the minimum would blow the rect
-		# up past the (smaller) canvas on high-density screens.
+		# The image is in physical pixels; keeping its size as the minimum would overflow the canvas.
 		_theme_snapshot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		_theme_snapshot.stretch_mode = TextureRect.STRETCH_SCALE
 		_theme_snapshot.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -461,8 +456,8 @@ func _on_viewport_resized() -> void:
 	_apply_safe_area()
 
 
-## Lays the UI out on a 720-unit short side and renders it at the chosen quality: at the
-## screen's own resolution, or into a smaller canvas that the window scales up.
+## Lays the UI out on a 720-unit short side and renders it at the chosen quality: natively, or
+## into a smaller canvas that the window scales up.
 func _update_content_scale() -> void:
 	var window := get_window()
 	if window == null or window != get_tree().root:
@@ -500,8 +495,7 @@ func _apply_safe_area() -> void:
 			left += safe.position.x * k.x
 			right += maxf(0.0, win.x - safe.end.x) * k.x
 			bottom += maxf(0.0, win.y - safe.end.y) * k.y
-	# Portrait tablets keep a phone-width column; landscape screens get a wide area (for the
-	# side-by-side layouts) that is only clamped on extreme aspect ratios.
+	# Portrait tablets keep a phone-width column; landscape is only clamped on extreme ratios.
 	var vp_size := get_viewport_rect().size
 	var width := vp_size.x
 	var max_content := 760.0 if vp_size.x <= vp_size.y * 1.1 else vp_size.y * 2.3
@@ -513,8 +507,7 @@ func _apply_safe_area() -> void:
 	_safe.add_theme_constant_override("margin_bottom", int(bottom))
 	_safe.add_theme_constant_override("margin_left", int(left))
 	_safe.add_theme_constant_override("margin_right", int(right))
-	# Landscape keeps the logo in the top-left corner, so the overlay moves to the bottom right,
-	# which the game screen leaves free.
+	# Landscape keeps the logo top-left, so the overlay goes bottom-right.
 	if vp_size.x > vp_size.y * 1.1:
 		_fps_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 		_fps_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN

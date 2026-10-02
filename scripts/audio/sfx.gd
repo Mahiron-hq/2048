@@ -9,8 +9,7 @@ const VOICES := 8
 
 const MUSIC_PATH := "res://assets/music/2048_Quiet_Tiles.mp3"
 const MUSIC_RATE := 44100.0
-## Encoder delay of the game MP3 in decoder frames, measured against the lossless master.
-## Regenerating the MP3 with tools/make_game_music.py keeps it at this value.
+## MP3 encoder delay in frames, measured against the master; make_game_music.py keeps it.
 const MUSIC_DELAY_FRAMES := 1107
 ## The track is exactly this long and ends on a bar line, so the loop wraps here.
 const MUSIC_LOOP_FRAMES := 5_880_000
@@ -63,8 +62,7 @@ func _ready() -> void:
 	_streams[Kind.LOSE] = _make_lose()
 
 
-## The soundtrack configured to loop sample-exactly: playback skips the MP3 encoder delay and
-## wraps at the bar line instead of at the end of the padded MP3 stream.
+## The soundtrack looping sample-exactly: skips the encoder delay, wraps at the bar line.
 static func make_music_stream() -> AudioStreamMP3:
 	var s: AudioStreamMP3 = load(MUSIC_PATH)
 	s.loop = true
@@ -94,8 +92,7 @@ func play_merge(value: int) -> void:
 	play(Kind.MERGE, pow(2.0, minf(step, 12) / 12.0), -2.0)
 
 
-## Fades the soundtrack in or out. Turning it off pauses it after the fade, so turning it back
-## on resumes where it left off; toggling mid-fade continues from the current level.
+## Fades the soundtrack in or out. Off pauses it after the fade, so on resumes where it was.
 func set_music_enabled(on: bool) -> void:
 	music_enabled = on
 	if not is_inside_tree():
