@@ -1,12 +1,9 @@
 extends SceneTree
 ## Renders store screenshots (1080x1920, RU/EN) and promo graphics into store/. Needs a GPU window:
 ## godot --path . --script res://tools/make_store_art.gd
-## Uses Roboto (the Android system font) from build/fonts/Roboto-VF.ttf when present, so the
-## captures look like the game on a phone rather than with the desktop's system font.
 
 const OUT := "res://store/"
 const SAVE := "user://store_art_save.json"
-const ROBOTO := "res://build/fonts/Roboto-VF.ttf"
 
 const TAGLINE := {"ru": "Спокойная головоломка слияний", "en": "A calm, polished number puzzle"}
 const BADGES := {"ru": "Без рекламы  ·  Офлайн  ·  Авторская музыка", "en": "No ads  ·  Offline  ·  Original soundtrack"}
@@ -17,7 +14,6 @@ var _vp: SubViewport
 
 func _initialize() -> void:
 	OS.low_processor_usage_mode = false
-	_use_roboto()
 	for dir in ["screenshots/ru", "screenshots/en"]:
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT + dir))
 	_run.call_deferred()
@@ -25,30 +21,12 @@ func _initialize() -> void:
 
 func _run() -> void:
 	await _screenshots()
+	Palette.current = Palette.make(true)
 	for lang in ["ru", "en"]:
 		await _promo(Vector2i(1024, 500), "feature-graphic-1024x500-%s.png" % lang, lang)
 		await _promo(Vector2i(1920, 1080), "banner-1920x1080-%s.png" % lang, lang)
 	await _promo(Vector2i(630, 500), "itch-cover-630x500.png", "en")
 	quit(0)
-
-
-func _use_roboto() -> void:
-	var path := ProjectSettings.globalize_path(ROBOTO)
-	if not FileAccess.file_exists(path):
-		push_warning("Roboto not found; captures use the system font")
-		return
-	var file := FontFile.new()
-	if file.load_dynamic_font(path) != OK:
-		return
-	var ts := TextServerManager.get_primary_interface()
-	for weight in [Fonts.REGULAR, Fonts.MEDIUM, Fonts.SEMIBOLD, Fonts.BOLD, Fonts.BLACK]:
-		for tabular in [false, true]:
-			var v := FontVariation.new()
-			v.base_font = file
-			v.variation_opentype = {ts.name_to_tag("wght"): weight}
-			if tabular:
-				v.opentype_features = {ts.name_to_tag("tnum"): 1}
-			Fonts._cache[weight * 2 + int(tabular)] = v
 
 
 func _screenshots() -> void:
@@ -110,8 +88,6 @@ func _screenshots() -> void:
 		await _wait(0.4)
 	_vp.queue_free()
 	await _frames(2)
-	# Freeing the app clears the font cache; restore Roboto for the promo art.
-	_use_roboto()
 
 
 func _board(rows: Array, score: int, best: int) -> void:
@@ -123,6 +99,7 @@ func _board(rows: Array, score: int, best: int) -> void:
 	g._pending_over = false
 	app.store.submit_score(best, 4)
 	g._board_view.show_board(g.board)
+	g._board_view.hide_hint(true)
 	g._refresh_scores(false)
 
 
@@ -171,74 +148,42 @@ func _frames(n: int) -> void:
 		await process_frame
 
 
-## Promo card: dark gradient, the 2-0-4-8 tiles, title, tagline and feature line.
+## Promo card: the dark theme's background, the 2-0-4-8 logo tiles, title, tagline and features.
 class _Promo:
 	extends Control
 
-	const VALUES := [2, 16, 128, 2048]
 	const DIGITS := ["2", "0", "4", "8"]
 
 	var tagline := ""
 	var badges := ""
 
 	func _draw() -> void:
-		var p := Palette.make(true)
+		var p := Palette.current
 		var w := size.x
 		var h := size.y
-		var top := Color("2a2440")
-		var bottom := Color("120f1a")
 		draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(w, 0), Vector2(w, h), Vector2(0, h)]),
-				PackedColorArray([top, top.lerp(bottom, 0.35), bottom, top.lerp(bottom, 0.7)]))
-		_glow(Vector2(w * 0.12, h * 0.1), h * 0.9, Color(p.accent, 0.16))
-		_glow(Vector2(w * 0.92, h * 0.95), h * 1.0, Color(p.tile_bg(4096), 0.16))
+				PackedColorArray([p.bg, p.bg, p.bg_deep, p.bg_deep]))
 
 		var unit := minf(w / 1024.0, h / 500.0)
 		if w / h < 1.5:
 			unit = minf(w / 630.0, h / 500.0) * 0.82
-		var tile := 118.0 * unit
-		var gap := 16.0 * unit
+		var tile := 112.0 * unit
+		var gap := Design.SPACE_MD * unit
 		var row_w := tile * 4 + gap * 3
-		var title_size := int(84 * unit)
-		var tag_size := int(34 * unit)
-		var badge_size := int(24 * unit)
-		var block_h := tile + 36 * unit + title_size + 18 * unit + tag_size + 26 * unit + badge_size
+		var title_size := int(Design.TEXT_DISPLAY * 0.86 * unit)
+		var tag_size := int(Design.TEXT_HEADLINE * unit)
+		var badge_size := int(Design.TEXT_CALLOUT * unit)
+		var block_h := tile + Design.SPACE_XL * unit + title_size + Design.SPACE_MD * unit + tag_size \
+				+ Design.SPACE_LG * unit + badge_size
 		var y := (h - block_h) * 0.5
 		var x := (w - row_w) * 0.5
 		for i in 4:
-			_tile(Rect2(x + i * (tile + gap), y, tile, tile), VALUES[i], DIGITS[i], p)
-		y += tile + 36 * unit
-		_centered("2048 Merge", Fonts.sans(Fonts.BLACK), title_size, y + title_size * 0.8, p.text)
-		y += title_size + 18 * unit
-		_centered(tagline, Fonts.sans(Fonts.MEDIUM), tag_size, y + tag_size * 0.8, Color(p.text, 0.85))
-		y += tag_size + 26 * unit
-		_centered(badges, Fonts.sans(Fonts.SEMIBOLD), badge_size, y + badge_size * 0.8, p.accent)
-
-	func _centered(text: String, font: Font, fs: int, baseline: float, color: Color) -> void:
-		var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(font, Vector2((size.x - tw) * 0.5, baseline), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, color)
-
-	func _glow(center: Vector2, radius: float, color: Color) -> void:
-		for i in 24:
-			var t := i / 24.0
-			draw_circle(center, radius * (1.0 - t), Color(color, color.a * 0.09 * (0.3 + t)), true, -1.0, true)
-
-	func _tile(r: Rect2, value: int, label: String, p: Palette) -> void:
-		var bg := p.tile_bg(value)
-		var depth := r.size.y * 0.06
-		var base := StyleBoxFlat.new()
-		base.bg_color = bg.darkened(0.25)
-		base.set_corner_radius_all(int(r.size.x * 0.2))
-		base.corner_detail = 12
-		if p.tile_glows(value):
-			base.shadow_color = Color(bg, 0.45)
-			base.shadow_size = int(r.size.x * 0.18)
-		draw_style_box(base, r)
-		var face := base.duplicate() as StyleBoxFlat
-		face.bg_color = bg
-		face.shadow_size = 0
-		draw_style_box(face, Rect2(r.position, Vector2(r.size.x, r.size.y - depth)))
-		var font := Fonts.sans(Fonts.BLACK)
-		var fs := int(r.size.x * 0.62)
-		var tw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(font, r.position + Vector2((r.size.x - tw) * 0.5, (r.size.y - depth) * 0.5 + fs * 0.355), label,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, fs, p.tile_fg(value))
+			var value: int = MenuScreen.LOGO_VALUES[i]
+			var fs := Fonts.fit(TileArt.font(), DIGITS[i], int(tile * 0.6), tile * TileArt.TEXT_ROOM)
+			TileArt.draw(self, Rect2(x + i * (tile + gap), y, tile, tile), value, TileArt.styles(value, tile), fs, DIGITS[i])
+		y += tile + Design.SPACE_XL * unit
+		Fonts.draw_centered(self, Fonts.sans(Design.WEIGHT_HEAVY), "2048 Merge", Vector2(w * 0.5, y + title_size * 0.5), title_size, p.text)
+		y += title_size + Design.SPACE_MD * unit
+		Fonts.draw_centered(self, Fonts.sans(Design.WEIGHT_MEDIUM), tagline, Vector2(w * 0.5, y + tag_size * 0.5), tag_size, p.text_secondary)
+		y += tag_size + Design.SPACE_LG * unit
+		Fonts.draw_centered(self, Fonts.sans(Design.WEIGHT_BOLD), badges, Vector2(w * 0.5, y + badge_size * 0.5), badge_size, p.accent)
