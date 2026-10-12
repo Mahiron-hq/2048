@@ -82,6 +82,11 @@ var _settings_return: Control
 var _transition: Tween
 var _theme_snapshot: TextureRect
 var _theme_fade: Tween
+## Built once per palette: a fresh Theme on every switch made each control re-read its look.
+var _themes := {}
+## Hidden screens and the broadcasts they still owe, run when they are shown. Restyling and
+## relaying out all five screens made every theme, language or text size switch hitch.
+var _stale := {}
 var _fps_accum := 0.0
 
 
@@ -510,7 +515,12 @@ func _apply_palette() -> void:
 	var dark := _wants_dark()
 	if dark == Palette.current.dark:
 		return
-	# The captured frame already shows any crossfade in progress, so one snapshot is enough.
+	# While a crossfade runs its snapshot keeps fading over the new look; reading the frame back
+	# from the GPU again would only make quick taps stutter.
+	if _theme_fade and _theme_fade.is_valid():
+		Palette.current = Palette.make(dark)
+		_broadcast("_on_skin_changed")
+		return
 	_clear_theme_fade()
 	# The headless test runs render nothing to capture.
 	var img := get_viewport().get_texture().get_image() if DisplayServer.get_name() != "headless" else null
@@ -676,13 +686,43 @@ func set_language(lang: String) -> void:
 
 
 func _broadcast(method: StringName) -> void:
+	var live: Array[Control] = [_background, _overlays, _fps_label]
+	for s: Control in [_menu, _game, _settings, _stats, _about]:
+		if s.visible:
+			live.append(s)
+		else:
+			var owed: Array = _stale.get_or_add(s, [])
+			if not owed.has(method):
+				owed.append(method)
 	if method == &"_on_skin_changed":
-		theme = Design.make_theme()
-	propagate_call(method, [], true)
+		var t := _theme_for_palette()
+		for c in live:
+			c.theme = t
+	for c in live:
+		c.propagate_call(method, [], true)
 	_fps_label.add_theme_font_size_override("font_size", Design.ts(Design.TEXT_CAPTION))
 	_fps_label.add_theme_color_override("font_color", Palette.current.text)
 	_fps_label.add_theme_color_override("font_outline_color", Palette.current.bg)
 	RenderingServer.set_default_clear_color(Palette.current.bg_deep)
+
+
+func _theme_for_palette() -> Theme:
+	var dark := Palette.current.dark
+	if not _themes.has(dark):
+		_themes[dark] = Design.make_theme()
+	return _themes[dark]
+
+
+## Brings a screen up to date with the broadcasts it missed while hidden; call before showing it.
+func _refresh_stale(screen: Control) -> void:
+	var owed: Array = _stale.get(screen, [])
+	if owed.is_empty():
+		return
+	_stale.erase(screen)
+	if owed.has(&"_on_skin_changed"):
+		screen.theme = _theme_for_palette()
+	for method: StringName in owed:
+		screen.propagate_call(method, [], true)
 
 
 func _on_viewport_resized() -> void:
@@ -772,6 +812,7 @@ func _show_screen(next: Control) -> void:
 				s.visible = false
 	_since_input = 0.0
 	_update_keep_awake()
+	_refresh_stale(next)
 	next.visible = true
 	next.modulate.a = 0.0
 	next.pivot_offset = _screens.size * 0.5
