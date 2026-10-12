@@ -48,9 +48,9 @@ Based on the original 2048 by Gabriele Cirulli.
 Open source: github.com/Mahiron-hq/2048
 ```
 
-### What's new in 1.3.1 (up to 500 characters, this one is 446)
+### What's new in 1.3.1 (up to 500 characters, this one is 471)
 ```
-• Hints run on a new engine, with three strengths: Simple, Medium and Smart.
+• Hints run on a new engine, with three strengths: Simple, Medium and Smart. Hold the bulb to switch.
 • Best score without help, resetting statistics and records, moving progress through a file.
 • Text size, reduced motion and an About screen with the licenses.
 • Undo the losing move right from the "No moves left" card.
@@ -101,7 +101,7 @@ Open source: github.com/Mahiron-hq/2048
 
 ### Devlog for update 1.3.1 (optional)
 ```
-• Hints run on a new engine, with three strengths: Simple, Medium and Smart.
+• Hints run on a new engine, with three strengths: Simple, Medium and Smart. Hold the bulb to switch.
 • Best score without help, resetting statistics and records, moving progress through a file.
 • Text size, reduced motion and an About screen with the licenses.
 • Undo the losing move right from the "No moves left" card.
@@ -156,9 +156,9 @@ Based on the original 2048 by Gabriele Cirulli.
 Open source: github.com/Mahiron-hq/2048
 ```
 
-### What's new in 1.3.1 (up to 500 characters, this one is 446)
+### What's new in 1.3.1 (up to 500 characters, this one is 471)
 ```
-• Hints run on a new engine, with three strengths: Simple, Medium and Smart.
+• Hints run on a new engine, with three strengths: Simple, Medium and Smart. Hold the bulb to switch.
 • Best score without help, resetting statistics and records, moving progress through a file.
 • Text size, reduced motion and an About screen with the licenses.
 • Undo the losing move right from the "No moves left" card.

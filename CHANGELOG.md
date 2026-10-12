@@ -10,12 +10,12 @@ All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changel
 
 #### Added
 
-- **Hint strength** in Game settings: **Simple** answers at once from a one-level search, **Medium** (the default) thinks for up to a second on up to four cores, always leaving two to the game, **Smart** looks as deep as the phone manages in up to 15 seconds on every core but one, and stops early once its answer is settled. Hints now come from a native engine written in Rust, about 40 times faster than before on one core, so every level sees further than 1.3.0 did. A ring on the bulb fills up from the moment you tap it; tapping the bulb again, or making a move, calls the search off, while a quick double tap does not.
+- **Hint strength** in Game settings: **Simple** answers at once from a one-level search, **Medium** (the default) thinks for up to a second on up to four cores, always leaving two to the game, **Smart** looks as deep as the phone manages in up to 15 seconds on every core but one, and stops early once its answer is settled. Hints now come from a native engine written in Rust, about 40 times faster than before on one core, so every level sees further than 1.3.0 did. A ring on the bulb fills up from the moment you tap it; tapping the bulb again, or making a move, calls the search off, while a quick double tap does not. Hold the bulb for a second and the three strengths slide out of it, to switch right in the game.
 - **Best without help:** a separate record for games played without undo or hints, shown in Statistics, along with the **longest game** in moves.
 - **Undo the losing move** right from the "No moves left" card. A lost game stays saved until you leave it, so Continue brings the card (and its undo) back.
 - **Data** in Settings: save your progress to a file and load it on another phone through the system file picker; reset statistics, records or both, for every board size or one. Saving and loading ask before the file picker opens; every reset and every loaded file asks once more, and that final button wakes up only after three seconds.
 - **Text size** (System, 100%, 115%, 130%) and **Reduce motion** (As in system, On, Off): tiles still slide, while confetti, rings, swells, bounces and pulses give way to plain fades.
-- **About** screen: version, contacts, credits and the full license texts of the game, its music and font, the Godot Engine and its components, and the Android and Rust libraries.
+- **About** screen: version, contacts, credits and the full license texts of the game, its music and font, the Godot Engine and its components, and the Android and Rust libraries. A tap on an open text folds it away.
 - Android offers to keep the game's data when you uninstall it.
 
 #### Changed
@@ -48,22 +48,22 @@ All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changel
 
 #### Добавлено
 
-- **Ум подсказок** в «Настройках игры»: **Простой** отвечает сразу по поиску на один уровень, **Средний** (по умолчанию) думает до секунды на четырёх ядрах (если они есть), всегда оставляя два игре, **Умный** просчитывает настолько глубоко, насколько телефон успевает за 15 секунд на всех ядрах, кроме одного, и останавливается раньше, когда ответ устоялся. Подсказки теперь считает нативный движок на Rust, примерно в 40 раз быстрее прежнего на одном ядре, поэтому каждый уровень видит дальше, чем 1.3.0. Кольцо на лампочке заполняется с момента нажатия; повторное нажатие или ваш ход отменяют поиск, а случайное двойное касание – нет.
+- **Ум подсказок** в «Настройках игры»: **Простой** отвечает сразу по поиску на один уровень, **Средний** (по умолчанию) думает до секунды на четырёх ядрах (если они есть), всегда оставляя два игре, **Умный** просчитывает настолько глубоко, насколько телефон успевает за 15 секунд на всех ядрах, кроме одного, и останавливается раньше, когда ответ устоялся. Подсказки теперь считает нативный движок на Rust, примерно в 40 раз быстрее прежнего на одном ядре, поэтому каждый уровень видит дальше, чем 1.3.0. Кольцо на лампочке заполняется с момента нажатия; повторное нажатие или ваш ход отменяют поиск, а случайное двойное касание – нет. Если удержать лампочку секунду, из неё выезжают три уровня ума, чтобы переключить его прямо в игре.
 - **Рекорд без помощи:** отдельный рекорд партий без отмены и подсказок, в статистике – вместе с **самой длинной партией** в ходах.
 - **Отмена проигрышного хода** прямо в окне «Ходов больше нет». Проигранная партия сохраняется, пока вы из неё не выйдете, и «Продолжить» возвращает окно вместе с отменой.
-- **Данные** в настройках: сохранение прогресса в файл и загрузка на другом телефоне через системный выбор файла; сброс статистики, рекордов или всего — для всех размеров поля или одного. Сохранение и загрузка спрашивают подтверждение до открытия выбора файла; сброс и выбранный файл спрашивают ещё раз, и эта кнопка становится активной только через три секунды.
+- **Данные** в настройках: сохранение прогресса в файл и загрузка на другом телефоне через системный выбор файла; сброс статистики, рекордов или всего – для всех размеров поля или одного. Сохранение и загрузка спрашивают подтверждение до открытия выбора файла; сброс и выбранный файл спрашивают ещё раз, и эта кнопка становится активной только через три секунды.
 - **Размер текста** (Системный, 100%, 115%, 130%) и **«Уменьшить движение»** (Как в системе, Вкл, Выкл): плитки по-прежнему скользят, а конфетти, кольца, увеличения, прыжки и пульсации заменяются простым затуханием.
-- Экран **«О программе»**: версия, контакты, благодарности и полные тексты лицензий игры, музыки и шрифта, Godot Engine и его компонентов, Android- и Rust-библиотек.
+- Экран **«О программе»**: версия, контакты, благодарности и полные тексты лицензий игры, музыки и шрифта, Godot Engine и его компонентов, Android- и Rust-библиотек. Нажатие на открытый текст сворачивает его.
 - При удалении игры Android предлагает сохранить её данные.
 
 #### Изменено
 
-- **Батарея:** поле после первого хода и меню больше не перерисовывают экран, пока ничего не движется; дышащая подсказка свайпа и лампочка в простое рисуются с 30 кадрами в секунду, а на скрытом экране игры останавливаются. Через две секунды после последнего касания, когда на экране ничего не движется, игра отпускает быстрый экран на его частоту покоя (60 Гц вместо 120 на тестовом телефоне) и реже просыпается — в простое она тратит вдвое меньше процессора. Экран игры не гаснет две минуты после последнего касания вместо «всегда», а время в игре перестаёт идти через минуту без хода.
+- **Батарея:** поле после первого хода и меню больше не перерисовывают экран, пока ничего не движется; дышащая подсказка свайпа и лампочка в простое рисуются с 30 кадрами в секунду, а на скрытом экране игры останавливаются. Через две секунды после последнего касания, когда на экране ничего не движется, игра отпускает быстрый экран на его частоту покоя (60 Гц вместо 120 на тестовом телефоне) и реже просыпается – в простое она тратит вдвое меньше процессора. Экран игры не гаснет две минуты после последнего касания вместо «всегда», а время в игре перестаёт идти через минуту без хода.
 - **Вибрация следует настройкам телефона.** Если вибрация выключена во всём телефоне, игра тоже молчит, а в настройках объясняется почему; касания интерфейса идут через канал виброотклика.
-- **Статистика:** проигранная партия засчитывается, когда вы из неё выходите; брошенная ради новой — если в ней было не меньше десяти ходов, поэтому быстрые перезапуски больше не занижают средний счёт.
+- **Статистика:** проигранная партия засчитывается, когда вы из неё выходите; брошенная ради новой – если в ней было не меньше десяти ходов, поэтому быстрые перезапуски больше не занижают средний счёт.
 - **«Назад»** в меню сворачивает игру, как Android делает с другими приложениями, и она открывается мгновенно.
 - Выбранный размер поля запоминается между запусками.
-- Одно название — **2048 Merge** — на всех языках; подзаголовок в меню — «числовая головоломка».
+- Одно название – **2048 Merge** – на всех языках; подзаголовок в меню – «числовая головоломка».
 - Частота экрана меняется только без мигания, а сохранённое ограничение FPS больше не сбрасывается, если режимы экрана прочитаны поздно.
 - **Быстрее настройки:** смена темы, языка или размера текста обновляет скрытые экраны только при их показе, поэтому частые нажатия больше не копятся.
 - Акцентный текст держит контраст 4,5:1 в обеих темах; полоса прокрутки не налезает на карточки.
