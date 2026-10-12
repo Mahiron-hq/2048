@@ -1,6 +1,86 @@
 # Changelog
 
-All notable changes to 2048 Merge. Versions follow [Semantic Versioning](https://semver.org/).
+All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); earlier ones keep the form they were written in.
+
+## [Unreleased]
+
+## [1.3.1] - 2026-10-12
+
+### 🇬🇧 English
+
+#### Added
+
+- **Hint strength** in Game settings: **Simple** answers at once from a one-level search, **Medium** (the default) thinks about a third of a second on two cores, **Smart** looks as deep as the phone manages in up to 15 seconds on every core but one, and stops early once its answer is settled. Hints now come from a native engine written in Rust, about 40 times faster than before on one core, so every level sees further than 1.3.0 did. While a long search runs, a ring on the bulb fills up; tapping the bulb again, or making a move, calls it off.
+- **Best without help:** a separate record for games played without undo or hints, shown in Statistics.
+- **Undo the losing move** right from the "No moves left" card. A lost game stays saved until you leave it, so Continue brings the card (and its undo) back.
+- **Data** in Settings: save your progress to a file and load it on another phone through the system file picker; reset statistics, records or both, for every board size or one. Every reset and import asks twice, and the final button wakes up only after three seconds.
+- **Text size** (System, 100%, 115%, 130%) and **Reduce motion** (As in system, On, Off): tiles still slide, while confetti, rings, swells, bounces and pulses give way to plain fades.
+- **About** screen: version, contacts, credits and the full license texts of the game, its music and font, the Godot Engine and its components, and the Android and Rust libraries.
+- Android offers to keep the game's data when you uninstall it.
+
+#### Changed
+
+- **Battery:** the swipe tutorial breathes a few times and rests, and shows only in your first three games; an untouched board or the menu after it no longer redraws the screen at full rate. Two seconds after the last touch, with nothing moving, the game lets a fast display drop to its idle rate (60 Hz instead of 120 on the test phone) and wakes less often, which halves its CPU use while idle. The game screen keeps the display awake for two minutes after your last touch instead of forever, and play time stops counting after a minute without a move.
+- **Vibration follows the phone's own settings.** When vibration is turned off for the whole phone, the game stays silent too and Settings says why; interface taps use the touch feedback channel.
+- **Moves start on the board.** Swipes from the screen's edge stay with Android's back gesture, which used to take them on gesture-navigation phones.
+- **Statistics:** a lost game counts when you leave it; a game left for a new one counts once it had ten moves, so quick restarts no longer drag the average down.
+- **Back** on the menu sends the game to the background, as Android does with other apps, so it reopens instantly.
+- The chosen board size is remembered between launches.
+- One name, **2048 Merge**, in every language; the menu subtitle reads "number puzzle".
+- Refresh rate changes only switch seamlessly, and a saved frame rate cap is no longer reset when the screen's modes are read late.
+- Accent text keeps 4.5:1 contrast in both themes; the scroll thumb keeps clear of the cards.
+- Interface strings moved to standard translation files with plural forms; the languages of neighbouring countries start in Russian.
+
+#### Fixed
+
+- A damaged save is set aside, never overwritten: the game restores the previous save from its backup and says so.
+- Saves are read strictly; malformed numbers, oversized values and broken tile ids are refused instead of half-loaded.
+- Milestone banners appear once per game, also after undo and replay.
+- Layout containers and the music stream are freed at exit (no leak reports).
+
+#### Security
+
+- APKs are signed with APK Signature Scheme v2 and v3, which allows a key rotation later.
+- The universal APK (the one for RuStore) is built, checksummed and attested by the release workflow like the others.
+- The release build checks the Gradle distribution and every Maven artifact against pinned checksums, runs without write access, and the game must start on an emulator before anything is published.
+
+### 🇷🇺 Русский
+
+#### Добавлено
+
+- **Ум подсказок** в «Настройках игры»: **Простой** отвечает сразу по поиску на один уровень, **Средний** (по умолчанию) думает около трети секунды на двух ядрах, **Умный** просчитывает настолько глубоко, насколько телефон успевает за 15 секунд на всех ядрах, кроме одного, и останавливается раньше, когда ответ устоялся. Подсказки теперь считает нативный движок на Rust, примерно в 40 раз быстрее прежнего на одном ядре, поэтому каждый уровень видит дальше, чем 1.3.0. Пока идёт долгий поиск, на лампочке заполняется кольцо; повторное нажатие на лампочку или ваш ход его отменяют.
+- **Рекорд без помощи:** отдельный рекорд партий без отмены и подсказок, в статистике.
+- **Отмена проигрышного хода** прямо в окне «Ходов больше нет». Проигранная партия сохраняется, пока вы из неё не выйдете, и «Продолжить» возвращает окно вместе с отменой.
+- **Данные** в настройках: сохранение прогресса в файл и загрузка на другом телефоне через системный выбор файла; сброс статистики, рекордов или всего — для всех размеров поля или одного. Сброс и загрузка спрашивают дважды, а последняя кнопка становится активной только через три секунды.
+- **Размер текста** (Системный, 100%, 115%, 130%) и **«Уменьшить движение»** (Как в системе, Вкл, Выкл): плитки по-прежнему скользят, а конфетти, кольца, увеличения, прыжки и пульсации заменяются простым затуханием.
+- Экран **«О программе»**: версия, контакты, благодарности и полные тексты лицензий игры, музыки и шрифта, Godot Engine и его компонентов, Android- и Rust-библиотек.
+- При удалении игры Android предлагает сохранить её данные.
+
+#### Изменено
+
+- **Батарея:** подсказка свайпа делает несколько вдохов и замирает, а показывается только в первых трёх партиях; нетронутое поле и меню после него больше не перерисовывают экран на полной частоте. Через две секунды после последнего касания, когда на экране ничего не движется, игра отпускает быстрый экран на его частоту покоя (60 Гц вместо 120 на тестовом телефоне) и реже просыпается — в простое она тратит вдвое меньше процессора. Экран игры не гаснет две минуты после последнего касания вместо «всегда», а время в игре перестаёт идти через минуту без хода.
+- **Вибрация следует настройкам телефона.** Если вибрация выключена во всём телефоне, игра тоже молчит, а в настройках объясняется почему; касания интерфейса идут через канал виброотклика.
+- **Ход начинается на поле.** Свайпы от края экрана остаются системному жесту «Назад», который раньше перехватывал их на телефонах с жестовой навигацией.
+- **Статистика:** проигранная партия засчитывается, когда вы из неё выходите; брошенная ради новой — если в ней было не меньше десяти ходов, поэтому быстрые перезапуски больше не занижают средний счёт.
+- **«Назад»** в меню сворачивает игру, как Android делает с другими приложениями, и она открывается мгновенно.
+- Выбранный размер поля запоминается между запусками.
+- Одно название — **2048 Merge** — на всех языках; подзаголовок в меню — «числовая головоломка».
+- Частота экрана меняется только без мигания, а сохранённое ограничение FPS больше не сбрасывается, если режимы экрана прочитаны поздно.
+- Акцентный текст держит контраст 4,5:1 в обеих темах; полоса прокрутки не налезает на карточки.
+- Строки интерфейса переехали в стандартные файлы переводов с множественными формами; языки соседних стран запускаются на русском.
+
+#### Исправлено
+
+- Повреждённое сохранение откладывается в сторону и никогда не затирается: игра восстанавливает прошлое сохранение из резервной копии и сообщает об этом.
+- Сохранение читается строго: неверные числа, огромные значения и испорченные id плиток отклоняются, а не загружаются наполовину.
+- Баннеры этапов появляются один раз за партию, в том числе после отмены и повтора хода.
+- Контейнеры раскладок и музыкальный поток освобождаются при выходе (без сообщений об утечках).
+
+#### Безопасность
+
+- APK подписываются схемами APK Signature Scheme v2 и v3, что позволяет позже сменить ключ.
+- Универсальный APK (тот, что для RuStore) собирается, получает контрольную сумму и аттестацию в конвейере релизов, как и остальные.
+- Сборка релиза сверяет дистрибутив Gradle и каждый артефакт Maven с закреплёнными контрольными суммами, идёт без прав на запись, а перед публикацией игра должна запуститься на эмуляторе.
 
 ## [1.3.0] - 2026-10-02
 
@@ -217,3 +297,6 @@ Installs over 1.0.0, keeping your best score and settings. `arm64-v8a` for virtu
 - Единственное разрешение - вибрация; интернет не используется
 
 **Какой файл скачать:** `arm64-v8a` — для почти всех современных телефонов; `armeabi-v7a` — для старых 32-битных устройств. Нужен Android 8.0+.
+
+[Unreleased]: https://github.com/Mahiron-hq/2048/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/Mahiron-hq/2048/compare/v1.3.0...v1.3.1

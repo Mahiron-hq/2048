@@ -1,8 +1,16 @@
 2048 Merge
 Copyright 2026 Lev Burmistrov (Mahiron-hq)
 
-This product includes software developed by the Godot Engine contributors
-(https://godotengine.org), licensed under the MIT License.
+This product includes the Godot Engine (https://godotengine.org), licensed under the MIT License:
+  Copyright (c) 2014-present Godot Engine contributors.
+  Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
+The engine bundles further third-party components; the game's About screen lists them with
+their licenses.
+
+The move hint engine is built with godot-rust (https://github.com/godot-rust/gdext), licensed
+under the Mozilla Public License 2.0, and other Rust crates listed in legal/rust-crates.txt.
+The Android build includes AndroidX, Kotlin and kotlinx.coroutines libraries under the Apache
+License 2.0 (legal/android-libraries.txt).
 
 The game is based on the idea of 2048 by Gabriele Cirulli
 (https://github.com/gabrielecirulli/2048, MIT License). No code from it is used.
