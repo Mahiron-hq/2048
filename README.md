@@ -80,17 +80,17 @@ Measured with version 1.3.1 on an **Infinix NOTE 50 Pro** (Android 16, MediaTek 
 
 | | Infinix: frames/s, CPU | Redmi: frames/s, CPU |
 |---|---|---|
-| Menu, untouched | 0, 8% | 0, 8% |
-| New board, untouched (arrows breathing) | 30, – | 30, 63% |
-| Playing, 2 moves a second | 104, 88% | 55, 75% |
-| FPS counter on, no cap | 120, 83% | 60, 87% |
-| … cap 60 | 60, 52% | 60, 88% |
-| … cap 30 | 30, 42% | 30, 62% |
+| Menu, untouched | 0, 7% | 0, 8% |
+| New board, untouched (arrows breathing) | 30, 52% | 30, 63% |
+| Playing, 2 moves a second | 103, 86% | 55, 75% |
+| FPS counter on, no cap | 120, 100% | 60, 87% |
+| … cap 60 | 60, 77% | 60, 88% |
+| … cap 30 | 30, 50% | 30, 62% |
 
 - **A still screen costs almost nothing.** It draws no frames, and two seconds after your last touch the game lets the display drop to its idle rate (the Infinix goes from 120 to 60 Hz, as it does for the system's own apps) and wakes less often. Most of what remains is the music. The breathing arrows on a new board draw at 30 frames a second, not at the screen's 60–120.
 - **Battery:** Android's own estimate on the Redmi puts an hour of play at about 90 mAh at minimum brightness, under 2% of its battery, and 87% of that is the screen.
-- **Hints:** Simple answers in under 10 ms. Medium takes a median of 0.1–0.8 s and at most about 0.9 s: it stops early when the next level of depth cannot finish within its second. Smart takes from a fraction of a second up to its 15-second cap, a median of 4–13 s. The Rust engine is about 40 times faster than 1.3.0's GDScript solver on one core.
-- **Size:** the arm64 APK is 29 MB to download and 99 MB installed; the game reaches its first frame in about 0.4 s (Infinix) and 0.75 s (Redmi). Memory: about 250–275 MB.
+- **Hints:** Simple answers in about 10 ms. Medium takes a median of 0.1–0.85 s and at most about 0.9 s: it stops early when the next level of depth cannot finish within its second. Smart takes from a fraction of a second up to its 15-second cap, a median of 4–13 s. The Rust engine is about 40 times faster than 1.3.0's GDScript solver on one core.
+- **Size:** the arm64 APK is 29 MB to download and 99 MB installed; the game reaches its first frame in about 0.4 s (Infinix) and 0.75 s (Redmi). Memory: about 245–270 MB.
 - The frame cap paces evenly when the screen's rate is a multiple of it: 60 on 120 Hz screens, 30 everywhere; a cap above the screen's rate changes nothing.
 
 ### Music
@@ -246,17 +246,17 @@ Store and README screenshots come from real games ([`tools/make_screenshots.gd`]
 
 | | Infinix: кадров/с, CPU | Redmi: кадров/с, CPU |
 |---|---|---|
-| Меню, без касаний | 0, 8% | 0, 8% |
-| Новое поле, без касаний (стрелочки дышат) | 30, – | 30, 63% |
-| Игра, 2 хода в секунду | 104, 88% | 55, 75% |
-| Счётчик FPS, без ограничения | 120, 83% | 60, 87% |
-| … ограничение 60 | 60, 52% | 60, 88% |
-| … ограничение 30 | 30, 42% | 30, 62% |
+| Меню, без касаний | 0, 7% | 0, 8% |
+| Новое поле, без касаний (стрелочки дышат) | 30, 52% | 30, 63% |
+| Игра, 2 хода в секунду | 103, 86% | 55, 75% |
+| Счётчик FPS, без ограничения | 120, 100% | 60, 87% |
+| … ограничение 60 | 60, 77% | 60, 88% |
+| … ограничение 30 | 30, 50% | 30, 62% |
 
 - **Неподвижный экран почти ничего не стоит.** Кадры не рисуются, а через две секунды после последнего касания игра отпускает дисплей на частоту покоя (Infinix переходит со 120 на 60 Гц, как и для системных приложений) и реже просыпается. Остаток — в основном музыка. Дышащие стрелочки на новом поле рисуются с 30 кадрами в секунду, а не с частотой экрана 60–120.
 - **Батарея:** по собственной оценке Android на Redmi час игры стоит около 90 мА·ч при минимальной яркости — меньше 2% батареи, и 87% из них приходится на экран.
-- **Подсказки:** Простой отвечает быстрее 10 мс. Средний думает в среднем (медиана) 0,1–0,8 с и не дольше примерно 0,9 с: он останавливается раньше, когда следующий уровень глубины не успеет за секунду. Умный думает от доли секунды до предела в 15 секунд, в среднем 4–13 с. Движок на Rust примерно в 40 раз быстрее решателя 1.3.0 на GDScript на одном ядре.
-- **Размер:** APK для arm64 — 29 МБ для скачивания и 99 МБ после установки; первый кадр игры появляется примерно через 0,4 с (Infinix) и 0,75 с (Redmi). Память — около 250–275 МБ.
+- **Подсказки:** Простой отвечает примерно за 10 мс. Средний думает в среднем (медиана) 0,1–0,85 с и не дольше примерно 0,9 с: он останавливается раньше, когда следующий уровень глубины не успеет за секунду. Умный думает от доли секунды до предела в 15 секунд, в среднем 4–13 с. Движок на Rust примерно в 40 раз быстрее решателя 1.3.0 на GDScript на одном ядре.
+- **Размер:** APK для arm64 — 29 МБ для скачивания и 99 МБ после установки; первый кадр игры появляется примерно через 0,4 с (Infinix) и 0,75 с (Redmi). Память — около 245–270 МБ.
 - Ограничение FPS идёт ровно, когда частота экрана кратна ему: 60 на экранах 120 Гц, 30 — везде; ограничение выше частоты экрана ничего не меняет.
 
 ### Музыка

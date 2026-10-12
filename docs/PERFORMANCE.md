@@ -12,31 +12,29 @@ The bench build (`python tools/export_android.py bench-in-place`) is the release
 
 ## Drawing and CPU
 
-The Redmi columns come from one complete run of the final build. The Infinix locked itself during its run (a 15-second screen timeout while Android was told the phone is unplugged; the bench build now keeps the display on), so its hint timings and frame rates are from that run, and its CPU shares from the complete run of the first 1.3.1 build the day before, which drew the same screens. The untouched new board, which changed in between, has no Infinix CPU figure.
-
 CPU time as a share of one core over 20 s (10 min for the last two rows): the game process, its GPU driver threads, and SurfaceFlinger (the system compositor). Graphics quality is high unless stated.
 
 | Phase | Infinix: frames/s | game | GPU driver | compositor | Redmi: frames/s | game | GPU driver | compositor |
 |---|---|---|---|---|---|---|---|---|
-| Menu, untouched | 0.0 | 8% | 0% | 2% | 0.0 | 8% | 0% | 1% |
-| New board, untouched (the swipe hint pulses until the first move) | 30.0 | – | – | – | 30.0 | 63% | 9% | 11% |
-| Playing, 2 moves a second | 103.7 | 88% | 17% | 50% | 54.8 | 75% | 10% | 18% |
-| Playing, 5 moves a second | 120.0 | 102% | 19% | 52% | 60.1 | 85% | 10% | 19% |
-| FPS counter on, no cap | 120.2 | 83% | 19% | 59% | 60.2 | 87% | 10% | 17% |
-| FPS counter on, cap 120 | 120.0 | 83% | 19% | 60% | 60.2 | 89% | 10% | 17% |
-| FPS counter on, cap 90 | 90.0 | 71% | 16% | 53% | 60.2 | 89% | 10% | 17% |
-| FPS counter on, cap 60 | 60.0 | 52% | 12% | 41% | 60.0 | 88% | 10% | 17% |
-| FPS counter on, cap 30 | 30.0 | 42% | 9% | 26% | 30.0 | 62% | 9% | 11% |
-| FPS counter on, medium quality (1080p) | 120.2 | 83% | 18% | 60% | 60.2 | 89% | 11% | 17% |
-| FPS counter on, low quality (720p) | 120.2 | 83% | 18% | 56% | 60.2 | 89% | 10% | 16% |
-| 10 minutes of play, a move every 1.8 s | 35.9 | 42% | 6% | 20% | 18.6 | 34% | 4% | 7% |
-| 10 minutes on a board left mid-game | 0.8 | 9% | 0% | 1% | 0.2 | 10% | 0% | 0% |
+| Menu, untouched | 0.0 | 7% | 1% | 2% | 0.0 | 8% | 0% | 1% |
+| New board, untouched (the swipe hint pulses until the first move) | 30.0 | 52% | 18% | 26% | 30.0 | 63% | 9% | 11% |
+| Playing, 2 moves a second | 102.6 | 86% | 16% | 48% | 54.8 | 75% | 10% | 18% |
+| Playing, 5 moves a second | 118.9 | 103% | 19% | 53% | 60.1 | 85% | 10% | 19% |
+| FPS counter on, no cap | 120.2 | 100% | 23% | 49% | 60.2 | 87% | 10% | 17% |
+| FPS counter on, cap 120 | 120.0 | 97% | 22% | 51% | 60.2 | 89% | 10% | 17% |
+| FPS counter on, cap 90 | 90.0 | 98% | 21% | 46% | 60.2 | 89% | 10% | 17% |
+| FPS counter on, cap 60 | 60.0 | 77% | 22% | 36% | 60.0 | 88% | 10% | 17% |
+| FPS counter on, cap 30 | 30.0 | 50% | 17% | 26% | 30.0 | 62% | 9% | 11% |
+| FPS counter on, medium quality (1080p) | 120.2 | 102% | 23% | 52% | 60.2 | 89% | 11% | 17% |
+| FPS counter on, low quality (720p) | 120.2 | 102% | 23% | 51% | 60.2 | 89% | 10% | 16% |
+| 10 minutes of play, a move every 1.8 s | 35.6 | 41% | 6% | 20% | 18.6 | 34% | 4% | 7% |
+| 10 minutes on a board left mid-game | 0.2 | 8% | 0% | 0% | 0.2 | 10% | 0% | 0% |
 
 - A still screen draws nothing. Two seconds after the last touch, with nothing animating, the game also withdraws its refresh rate request, so the Infinix panel drops from 120 to 60 Hz (checked in `dumpsys SurfaceFlinger`; Settings and the launcher idle at 60 Hz too), and its main loop wakes every 33 ms instead of 8 ms. Before this change the untouched menu cost 15% of a core on the Infinix and the display stayed at 120 Hz.
-- What a still menu still costs is mostly the music: on the Infinix, 6 of its 9% are the `AudioTrack` mixer thread and 3% the engine's main thread.
-- A new board keeps the swipe hint breathing until the first move. While only such slow loops run (the breathing arrows, the idle bulb) the game draws at 30 fps and lets the display rest: on the Redmi that is 63% of a core instead of 89% at 60 fps, and on the Infinix a quarter of the frames it drew at 120 Hz. A board left mid-game is still and costs about as much as the menu.
-- Graphics quality hardly changes CPU time: the board is simple 2D, and the phones expose no GPU load. The frame cap does: at 60 the Infinix spends 37% less game CPU and 31% less compositor time than without a cap.
-- Memory after playing: 274 MB (Infinix) and 243 MB (Redmi) PSS, of which about 107 MB is graphics memory and 57 MB the engine's code.
+- What a still menu still costs is mostly the music: on the Infinix about two thirds of it is the `AudioTrack` mixer thread, the rest the engine's main thread.
+- A new board keeps the swipe hint breathing until the first move. While only such slow loops run (the breathing arrows, the idle bulb) the game draws at 30 fps and lets the display rest: on the Redmi that is 63% of a core instead of 89% at 60 fps, and on the Infinix about half of what drawing at 120 fps costs. A board left mid-game is still and costs about as much as the menu.
+- Graphics quality hardly changes CPU time: the board is simple 2D, and the phones expose no GPU load. The frame cap does: at 60 the Infinix spends 22% less game CPU and 28% less compositor time than without a cap.
+- Memory after playing: 271 MB (Infinix) and 243 MB (Redmi) PSS, of which about 107 MB is graphics memory and 57 MB the engine's code.
 
 ## Battery
 
@@ -44,8 +42,8 @@ For the two ten-minute phases Android was told the phone is unplugged (`dumpsys 
 
 | 10 minutes | Redmi: whole estimate | screen | game CPU | Infinix |
 |---|---|---|---|---|
-| Playing | 15.1 mAh | 13.1 mAh | 1.94 mAh | no per-app estimate; game CPU 42% of a core |
-| Board left mid-game | 13.5 mAh | 13.1 mAh | 0.34 mAh | no per-app estimate; game CPU 9% of a core |
+| Playing | 15.1 mAh | 13.1 mAh | 1.94 mAh | no per-app estimate; game CPU 41% of a core |
+| Board left mid-game | 13.5 mAh | 13.1 mAh | 0.34 mAh | no per-app estimate; game CPU 8% of a core |
 
 - On the Redmi an hour of play costs about 90 mAh at minimum brightness, 1.8% of its 5000 mAh battery; the screen takes 87% of it, the game's own CPU about 12 mAh. Brighter screens raise the screen's share.
 - The Infinix firmware's power profile gives the game an estimate near zero, so only its CPU time is reported.
@@ -57,18 +55,18 @@ Time from asking to the answer, on positions from seeded games of each board siz
 
 | Board | Level | Infinix | depth | Redmi | depth |
 |---|---|---|---|---|---|
-| 3×3 | Simple | 9 ms (12 ms) | 1 | 8 ms (10 ms) | 1 |
-| 3×3 | Medium | 818 ms (861 ms) | 10–13 | 709 ms (769 ms) | 8–10 |
-| 3×3 | Smart | 12.0 s (13.3 s) | 16–22 | 13.1 s (13.7 s) | 18–23 |
-| 4×4 | Simple | 7 ms (9 ms) | 1 | 6 ms (7 ms) | 1 |
-| 4×4 | Medium | 573 ms (740 ms) | 5–7 | 677 ms (885 ms) | 4–6 |
-| 4×4 | Smart | 7.7 s (12.1 s) | 7–12 | 6.5 s (13.0 s) | 6–12 |
-| 5×5 | Simple | 6 ms (9 ms) | 1 | 6 ms (9 ms) | 1 |
-| 5×5 | Medium | 337 ms (484 ms) | 4–5 | 118 ms (262 ms) | 3–4 |
-| 5×5 | Smart | 9.9 s (15.0 s) | 5–6 | 11.4 s (13.9 s) | 5 |
-| 6×6 | Simple | 6 ms (9 ms) | 1 | 6 ms (9 ms) | 1 |
-| 6×6 | Medium | 202 ms (461 ms) | 3–4 | 327 ms (343 ms) | 3 |
-| 6×6 | Smart | 4.2 s (4.9 s) | 4 | 4.4 s (5.7 s) | 4 |
+| 3×3 | Simple | 8 ms (13 ms) | 1 | 8 ms (10 ms) | 1 |
+| 3×3 | Medium | 841 ms (876 ms) | 10–13 | 709 ms (769 ms) | 8–10 |
+| 3×3 | Smart | 12.5 s (14.1 s) | 16–22 | 13.1 s (13.7 s) | 18–23 |
+| 4×4 | Simple | 6 ms (10 ms) | 1 | 6 ms (7 ms) | 1 |
+| 4×4 | Medium | 504 ms (733 ms) | 5–7 | 677 ms (885 ms) | 4–6 |
+| 4×4 | Smart | 7.6 s (13.4 s) | 6–8 | 6.5 s (13.0 s) | 6–12 |
+| 5×5 | Simple | 5 ms (9 ms) | 1 | 6 ms (9 ms) | 1 |
+| 5×5 | Medium | 321 ms (493 ms) | 4–5 | 118 ms (262 ms) | 3–4 |
+| 5×5 | Smart | 9.5 s (15.0 s) | 5–6 | 11.4 s (13.9 s) | 5 |
+| 6×6 | Simple | 6 ms (10 ms) | 1 | 6 ms (9 ms) | 1 |
+| 6×6 | Medium | 197 ms (453 ms) | 3–4 | 327 ms (343 ms) | 3 |
+| 6×6 | Smart | 4.2 s (4.5 s) | 4 | 4.4 s (5.7 s) | 4 |
 
 - **Simple** searches one level on one thread. **Medium** has up to a second on up to four threads, always leaving two cores to the game, and stops early when the next level would not fit. **Smart** has 15 s on every core but one (7 threads here); it stops when its answer has held for three rounds from depth 4 on with a lead of at least 1%, or when the next level cannot finish in time, and when chance has cut every line short of the depth limit it lowers that cut-off tenfold and searches again.
 - Speed against 1.3.0's GDScript solver, same positions, same search, one desktop core, medians over 10 positions: depth 3 took 17 ms instead of 0.71 s, depth 4 0.12 s instead of 5.4 s, depth 5 0.50 s instead of 19 s, so about 40 times faster.
