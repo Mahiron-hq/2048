@@ -159,19 +159,33 @@ static func godot_text(parts: bool) -> String:
 	return "\n".join(lines)
 
 
-## One license: a tappable title row; the text below loads and shows on the first tap.
+## One license: a tappable title row; the text below loads and shows on the first tap, and a tap on
+## the text folds it away again.
 class _LicenseSection:
 	extends VBoxContainer
+
+	## A press on the text that moves less than this, scrolls nothing and ends this soon is a tap.
+	const TAP_SLOP := float(TouchScroll.DEADZONE)
+	const TAP_MAX_MS := 400
 
 	var title_key := ""
 	var source := ""
 	var _toggle: PillButton
 	var _body := SkinLabel.make("", Design.TEXT_CAPTION, Design.WEIGHT_REGULAR, SkinLabel.Role.MUTED)
+	var _fold := _Fold.new()
+	var _folding: Tween
+	var _press_at := Vector2.ZERO
+	var _press_ms := -1
+	var _press_scroll := 0
 
 	func _init() -> void:
 		add_theme_constant_override("separation", int(Design.SPACE_XS))
 		_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		_body.visible = false
+		# The scroll container still sees the drag; the text only listens for a plain tap.
+		_body.mouse_filter = Control.MOUSE_FILTER_PASS
+		_body.gui_input.connect(_on_body_input)
+		_fold.visible = false
+		_fold.add_child(_body)
 
 	func _ready() -> void:
 		_toggle = PillButton.make(title_key, PillButton.Look.GHOST)
@@ -179,21 +193,69 @@ class _LicenseSection:
 		_toggle.fit_text = true
 		_toggle.pressed.connect(_flip)
 		add_child(_toggle)
-		add_child(_body)
+		add_child(_fold)
 
+	## Closes at once and lets the text go.
 	func collapse() -> void:
-		_body.visible = false
+		if _folding:
+			_folding.kill()
+			_folding = null
+		_fold.visible = false
+		_fold.shown = 1.0
+		_body.modulate.a = 1.0
 		_body.text = ""
 
 	func is_open() -> bool:
-		return _body.visible
+		return _fold.visible
+
+	func is_folding() -> bool:
+		return _folding != null and _folding.is_valid()
 
 	func _flip() -> void:
-		if _body.visible:
+		if _fold.visible:
 			collapse()
 			return
 		_body.text = _load()
-		_body.visible = true
+		_fold.visible = true
+
+	## Folds the open text up into its title, scrolling so the title stays in view.
+	func fold_away() -> void:
+		if not _fold.visible or is_folding():
+			return
+		var scroll := _scroll()
+		_folding = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		var time := Design.DUR_INSTANT if Motion.reduced() else Design.DUR_SLOW
+		_folding.tween_property(_body, "modulate:a", 0.0, time * 0.6)
+		_folding.tween_property(_fold, "shown", 0.0, time)
+		if scroll:
+			var title_at := int(_toggle.global_position.y - scroll.global_position.y) + scroll.scroll_vertical - int(Design.SPACE_MD)
+			if title_at < scroll.scroll_vertical:
+				_folding.tween_property(scroll, "scroll_vertical", maxi(title_at, 0), time)
+		_folding.chain().tween_callback(collapse)
+
+	func _on_body_input(event: InputEvent) -> void:
+		if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
+			return
+		var scroll := _scroll()
+		if event.pressed:
+			_press_at = event.global_position
+			_press_ms = Time.get_ticks_msec()
+			_press_scroll = scroll.scroll_vertical if scroll else 0
+			return
+		if _press_ms < 0:
+			return
+		var tap: bool = event.global_position.distance_to(_press_at) <= TAP_SLOP \
+				and Time.get_ticks_msec() - _press_ms <= TAP_MAX_MS \
+				and (scroll == null or scroll.scroll_vertical == _press_scroll)
+		_press_ms = -1
+		if tap:
+			fold_away()
+
+	func _scroll() -> ScrollContainer:
+		var n := get_parent()
+		while n and not (n is ScrollContainer):
+			n = n.get_parent()
+		return n as ScrollContainer
 
 	func _load() -> String:
 		match source:
@@ -203,3 +265,31 @@ class _LicenseSection:
 				return AboutScreen.godot_text(true)
 		var text := FileAccess.get_file_as_string(source)
 		return text if not text.is_empty() else I18n.t("LICENSE_MISSING")
+
+
+## Shows its one child at full height, or [member shown] of it; animating that folds the child away.
+class _Fold:
+	extends Container
+
+	var shown := 1.0:
+		set(v):
+			shown = v
+			update_minimum_size()
+			queue_sort()
+
+	func _init() -> void:
+		clip_contents = true
+		size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	func _get_minimum_size() -> Vector2:
+		var c := _child()
+		return Vector2(0, c.get_combined_minimum_size().y * shown) if c else Vector2.ZERO
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_SORT_CHILDREN:
+			var c := _child()
+			if c:
+				fit_child_in_rect(c, Rect2(0, 0, size.x, c.get_combined_minimum_size().y))
+
+	func _child() -> Control:
+		return get_child(0) as Control if get_child_count() > 0 else null
