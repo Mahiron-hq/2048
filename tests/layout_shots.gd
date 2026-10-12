@@ -73,7 +73,8 @@ func _device(tag: String, px: Vector2i, dark: bool) -> void:
 		0, 2, 4, 2, 8, 0,
 		0, 0, 2, 0, 0, 0,
 		0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 2], "score": 48212, "moves": 900})
+		0, 0, 0, 0, 0, 2], "score": 48212, "moves": 3790})
+	app.store.submit_score(48212, 6)
 	app._game._board_view.show_board(app._game.board)
 	app._game._board_view.hide_hint(true)
 	app._game._refresh_scores(false)
@@ -112,6 +113,28 @@ func _device(tag: String, px: Vector2i, dark: bool) -> void:
 	var scroll: ScrollContainer = app._settings.find_children("*", "ScrollContainer", true, false)[0]
 	scroll.scroll_vertical = 100000
 	await _capture(tag + "-5b-settings-bottom", 0.3)
+	app.ask_reset(ResetDialog.Scope.ALL)
+	await _capture(tag + "-5c-reset-step1", 0.6)
+	app._reset._on_go()
+	await _capture(tag + "-5d-reset-step2", 0.4)
+	app._reset.close()
+	await _wait(0.3)
+	app.set_text_size(SaveStore.TextSize.XLARGE)
+	scroll.scroll_vertical = 0
+	await _capture(tag + "-5e-settings-xlarge", 0.6)
+	app._close_settings()
+	await _wait(0.3)
+	app._to_menu()
+	await _capture(tag + "-5f-menu-xlarge", 0.8)
+	app.set_text_size(SaveStore.TextSize.NORMAL)
+	app._open_settings()
+	await _wait(0.4)
+	app._open_about()
+	await _capture(tag + "-5g-about", 0.6)
+	app._about._sections[0]._flip()
+	await _capture(tag + "-5h-about-license", 0.4)
+	app._close_about()
+	await _wait(0.3)
 	app._close_settings()
 	await _wait(0.3)
 

@@ -32,6 +32,13 @@ var compact := false:
 		font_size = Design.TEXT_CALLOUT if v else Design.TEXT_BODY
 		_update_min_size()
 		queue_redraw()
+## Shrinks the label to the button's width instead of widening the button for it, for long labels
+## in narrow columns.
+var fit_text := false:
+	set(v):
+		fit_text = v
+		_update_min_size()
+		queue_redraw()
 ## Leaves the icon out of a labeled button when room is short.
 var hide_icon := false:
 	set(v):
@@ -157,6 +164,8 @@ func _draw() -> void:
 	else:
 		var label := _label()
 		var fs := Design.ts(font_size)
+		if fit_text:
+			fs = Fonts.fit(_font, label, fs, size.x - Design.SPACE_LG * 2.0)
 		var text_w := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		var gap := Design.SPACE_SM
 		var with_icon := icon != Icons.Kind.NONE and not hide_icon
@@ -197,6 +206,9 @@ func _update_min_size() -> void:
 		return
 	if icon_only:
 		custom_minimum_size = Vector2(height, height)
+		return
+	if fit_text:
+		custom_minimum_size = Vector2(height * 2.0, height)
 		return
 	var w := _font.get_string_size(_label(), HORIZONTAL_ALIGNMENT_LEFT, -1, Design.ts(font_size)).x
 	if icon != Icons.Kind.NONE and not hide_icon:
