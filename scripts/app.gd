@@ -931,7 +931,9 @@ func _close_settings() -> void:
 
 
 func _on_back() -> void:
-	if _picker.is_open:
+	if _game.close_level_picker():
+		pass
+	elif _picker.is_open:
 		_picker.close()
 	elif _confirm.is_open:
 		_confirm.close()

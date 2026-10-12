@@ -85,6 +85,9 @@ func _device(tag: String, px: Vector2i, dark: bool) -> void:
 	app._game._set_hint_glow(true)
 	await _capture(tag + "-4f-hint-lit", 0.9)
 	app._game._set_hint_glow(false)
+	app._game._open_levels()
+	await _capture(tag + "-4g-hint-levels", 1.0)
+	app._game._levels.close(true)
 
 	# The biggest score a 6x6 board can plausibly show must still fit the game-over card.
 	app._game._game_over.present(137438953472, 1 << 37, 99999, true)
