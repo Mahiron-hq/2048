@@ -185,8 +185,7 @@ func _run() -> void:
 	await _wait(0.3)
 
 	# Simulate process death: throw the app away and start a new one on the same save file.
-	app.queue_free()
-	await _frames(3)
+	await _dispose(app)
 	# Statics survive in-process; reset them as a fresh process would have them.
 	I18n.current = "en"
 	Palette.current = Palette.make(true)
@@ -231,8 +230,7 @@ func _run() -> void:
 	await _quality(app)
 	await _landscape(app)
 
-	app.queue_free()
-	await _frames(2)
+	await _dispose(app)
 	for f in [SAVE, SAVE + ".bak", SAVE + ".tmp"]:
 		DirAccess.remove_absolute(f)
 	print("\nui smoke: %d failed" % _failed)
@@ -366,6 +364,7 @@ func _fixes_121(app: App) -> void:
 			break
 	check(moved, "a swipe starting on the board moves")
 
+
 	# Statistics: move, undo, move counts one move.
 	var before: int = app.store.stats_for(0).moves
 	g.undo()
@@ -375,6 +374,20 @@ func _fixes_121(app: App) -> void:
 		g.request_move(guard)
 		guard += 1
 	check(app.store.stats_for(0).moves == before, "an undone move does not stay in the move count")
+
+	# The screen's edges belong to the system back gesture: a swipe starting there is not a move.
+	var board_rect := g._board_view.board_global_rect()
+	var before_edge := g.board.move_count
+	for d in [Vector2.RIGHT, Vector2.DOWN, Vector2.UP]:
+		await _swipe(Vector2(2.0, board_rect.get_center().y), d * 160.0)
+	check(g.board.move_count == before_edge, "a swipe from the screen's edge beside the board does not move")
+	var inside := false
+	for d in [Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN, Vector2.UP]:
+		await _swipe(Vector2(board_rect.position.x + 6.0, board_rect.get_center().y), d * 160.0)
+		if g.board.move_count > before_edge:
+			inside = true
+			break
+	check(inside, "a swipe starting just inside the board's edge moves")
 
 	# The size picker keeps its size when reopened.
 	app._to_menu()
@@ -596,6 +609,16 @@ func _view_matches(g: GameScreen) -> bool:
 			printerr("view mismatch at cell %d" % i)
 			return false
 	return shown == expected
+
+
+## Frees [param app] after stopping its music, so the audio thread lets go of the stream before
+## the run ends instead of showing up as a leak.
+func _dispose(app: App) -> void:
+	for player in app.sfx.find_children("*", "AudioStreamPlayer", false, false):
+		player.stop()
+	await _wait(0.3)
+	app.queue_free()
+	await _frames(3)
 
 
 func _spawn_app() -> App:

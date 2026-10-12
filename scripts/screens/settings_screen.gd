@@ -179,9 +179,13 @@ func _refresh_quality_hint() -> void:
 	_quality_hint.set_key("QUALITY_HINT", "%d × %d" % [px.x, px.y])
 
 
-## Offers only the caps this display can show evenly; a stored cap it cannot is dropped.
+## Offers only the caps this display can show evenly; a stored cap it cannot is dropped, but only
+## once the panel's modes are known, so a slow or failed query never resets the player's choice.
 func _refresh_fps_limits() -> void:
 	_fps_limits = DisplayRate.limit_options()
+	var stored := _app.store.fps_limit
+	if stored > 0 and not _fps_limits.has(stored) and not DisplayRate.panel_known():
+		_fps_limits.insert(_fps_limits.size() - 1, stored)
 	var labels := PackedStringArray()
 	for limit in _fps_limits:
 		labels.append(str(limit) if limit > 0 else "∞")

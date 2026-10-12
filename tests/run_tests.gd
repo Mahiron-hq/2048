@@ -1,3 +1,4 @@
+# gdlint: disable=max-public-methods
 extends SceneTree
 ## Headless test runner: godot --headless --path . --script res://tests/run_tests.gd
 ## Exits with the number of failed tests.
@@ -320,7 +321,7 @@ func test_rejects_mistyped_fields() -> void:
 	for d in bad:
 		var b := Board.new(1)
 		check(not b.from_dict(d), "rejects %s" % [JSON.stringify(d).left(80)])
-	var huge_ids := cells.map(func(v: int) -> int: return 0)
+	var huge_ids := cells.map(func(_v: int) -> int: return 0)
 	huge_ids[0] = 1e12
 	var c := Board.new(1)
 	check(c.from_dict({"size": 4, "values": cells, "score": 0, "moves": 0, "ids": huge_ids}), "out-of-range ids are reissued")

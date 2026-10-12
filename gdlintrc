@@ -1,0 +1,8 @@
+# gdlint (gdtoolkit 4.x), tuned to this codebase: naming, unused and structural checks stay on;
+# line length and member order follow the project's own conventions instead.
+disable:
+  - class-definitions-order
+  - max-line-length
+max-public-methods: 40
+max-returns: 8
+max-file-lines: 1200

@@ -7,6 +7,8 @@ Copyright 2026 Lev Burmistrov (Mahiron-hq)
 Covered files:
   2048_Quiet_Tiles.flac (lossless master, published with the GitHub releases)
   assets/music/2048_Quiet_Tiles.mp3
+  tests/data/master_frames_60000.f32 (a fraction of a second of the master,
+    used by the automated loop test)
   and the same recording inside the released game packages.
 
 The music is NOT covered by the Apache License 2.0 that applies to the
@@ -20,13 +22,22 @@ In short (the legal code below is what applies):
     CC BY-NC-ND 4.0.
   - You may not use it commercially or distribute modified versions
     (remixes, edits, excerpts set to other media) without permission.
-  - Other uses: ask the author through https://github.com/Mahiron-hq/2048
+  - Builds of the game: the track may be shipped only in the official builds
+    of 2048 Merge. A modified version of the game (a fork) sets the recording
+    to new material, which this license does not allow; remove
+    assets/music/2048_Quiet_Tiles.mp3 from such builds or replace it with
+    your own music.
+  - Other uses: ask the author at Mahiron.HQ@protonmail.com or through
+    https://github.com/Mahiron-hq/2048
 
 Музыка «2048 Quiet Tiles» не подпадает под лицензию Apache 2.0, по которой
 распространяется исходный код игры. Она распространяется по лицензии
 CC BY-NC-ND 4.0: трек можно копировать и распространять без изменений,
 в некоммерческих целях и с указанием автора. Коммерческое использование и
 распространение изменённых версий — только с разрешения автора.
+В составе игры трек распространяется только в официальных сборках
+2048 Merge: в изменённых версиях игры (форках) его нужно убрать или
+заменить своей музыкой. Вопросы — на Mahiron.HQ@protonmail.com.
 
 =======================================================================
 

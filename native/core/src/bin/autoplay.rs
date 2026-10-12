@@ -36,7 +36,9 @@ fn parse() -> Result<Options, String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
     while i < args.len() {
-        let value = args.get(i + 1).ok_or(format!("{} needs a value", args[i]))?;
+        let value = args
+            .get(i + 1)
+            .ok_or(format!("{} needs a value", args[i]))?;
         let bad = || format!("bad value {value} for {}", args[i]);
         match args[i].as_str() {
             "--level" => {
@@ -107,7 +109,6 @@ fn score_gain(grid: &Grid, dir: Dir) -> i64 {
     gain
 }
 
-
 fn main() -> ExitCode {
     let o = match parse() {
         Ok(o) => o,
@@ -157,7 +158,9 @@ fn main() -> ExitCode {
             let started = Instant::now();
             let out = search(&grid, &limits, &Control::new());
             total_time += started.elapsed();
-            let Some(dir): Option<Dir> = out.best else { break };
+            let Some(dir): Option<Dir> = out.best else {
+                break;
+            };
             depth_sum += u64::from(out.depth);
             score += score_gain(&grid, dir);
             let moved = grid.slid(dir);

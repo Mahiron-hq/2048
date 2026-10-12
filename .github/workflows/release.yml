@@ -14,7 +14,10 @@ env:
   GODOT_TEMPLATES_SHA512: ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079
   ANDROID_PLATFORM: android-36
   ANDROID_BUILD_TOOLS: 36.1.0
-  # Fingerprint of the release signing certificate; an APK signed with anything else is not published.
+  ANDROID_NDK: 29.0.14206865
+  RUST_TOOLCHAIN: 1.95.0
+  CARGO_NDK_VERSION: 4.1.2
+  # Fingerprint of the release signing certificate; a package signed with anything else is not published.
   RELEASE_CERT_SHA256: eb4210095c9919745312b83e94a3755767b764427c447b986c85e63479542fe0
 
 jobs:
@@ -23,27 +26,23 @@ jobs:
     permissions:
       contents: read
 
-  apk:
-    name: Build and publish packages
+  build:
+    name: Build packages
     needs: tests
     runs-on: ubuntu-24.04
+    # The build runs Godot, Gradle and Cargo; it gets the signing key but no write access.
+    environment: release
     permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    timeout-minutes: 60
+      contents: read
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
-      - name: Check tag matches the project version
-        run: |
-          version=$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match project version $version"
-            exit 1
-          fi
+      - name: Check the tag and the version
+        run: python3 tools/check_version.py --tag "$GITHUB_REF_NAME"
 
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
@@ -54,7 +53,15 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS" > /dev/null
+            "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS" "ndk;$ANDROID_NDK" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ANDROID_NDK" >> "$GITHUB_ENV"
+
+      - name: Rust toolchain for Android
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal \
+            --target aarch64-linux-android --target armv7-linux-androideabi
+          rustup default "$RUST_TOOLCHAIN"
+          cargo install cargo-ndk --locked --version "$CARGO_NDK_VERSION"
 
       - name: Cache Godot and Android templates
         id: godot-cache
@@ -94,16 +101,6 @@ jobs:
           export/android/java_sdk_path = "$JAVA_HOME"
           SETTINGS
 
-      - name: Import project and install the Gradle build template
-        run: |
-          timeout 600 ~/godot/godot --headless --path . --import
-          mkdir -p android/build
-          unzip -q -o ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip -d android/build
-          echo "${GODOT_VERSION}.stable" > android/.build_version
-          touch android/build/.gdignore
-          # A lingering Gradle daemon keeps Godot's export process from exiting.
-          printf '\norg.gradle.daemon=false\n' >> android/build/gradle.properties
-
       - name: Decode signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -114,48 +111,82 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
 
-      - name: Export APKs and the Play bundle
+      - name: Export, sign with schemes v2 and v3, verify
         env:
           GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ runner.temp }}/release.jks
           GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_KEY_ALIAS }}
           GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          mkdir -p build
-          export_preset() {
-            # Fresh Gradle intermediates per preset: switching ABIs must not reuse old outputs.
-            rm -rf android/build/build
-            if ! timeout 1500 ~/godot/godot --headless --path . --export-release "$1" "$2"; then
-              echo "::error::Export of '$1' failed"; exit 1
-            fi
-            test -s "$2" || { echo "::error::Export of '$1' produced no file"; exit 1; }
-          }
-          export_preset "Android" build/2048-merge-arm64.apk
-          export_preset "Android armeabi-v7a" build/2048-merge-armv7.apk
-          export_preset "Android AAB" build/2048-merge.aab
+        run: GODOT="$HOME/godot/godot" python3 tools/export_android.py arm64 armv7 universal aab
 
-      - name: Verify packages
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Checksums
         run: |
-          tools="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS"
-          version=${GITHUB_REF_NAME#v}
-          check() {
-            "$tools/apksigner" verify --print-certs "$1" > /tmp/certs.txt
-            grep -q "certificate SHA-256 digest: $RELEASE_CERT_SHA256" /tmp/certs.txt || {
-              echo "::error::$1 is not signed with the release certificate"; exit 1; }
-            "$tools/aapt2" dump badging "$1" > /tmp/badging.txt
-            grep -q "versionName='$version'" /tmp/badging.txt
-            grep -q "native-code: '$2'" /tmp/badging.txt
-          }
-          check build/2048-merge-arm64.apk arm64-v8a
-          check build/2048-merge-armv7.apk armeabi-v7a
-          # The bundle is jar-signed; keytool prints the fingerprint with colons.
-          want=$(echo "$RELEASE_CERT_SHA256" | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
-          keytool -printcert -jarfile build/2048-merge.aab | grep -q "SHA256: $want" || {
-            echo "::error::The AAB is not signed with the release certificate"; exit 1; }
-          mv build/2048-merge-arm64.apk "build/2048-Merge-${GITHUB_REF_NAME}-arm64-v8a.apk"
-          mv build/2048-merge-armv7.apk "build/2048-Merge-${GITHUB_REF_NAME}-armeabi-v7a.apk"
-          mv build/2048-merge.aab "build/2048-Merge-${GITHUB_REF_NAME}.aab"
-          rm -f "$RUNNER_TEMP/release.jks"
-          (cd build && sha256sum 2048-Merge-*.apk 2048-Merge-*.aab > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          cd build
+          sha256sum 2048-Merge-*.apk 2048-Merge-*.aab > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages
+          path: |
+            build/2048-Merge-*.apk
+            build/2048-Merge-*.aab
+            build/SHA256SUMS.txt
+          if-no-files-found: error
+
+  emulator:
+    name: Start on an emulator
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packages
+          path: build
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # The x86_64 image runs the arm64 build through Android's ARM translation.
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: tools/emulator_smoke.sh build/2048-Merge-${{ github.ref_name }}-universal.apk
+
+  publish:
+    name: Publish the release
+    needs: [build, emulator]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packages
+          path: build
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2

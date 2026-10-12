@@ -7,7 +7,8 @@ extends RefCounted
 ## Each JNI lookup runs in its own function, since a failed call aborts only that function.
 
 const FRAME_RATE_COMPATIBILITY_DEFAULT := 0
-const CHANGE_FRAME_RATE_ALWAYS := 1
+## Switch only when the panel can do it without a visible blink; ALWAYS is meant for video.
+const CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS := 0
 ## Frame caps the settings can offer; 0 (no cap) is always offered as well.
 const LIMITS := [30, 60, 90, 120]
 ## Offered on every device: any panel can show them evenly.
@@ -37,6 +38,14 @@ static func apply(limit: int) -> void:
 		return
 	var runnable = runtime.createRunnableFromGodotCallable(_apply.bind(activity))
 	activity.runOnUiThread(runnable)
+
+
+## True once the Android query has read the panel's modes.
+static func panel_known() -> bool:
+	_lock.lock()
+	var known := not _panel_rates.is_empty()
+	_lock.unlock()
+	return known
 
 
 ## Refresh rates of the panel's modes, highest first; empty when unknown.
@@ -112,7 +121,7 @@ static func _apply(activity) -> void:
 		return
 	# Display.getRoundedCorner marks API 31, where the strategy argument (and ALWAYS) exists.
 	if display.has_java_method("getRoundedCorner"):
-		surface.setFrameRate(target, FRAME_RATE_COMPATIBILITY_DEFAULT, CHANGE_FRAME_RATE_ALWAYS)
+		surface.setFrameRate(target, FRAME_RATE_COMPATIBILITY_DEFAULT, CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS)
 	else:
 		surface.setFrameRate(target, FRAME_RATE_COMPATIBILITY_DEFAULT)
 

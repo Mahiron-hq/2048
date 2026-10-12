@@ -1,0 +1,35 @@
+Rust libraries in the 2048 Merge hint engine
+
+The move hints come from a native library written in Rust. It is built from the game's own
+crates (Apache License 2.0) and these third-party crates, each under the license named here.
+godot-rust is under the Mozilla Public License 2.0; its source code is available at
+https://github.com/godot-rust/gdext and on https://crates.io/crates/godot.
+
+glam 0.32.1 — MIT OR Apache-2.0
+  https://github.com/bitshifter/glam-rs
+godot 0.5.5 — MPL-2.0
+  https://github.com/godot-rust/gdext
+godot-cell 0.5.5 — MPL-2.0
+  https://github.com/godot-rust/gdext
+godot-core 0.5.5 — MPL-2.0
+  https://github.com/godot-rust/gdext
+godot-ffi 0.5.5 — MPL-2.0
+  https://github.com/godot-rust/gdext
+godot-macros 0.5.5 — MPL-2.0
+  https://github.com/godot-rust/gdext
+libc 0.2.190 — MIT OR Apache-2.0
+  https://github.com/rust-lang/libc
+proc-macro2 1.0.107 — MIT OR Apache-2.0
+  https://github.com/dtolnay/proc-macro2
+quote 1.0.47 — MIT OR Apache-2.0
+  https://github.com/dtolnay/quote
+syn 3.0.8 — MIT OR Apache-2.0
+  https://github.com/dtolnay/syn
+thiserror 2.0.21 — MIT OR Apache-2.0
+  https://github.com/dtolnay/thiserror
+thiserror-impl 2.0.21 — MIT OR Apache-2.0
+  https://github.com/dtolnay/thiserror
+unicode-ident 1.0.26 — (MIT OR Apache-2.0) AND Unicode-3.0
+  https://github.com/dtolnay/unicode-ident
+venial 0.6.1 — MIT
+  https://github.com/PoignardAzur/venial

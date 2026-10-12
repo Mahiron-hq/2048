@@ -226,6 +226,11 @@ static func _dir_vector(dir: Board.Dir) -> Vector2:
 	return Vector2.DOWN
 
 
+## The board's square on screen, in the viewport's coordinates.
+func board_global_rect() -> Rect2:
+	return get_global_transform() * board_rect
+
+
 func cell_position(index: int) -> Vector2:
 	var x := index % grid_size
 	var y := index / grid_size

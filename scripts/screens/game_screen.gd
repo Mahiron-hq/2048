@@ -10,6 +10,8 @@ signal menu_requested
 const SWIPE_COMMIT := 44.0
 ## Shorter flicks still count when the finger lifts quickly.
 const SWIPE_FLICK := 22.0
+## How far outside the board a swipe may start and still move the tiles.
+const SWIPE_MARGIN := Design.SPACE_MD
 const FLICK_TIME_MS := 220
 ## Landscape: scores sit this close to the board's edges.
 const BOARD_GAP := Design.SPACE_LG
@@ -738,24 +740,10 @@ func _input(event: InputEvent) -> void:
 		_try_swipe(event.position - _touch_start, SWIPE_COMMIT)
 
 
-## Swipes may start anywhere except on the scores and buttons or past the screen's edge, so
-## checking the time or pulling the notification shade never moves tiles.
+## Swipes start on the board or just around it. The screen's edges stay with the system, whose
+## back gesture there would otherwise take a swipe meant for the tiles.
 func _in_swipe_area(point: Vector2) -> bool:
-	if not get_global_rect().has_point(point):
-		return false
-	if not _landscape_mode:
-		return point.y > _header.get_global_rect().end.y + Design.SPACE_XS \
-				and point.y < _actions.get_global_rect().position.y - Design.SPACE_XS
-	if _side_actions.get_global_rect().grow(Design.SPACE_SM).has_point(point):
-		return false
-	var board := _board_view.get_global_rect()
-	if point.x >= board.position.x - Design.SPACE_XS and point.x <= board.end.x + Design.SPACE_XS:
-		return true
-	var top_end := 0.0
-	for node: Control in [_brand, _score_box, _best_box, _hint_btn]:
-		if node.visible:
-			top_end = maxf(top_end, node.get_global_rect().end.y)
-	return point.y > top_end + Design.SPACE_SM
+	return _board_view.board_global_rect().grow(SWIPE_MARGIN).has_point(point)
 
 
 func _unhandled_input(event: InputEvent) -> void:
