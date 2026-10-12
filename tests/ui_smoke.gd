@@ -233,6 +233,7 @@ func _run() -> void:
 	await _about_licenses(app)
 	await _data_buttons(app)
 	await _regressions(app)
+	await _lazy_restyle(app)
 	await _quality(app)
 	await _landscape(app)
 
@@ -506,6 +507,28 @@ func _reduced_motion(app: App) -> void:
 	app.set_reduce_motion(SaveStore.ReduceMotion.OFF)
 	check(not Motion.reduced(), "Reduce motion: off")
 	await _wait(0.3)
+
+
+## Hidden screens catch up with theme and language changes when they are shown.
+func _lazy_restyle(app: App) -> void:
+	app._open_settings()
+	await _wait(0.5)
+	var lang := app.store.language
+	var mode := app.store.theme
+	var other := "en" if lang == "ru" else "ru"
+	app.set_language(other)
+	app.set_theme_mode(SaveStore.ThemeMode.LIGHT if Palette.current.dark else SaveStore.ThemeMode.DARK)
+	check(app._stale.has(app._menu) and not app._stale.has(app._settings), "a hidden screen waits for its update")
+	app._to_menu()
+	await _wait(0.6)
+	var subtitle: SkinLabel = app._menu._subtitle
+	var want := String(TranslationServer.get_translation_object(other).get_message("SUBTITLE"))
+	check(not app._stale.has(app._menu) and subtitle.text == want, "the menu shows the new language when it opens (%s)" % subtitle.text)
+	check(subtitle.get_theme_color("font_color") == Palette.current.text_secondary and app._menu.theme == app._theme_for_palette(),
+			"the menu shows the new palette when it opens")
+	app.set_language(lang)
+	app.set_theme_mode(mode)
+	await _wait(0.5)
 
 
 ## Earlier fixes without another check: keeping the display awake, the play-time clock, text
