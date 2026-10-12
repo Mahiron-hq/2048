@@ -20,13 +20,14 @@ All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changel
 
 #### Changed
 
-- **Battery:** a board after the first move, and the menu, no longer redraw the screen while nothing moves; a hidden game screen stops the swipe hint's animation. Two seconds after the last touch, with nothing moving, the game lets a fast display drop to its idle rate (60 Hz instead of 120 on the test phone) and wakes less often, which halves its CPU use while idle. The game screen keeps the display awake for two minutes after your last touch instead of forever, and play time stops counting after a minute without a move.
+- **Battery:** a board after the first move, and the menu, no longer redraw the screen while nothing moves; the breathing swipe hint and the idle bulb draw at 30 frames a second, and a hidden game screen stops them. Two seconds after the last touch, with nothing moving, the game lets a fast display drop to its idle rate (60 Hz instead of 120 on the test phone) and wakes less often, which halves its CPU use while idle. The game screen keeps the display awake for two minutes after your last touch instead of forever, and play time stops counting after a minute without a move.
 - **Vibration follows the phone's own settings.** When vibration is turned off for the whole phone, the game stays silent too and Settings says why; interface taps use the touch feedback channel.
 - **Statistics:** a lost game counts when you leave it; a game left for a new one counts once it had ten moves, so quick restarts no longer drag the average down.
 - **Back** on the menu sends the game to the background, as Android does with other apps, so it reopens instantly.
 - The chosen board size is remembered between launches.
 - One name, **2048 Merge**, in every language; the menu subtitle reads "number puzzle".
 - Refresh rate changes only switch seamlessly, and a saved frame rate cap is no longer reset when the screen's modes are read late.
+- **Quicker settings:** switching theme, language or text size updates hidden screens only when they are shown, so quick taps no longer pile up.
 - Accent text keeps 4.5:1 contrast in both themes; the scroll thumb keeps clear of the cards.
 - Interface strings moved to standard translation files with plural forms; the languages of neighbouring countries start in Russian.
 
@@ -57,13 +58,14 @@ All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changel
 
 #### Изменено
 
-- **Батарея:** поле после первого хода и меню больше не перерисовывают экран, пока ничего не движется; на скрытом экране игры анимация подсказки свайпа останавливается. Через две секунды после последнего касания, когда на экране ничего не движется, игра отпускает быстрый экран на его частоту покоя (60 Гц вместо 120 на тестовом телефоне) и реже просыпается — в простое она тратит вдвое меньше процессора. Экран игры не гаснет две минуты после последнего касания вместо «всегда», а время в игре перестаёт идти через минуту без хода.
+- **Батарея:** поле после первого хода и меню больше не перерисовывают экран, пока ничего не движется; дышащая подсказка свайпа и лампочка в простое рисуются с 30 кадрами в секунду, а на скрытом экране игры останавливаются. Через две секунды после последнего касания, когда на экране ничего не движется, игра отпускает быстрый экран на его частоту покоя (60 Гц вместо 120 на тестовом телефоне) и реже просыпается — в простое она тратит вдвое меньше процессора. Экран игры не гаснет две минуты после последнего касания вместо «всегда», а время в игре перестаёт идти через минуту без хода.
 - **Вибрация следует настройкам телефона.** Если вибрация выключена во всём телефоне, игра тоже молчит, а в настройках объясняется почему; касания интерфейса идут через канал виброотклика.
 - **Статистика:** проигранная партия засчитывается, когда вы из неё выходите; брошенная ради новой — если в ней было не меньше десяти ходов, поэтому быстрые перезапуски больше не занижают средний счёт.
 - **«Назад»** в меню сворачивает игру, как Android делает с другими приложениями, и она открывается мгновенно.
 - Выбранный размер поля запоминается между запусками.
 - Одно название — **2048 Merge** — на всех языках; подзаголовок в меню — «числовая головоломка».
 - Частота экрана меняется только без мигания, а сохранённое ограничение FPS больше не сбрасывается, если режимы экрана прочитаны поздно.
+- **Быстрее настройки:** смена темы, языка или размера текста обновляет скрытые экраны только при их показе, поэтому частые нажатия больше не копятся.
 - Акцентный текст держит контраст 4,5:1 в обеих темах; полоса прокрутки не налезает на карточки.
 - Строки интерфейса переехали в стандартные файлы переводов с множественными формами; языки соседних стран запускаются на русском.
 
