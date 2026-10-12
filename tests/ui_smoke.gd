@@ -618,6 +618,18 @@ func _about_licenses(app: App) -> void:
 		sec._flip()
 	await _frames(2)
 	check(app._about._sections.all(func(sec) -> bool: return sec.is_open()), "every license opens")
+	var first = app._about._sections[0]
+	var at: Vector2 = first._body.get_global_rect().get_center()
+	first._on_body_input(_click(at, true))
+	first._on_body_input(_click(at + Vector2(0, 120), false))
+	check(first.is_open() and not first.is_folding(), "dragging over a license text keeps it open")
+	first._on_body_input(_click(at, true))
+	first._on_body_input(_click(at + Vector2(3, 2), false))
+	check(first.is_folding(), "a tap on a license text starts folding it away")
+	await _wait(0.6)
+	check(not first.is_open() and first._body.text.is_empty(), "the tapped license is closed and its text let go")
+	first._flip()
+	await _frames(2)
 	app._close_about()
 	await _wait(0.5)
 	check(app._about._sections.all(func(sec) -> bool: return not sec.is_open() and sec._body.text.is_empty()),
@@ -628,6 +640,15 @@ func _about_licenses(app: App) -> void:
 		await _frames(1)
 	var ms := (Time.get_ticks_usec() - t0) / 1000.0
 	check(ms < 600.0, "four theme switches after reading the licenses stay quick (%.0f ms)" % ms)
+
+
+func _click(at: Vector2, pressed: bool) -> InputEventMouseButton:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_LEFT
+	e.pressed = pressed
+	e.global_position = at
+	e.position = at
+	return e
 
 
 ## The first message of a fresh app is a one-line pill, not a column of single letters.
