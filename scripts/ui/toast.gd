@@ -49,6 +49,10 @@ func _notification(what: int) -> void:
 
 func _place() -> void:
 	var width := minf(MAX_WIDTH, size.x - Design.GUTTER * 2.0)
+	# A wrapping label measures its height at its current width, which stays stale (zero on the
+	# first message) until the card lays it out; give it the final width first.
+	_label.size = Vector2(width - _card.padding * 2.0, 0)
+	_label.update_minimum_size()
 	_card.custom_minimum_size = Vector2(width, 0)
 	_card.size = Vector2(width, 0)
 	_card.size = _card.get_combined_minimum_size()
