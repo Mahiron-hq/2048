@@ -45,7 +45,7 @@ def main() -> None:
         if p.get("source") is None:
             continue
         source = p.get("repository") or "https://crates.io/crates/" + p["name"]
-        lines.append(f"{p['name']} {p['version']} — {p.get('license') or 'see source'}")
+        lines.append(f"{p['name']} {p['version']} – {p.get('license') or 'see source'}")
         lines.append(f"  {source}")
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     print(f"{OUT.relative_to(ROOT)}: {len(lines)} lines")

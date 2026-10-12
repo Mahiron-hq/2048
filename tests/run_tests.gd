@@ -354,6 +354,21 @@ func test_clean_record_and_reset() -> void:
 	var all := t.stats_for(0)
 	check(all.games == 0 and all.best_score == 0 and all.clean_best_score == 0 and all.moves == 0, "resetting everything clears every size")
 
+	var l := SaveStore.new("user://unused.json")
+	l.record_longest(4, 120)
+	l.record_longest(4, 80)
+	l.record_longest(6, 300)
+	check(l.stats_for(4).longest == 120 and l.stats_for(0).longest == 300, "the longest game is the most moves on a size, or on any")
+	var m := SaveStore.new("user://unused.json")
+	m.apply_dict(JSON.parse_string(l.serialize()))
+	check(m.stats_for(6).longest == 300, "the longest game survives a save")
+	var bad := SaveStore.new("user://unused.json")
+	bad.apply_dict({"stats": {"4": {"longest": -5}, "5": {"longest": "many"}}})
+	check(bad.stats_for(4).longest == 0 and bad.stats_for(5).longest == 0, "a bad longest game is refused")
+	m.reset_stats(6)
+	check(m.stats_for(6).longest == 0 and m.stats_for(4).longest == 120, "resetting one size clears only its longest game")
+	check(I18n.tn("N_MOVES", 1234).begins_with(I18n.number(1234)), "move counts keep the thousands separator")
+
 
 func test_new_settings_persist() -> void:
 	var s := SaveStore.new("user://unused.json")
@@ -362,14 +377,13 @@ func test_new_settings_persist() -> void:
 	s.board_size = 6
 	s.text_size = SaveStore.TextSize.XLARGE
 	s.reduce_motion = SaveStore.ReduceMotion.ON
-	s.tutorial_games = 2
 	var t := SaveStore.new("user://unused.json")
 	t.apply_dict(JSON.parse_string(s.serialize()))
 	check(t.hint_level == SaveStore.HintLevel.SMART and t.board_size == 6 and t.text_size == SaveStore.TextSize.XLARGE, "hint level, board size and text size persist")
-	check(t.reduce_motion == SaveStore.ReduceMotion.ON and t.tutorial_games == 2, "reduced motion and tutorial count persist")
+	check(t.reduce_motion == SaveStore.ReduceMotion.ON, "reduced motion persists")
 	var u := SaveStore.new("user://unused.json")
-	u.apply_dict({"settings": {"hint_level": "genius", "board_size": 9, "text_size": 2, "reduce_motion": true, "tutorial_games": -1}})
-	check(u.hint_level == SaveStore.HintLevel.MEDIUM and u.board_size == 4 and u.text_size == SaveStore.TextSize.SYSTEM and u.reduce_motion == SaveStore.ReduceMotion.SYSTEM and u.tutorial_games == 0, "invalid values keep the defaults")
+	u.apply_dict({"settings": {"hint_level": "genius", "board_size": 9, "text_size": 2, "reduce_motion": true}})
+	check(u.hint_level == SaveStore.HintLevel.MEDIUM and u.board_size == 4 and u.text_size == SaveStore.TextSize.SYSTEM and u.reduce_motion == SaveStore.ReduceMotion.SYSTEM, "invalid values keep the defaults")
 
 
 func test_what_counts_as_played() -> void:

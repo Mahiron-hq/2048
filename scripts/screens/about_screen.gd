@@ -1,7 +1,9 @@
 class_name AboutScreen
 extends Control
 ## Version, author and contacts, credits, and the licenses of everything the app ships with.
-## License texts load when their section is opened, so the screen itself stays light.
+## License texts load when their section is opened and are dropped again when it closes or the
+## screen is left: kept hidden, hundreds of kilobytes of text were laid out again on every theme,
+## language or text size change.
 
 signal back_requested
 
@@ -84,6 +86,9 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		_column.custom_minimum_size.x = minf(size.x, Design.COLUMN_MAX)
 		_header.custom_minimum_size.x = _column.custom_minimum_size.x
+	elif what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree():
+		for s in _sections:
+			s.collapse()
 
 
 func _on_language_changed() -> void:
@@ -148,7 +153,7 @@ static func godot_text(parts: bool) -> String:
 		lines.append("")
 	var licenses := Engine.get_license_info()
 	for name: String in licenses:
-		lines.append("— %s —" % name)
+		lines.append("– %s –" % name)
 		lines.append(licenses[name])
 		lines.append("")
 	return "\n".join(lines)
@@ -178,14 +183,17 @@ class _LicenseSection:
 
 	func collapse() -> void:
 		_body.visible = false
+		_body.text = ""
 
 	func is_open() -> bool:
 		return _body.visible
 
 	func _flip() -> void:
-		if _body.text.is_empty():
-			_body.text = _load()
-		_body.visible = not _body.visible
+		if _body.visible:
+			collapse()
+			return
+		_body.text = _load()
+		_body.visible = true
 
 	func _load() -> String:
 		match source:

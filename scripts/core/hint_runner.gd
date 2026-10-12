@@ -9,7 +9,7 @@ const RUNNING := -2
 ## [method poll] when no move changes the board.
 const NO_MOVE := -1
 ## Thinking time of the GDScript fallback per [enum SaveStore.HintLevel].
-const FALLBACK_BUDGET_MS: Array[int] = [40, 350, 3000]
+const FALLBACK_BUDGET_MS: Array[int] = [40, 1000, 3000]
 
 var _engine: Object = null
 var _solver := HintSolver.new()

@@ -12,7 +12,7 @@ msgid "ABOUT"
 msgstr "О программе"
 
 msgid "ABOUT_AUTHOR"
-msgstr "Автор — Лев Бурмистров (Mahiron-hq), © 2026"
+msgstr "Автор – Лев Бурмистров (Mahiron-hq), © 2026"
 
 msgid "ABOUT_LICENSES"
 msgstr "Лицензии"
@@ -96,7 +96,7 @@ msgid "FPS_LIMIT"
 msgstr "Ограничение FPS"
 
 msgid "FPS_LIMIT_HINT"
-msgstr "∞ — без ограничений, с частотой обновления экрана. Меньше кадров — меньше расход батареи."
+msgstr "Меньше кадров – меньше расход батареи."
 
 msgid "GAMES_PLAYED"
 msgstr "Сыграно партий"
@@ -117,13 +117,13 @@ msgid "HINTS"
 msgstr "Подсказки хода"
 
 msgid "HINTS_HINT"
-msgstr "Лампочка на экране игры подсказывает лучший ход. Если долго не ходить, она загорается сама."
+msgstr "Лампочка на экране игры подсказывает лучший ход."
 
 msgid "HINT_LEVEL"
 msgstr "Ум подсказок"
 
 msgid "HINT_LEVEL_HINT"
-msgstr "Простой отвечает сразу, Средний — за треть секунды, Умный думает до 15 секунд на всех ядрах, кроме одного."
+msgstr "Простой отвечает сразу, Средний – до секунды, Умный – до 15 секунд размышлений."
 
 msgid "HINT_LEVEL_MEDIUM"
 msgstr "Средний"
@@ -165,16 +165,16 @@ msgid "LANGUAGE"
 msgstr "Язык"
 
 msgid "LICENSE_ANDROID"
-msgstr "Android-библиотеки — Apache 2.0"
+msgstr "Android-библиотеки – Apache 2.0"
 
 msgid "LICENSE_FONT"
-msgstr "Шрифт Manrope — OFL 1.1"
+msgstr "Шрифт Manrope – OFL 1.1"
 
 msgid "LICENSE_GAME"
-msgstr "2048 Merge — Apache 2.0"
+msgstr "2048 Merge – Apache 2.0"
 
 msgid "LICENSE_GODOT"
-msgstr "Godot Engine — MIT"
+msgstr "Godot Engine – MIT"
 
 msgid "LICENSE_GODOT_PARTS"
 msgstr "Компоненты Godot Engine"
@@ -183,7 +183,7 @@ msgid "LICENSE_MISSING"
 msgstr "В этой сборке нет текста лицензии."
 
 msgid "LICENSE_MUSIC"
-msgstr "Музыка — CC BY-NC-ND 4.0"
+msgstr "Музыка – CC BY-NC-ND 4.0"
 
 msgid "LICENSE_RUST"
 msgstr "Rust-библиотеки"
@@ -198,7 +198,7 @@ msgid "MOTION"
 msgstr "Уменьшить движение"
 
 msgid "MOTION_HINT"
-msgstr "Без конфетти, колец и пульсаций, экраны сменяются простым затуханием. Плитки по-прежнему скользят."
+msgstr "Без конфетти, пульсаций и лишних анимаций."
 
 msgid "MOTION_OFF"
 msgstr "Выкл"
@@ -237,7 +237,7 @@ msgid "QUALITY_HIGH"
 msgstr "Высокое"
 
 msgid "QUALITY_HINT"
-msgstr "Сейчас картинка %s. На чётких экранах качество пониже бережёт батарею."
+msgstr "Сейчас картинка %s."
 
 msgid "QUALITY_LOW"
 msgstr "Низкое"
@@ -388,6 +388,21 @@ msgstr "Начать заново"
 
 msgid "N_GAMES"
 msgid_plural "N_GAMES_PLURAL"
-msgstr[0] "%d партия"
-msgstr[1] "%d партии"
-msgstr[2] "%d партий"
+msgstr[0] "%s партия"
+msgstr[1] "%s партии"
+msgstr[2] "%s партий"
+
+msgid "LONGEST_GAME"
+msgstr "Самая длинная партия"
+
+msgid "EXPORT_TITLE"
+msgstr "Сохранить прогресс в файл?"
+
+msgid "EXPORT_BODY"
+msgstr "Рекорды, статистика, настройки и текущая партия сохранятся в файл. Его можно загрузить на другом телефоне."
+
+msgid "N_MOVES"
+msgid_plural "N_MOVES_PLURAL"
+msgstr[0] "%s ход"
+msgstr[1] "%s хода"
+msgstr[2] "%s ходов"

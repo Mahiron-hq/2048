@@ -5,12 +5,15 @@ use std::time::Duration;
 
 use crate::search::Limits;
 
+/// Medium's ceiling on threads; past four the gain at a one-second budget is small next to the heat.
+const MEDIUM_MAX_THREADS: usize = 4;
+
 /// Hint strength, numbered like the game's `SaveStore.HintLevel`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Level {
     /// Answers at once from a one-level search: sound moves, without looking far ahead.
     Simple = 0,
-    /// About a third of a second on two threads.
+    /// Up to a second on up to four threads, always leaving two cores to the game.
     Medium = 1,
     /// As deep as the phone gets in 15 seconds on every core but one, stopping early once the
     /// answer is settled.
@@ -42,8 +45,9 @@ impl Level {
                 table_bits: 10,
             },
             Level::Medium => Limits {
-                budget: Duration::from_millis(350),
-                threads: cores.min(NonZeroUsize::new(2).unwrap_or(one)),
+                budget: Duration::from_secs(1),
+                threads: NonZeroUsize::new(cores.get().saturating_sub(2).min(MEDIUM_MAX_THREADS))
+                    .unwrap_or(one),
                 min_probability: 1e-4,
                 min_probability_floor: 1e-4,
                 max_depth: 16,
@@ -76,7 +80,13 @@ mod tests {
     fn levels_use_the_agreed_threads() {
         let eight = NonZeroUsize::new(8).expect("eight is not zero");
         assert_eq!(Level::Simple.limits(eight).threads.get(), 1);
-        assert_eq!(Level::Medium.limits(eight).threads.get(), 2);
+        assert_eq!(Level::Medium.limits(eight).threads.get(), 4);
+        let cores = |n| NonZeroUsize::new(n).expect("test core counts are not zero");
+        assert_eq!(Level::Medium.limits(cores(6)).threads.get(), 4);
+        assert_eq!(Level::Medium.limits(cores(4)).threads.get(), 2);
+        assert_eq!(Level::Medium.limits(cores(2)).threads.get(), 1);
+        assert_eq!(Level::Medium.limits(NonZeroUsize::MIN).threads.get(), 1);
+        assert_eq!(Level::Medium.limits(eight).budget, Duration::from_secs(1));
         assert_eq!(Level::Smart.limits(eight).threads.get(), 7);
         assert_eq!(Level::Smart.limits(NonZeroUsize::MIN).threads.get(), 1);
         assert_eq!(Level::Smart.limits(eight).budget, Duration::from_secs(15));

@@ -10,8 +10,6 @@ const APP_ID := "com.mahiron.merge2048"
 const FORMAT_VERSION := 4
 ## Volume steps were 1..5 before format 3; they now span 1..Sfx.LEVEL_COUNT.
 const LEGACY_VOLUME_STEPS := 5
-## Games at the start that show the swipe tutorial over the board.
-const TUTORIAL_GAMES := 3
 
 enum ThemeMode { SYSTEM, LIGHT, DARK }
 ## Render resolution: short side 720, 1080 or 1440 pixels, never above the screen's own.
@@ -62,8 +60,6 @@ var language := "en"
 var undo_limit := Board.DEFAULT_UNDO
 ## Board size picked for the next new game.
 var board_size := Board.DEFAULT_SIZE
-## Games that have shown the swipe tutorial, up to TUTORIAL_GAMES.
-var tutorial_games := 0
 ## Output of [method Board.to_dict] for the game in progress (or lost and not yet left); empty
 ## when there is none.
 var game: Dictionary = {}
@@ -74,7 +70,7 @@ var existed := false
 var _best := {}
 ## Best score per board size of games played without undo or hints.
 var _clean_best := {}
-## Per board size: {games, score_sum, best_tile, moves, time}.
+## Per board size: {games, score_sum, best_tile, moves, time, longest} (longest: most moves in one game).
 var _stats := {}
 var _path: String
 
@@ -184,6 +180,12 @@ func record_best_tile(size: int, tile: int) -> void:
 	s.best_tile = maxi(s.best_tile, tile)
 
 
+## Notes that a game on [param size] has reached [param moves] moves.
+func record_longest(size: int, moves: int) -> void:
+	var s := _stat(size)
+	s.longest = maxi(s.longest, moves)
+
+
 func add_play_time(size: int, seconds: float) -> void:
 	_stat(size).time += maxf(seconds, 0.0)
 
@@ -210,9 +212,11 @@ func reset_records(size: int) -> void:
 
 
 ## Totals for one board size, or for all sizes when [param size] is 0.
-## Keys: games, average_score, best_tile, best_score, clean_best_score, moves, time (seconds).
+## Keys: games, average_score, best_tile, best_score, clean_best_score, moves, time (seconds), and
+## longest (most moves in one game).
 func stats_for(size: int) -> Dictionary:
-	var out := {"games": 0, "average_score": 0, "best_tile": 0, "best_score": 0, "clean_best_score": 0, "moves": 0, "time": 0.0}
+	var out := {"games": 0, "average_score": 0, "best_tile": 0, "best_score": 0, "clean_best_score": 0, "moves": 0, "time": 0.0,
+			"longest": 0}
 	var score_sum := 0
 	for n in _sizes(size):
 		var s: Dictionary = _stats.get(n, {})
@@ -220,6 +224,7 @@ func stats_for(size: int) -> Dictionary:
 		score_sum += s.get("score_sum", 0)
 		out.best_tile = maxi(out.best_tile, s.get("best_tile", 0))
 		out.moves += s.get("moves", 0)
+		out.longest = maxi(out.longest, s.get("longest", 0))
 		out.time += s.get("time", 0.0)
 		out.best_score = maxi(out.best_score, best_for(n))
 		out.clean_best_score = maxi(out.clean_best_score, clean_best_for(n))
@@ -253,7 +258,6 @@ func to_dict() -> Dictionary:
 			"language": language,
 			"undo_limit": undo_limit,
 			"board_size": board_size,
-			"tutorial_games": tutorial_games,
 		},
 		"game": game,
 	}
@@ -278,7 +282,7 @@ func apply_dict(d: Dictionary) -> void:
 			if n > 0 and stats[key] is Dictionary:
 				var src: Dictionary = stats[key]
 				var s := _stat(n)
-				for field in ["games", "score_sum", "best_tile", "moves"]:
+				for field in ["games", "score_sum", "best_tile", "moves", "longest"]:
 					var v := Board.read_count(src.get(field), Board.MAX_SCORE)
 					if v >= 0:
 						s[field] = v
@@ -297,7 +301,6 @@ func apply_dict(d: Dictionary) -> void:
 		music_volume = _volume_step(s.get("music_volume"), steps, music_volume)
 		undo_limit = _int_in(s.get("undo_limit"), 0, Board.MAX_UNDO, undo_limit)
 		board_size = _int_in(s.get("board_size"), Board.MIN_SIZE, Board.MAX_SIZE, board_size)
-		tutorial_games = _int_in(s.get("tutorial_games"), 0, TUTORIAL_GAMES, tutorial_games)
 		show_fps = _bool_or(s.get("show_fps"), show_fps)
 		var limit = s.get("fps_limit")
 		if (limit is int or limit is float) and (limit == 0 or DisplayRate.LIMITS.has(int(limit))) and int(limit) == limit:
@@ -347,7 +350,7 @@ static func _quarantine(path: String) -> void:
 
 func _stat(size: int) -> Dictionary:
 	if not _stats.has(size):
-		_stats[size] = {"games": 0, "score_sum": 0, "best_tile": 0, "moves": 0, "time": 0.0}
+		_stats[size] = {"games": 0, "score_sum": 0, "best_tile": 0, "moves": 0, "time": 0.0, "longest": 0}
 	return _stats[size]
 
 
