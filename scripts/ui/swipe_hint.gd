@@ -19,6 +19,8 @@ var _tween: Tween
 var _pulse_tween: Tween
 var _box := StyleBoxFlat.new()
 var _font: Font = Fonts.sans(Design.WEIGHT_BOLD)
+var _fit_key := ""
+var _fit_size := 0
 
 
 func _init() -> void:
@@ -66,6 +68,8 @@ func _start_pulse() -> void:
 	_pulse_tween = create_tween().set_loops()
 	_pulse_tween.tween_property(self, "_pulse", 1.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_pulse_tween.tween_property(self, "_pulse", 0.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if App.instance:
+		App.instance.add_ambient(_pulse_tween)
 
 
 ## Fades out; no-op when already hidden.
@@ -89,6 +93,15 @@ func is_showing() -> bool:
 	return visible and modulate.a > 0.0
 
 
+## Font size that fits [param caption] on the board, remembered: the breathing redraws every frame.
+func _caption_size(caption: String) -> int:
+	var key := "%s|%d|%d" % [caption, int(board_rect.size.x), Design.ts(Design.TEXT_BODY)]
+	if key != _fit_key:
+		_fit_key = key
+		_fit_size = Fonts.fit(_font, caption, Design.ts(Design.TEXT_BODY), board_rect.size.x - Design.SPACE_2XL * 2.0)
+	return _fit_size
+
+
 func _stop_pulse() -> void:
 	if _pulse_tween:
 		_pulse_tween.kill()
@@ -107,7 +120,7 @@ func _draw() -> void:
 
 	var side := board_rect.size.x * 0.6
 	var caption := I18n.t("SWIPE_TO_PLAY")
-	var fs := Fonts.fit(_font, caption, Design.ts(Design.TEXT_BODY), board_rect.size.x - Design.SPACE_2XL * 2.0)
+	var fs := _caption_size(caption)
 	var c := board_rect.get_center() - Vector2(0, fs)
 	var ink := p.overlay_ink
 	var reach := side * (0.24 + 0.04 * _pulse)

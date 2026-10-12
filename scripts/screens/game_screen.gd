@@ -297,6 +297,7 @@ func _set_hint_glow(on: bool) -> void:
 		_hint_btn.glow = 1.0
 		return
 	_hint_glow_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_app.add_ambient(_hint_glow_tween)
 	_hint_glow_tween.tween_property(_hint_btn, "glow", 1.0, 0.5)
 	for pulse in 3:
 		_hint_glow_tween.tween_property(_hint_btn, "glow", 0.45, 0.6)

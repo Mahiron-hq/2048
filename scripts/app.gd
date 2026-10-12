@@ -25,6 +25,9 @@ const PLAY_IDLE_SEC := 60.0
 ## After this long with no touch and nothing animating the game stops asking for a high refresh
 ## rate, so a still screen runs at the system's idle rate; the next touch asks again.
 const REST_AFTER_SEC := 2.0
+## Frame rate while only slow ambient animations run (see [method add_ambient]): they look the
+## same at this rate, and drawing an untouched new board at 120 fps cost most of a core.
+const AMBIENT_FPS := 30
 
 static var instance: App
 ## Message for the next app instance to show on its menu, e.g. after an import reload.
@@ -55,6 +58,7 @@ var _play_time := 0.0
 ## Seconds since the last touch or key press, for the screen keep-awake.
 var _since_input := 0.0
 var _still := 0.0
+var _ambient: Array[Tween] = []
 ## Seconds since the last move (or since play resumed), for the play-time clock.
 var _since_move := 0.0
 var _keep_awake := false
@@ -207,10 +211,17 @@ func _process(delta: float) -> void:
 	if _focused and _current == _game and _game.is_playing() and _since_move <= PLAY_IDLE_SEC:
 		_play_time += delta
 	_update_keep_awake()
-	var animating := not get_tree().get_processed_tweens().is_empty() or _game.is_celebrating()
+	var tweens := get_tree().get_processed_tweens()
+	var animating := not tweens.is_empty() or _game.is_celebrating()
+	var ambient := animating and not _game.is_celebrating() and _only_ambient(tweens)
 	OS.low_processor_usage_mode = not animating and not store.show_fps
-	_still = 0.0 if animating else _still + delta
+	_still = 0.0 if animating and not ambient else _still + delta
 	_rest(_still >= REST_AFTER_SEC and not store.show_fps)
+	var cap := store.fps_limit
+	if ambient and not store.show_fps and (cap == 0 or cap > AMBIENT_FPS):
+		cap = AMBIENT_FPS
+	if Engine.max_fps != cap:
+		Engine.max_fps = cap
 	if store.show_fps:
 		_fps_accum += delta
 		if _fps_accum >= 0.5:
@@ -272,6 +283,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE:
 		_on_back()
 		get_viewport().set_input_as_handled()
+
+
+## Marks [param tween] as ambient: a slow loop such as the swipe hint's breathing. While nothing
+## else animates the game draws at AMBIENT_FPS and the display may rest.
+func add_ambient(tween: Tween) -> void:
+	_ambient = _ambient.filter(func(t: Tween) -> bool: return t.is_valid())
+	_ambient.append(tween)
+
+
+func _only_ambient(tweens: Array[Tween]) -> bool:
+	for t in tweens:
+		if not _ambient.has(t):
+			return false
+	return true
 
 
 func _rest(resting: bool) -> void:
