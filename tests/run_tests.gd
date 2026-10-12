@@ -1118,7 +1118,7 @@ func test_palette_roles_and_tiles() -> void:
 		var value := 2
 		var previous := Color.TRANSPARENT
 		var distinct := true
-		for i in 17:
+		for i in Board.MAX_RANK:
 			worst = minf(worst, _contrast(p.tile_bg(value), p.tile_fg(value)))
 			distinct = distinct and p.tile_bg(value) != previous
 			previous = p.tile_bg(value)
@@ -1130,7 +1130,9 @@ func test_palette_roles_and_tiles() -> void:
 		var soft := p.surface.blend(p.accent_soft)
 		check(_contrast(p.accent, soft) >= 4.5 and _contrast(p.accent, p.bg) >= 4.5 and _contrast(p.accent, p.surface) >= 4.5,
 				"accent text keeps 4.5:1 on its soft badge, the background and cards (%s theme)" % ["dark" if dark else "light"])
-	check(Palette.make(false).tile_bg(1 << 40) == Palette.make(false).tile_bg(1 << 17), "tiles past the ramp keep its last color")
+	var light := Palette.make(false)
+	check(light.tile_bg(1 << 18) == light.tile_bg(1 << 16) and light.tile_bg(1 << 19) == light.tile_bg(1 << 17),
+			"past the ramp its last two colors alternate")
 
 
 ## WCAG contrast ratio, from the relative luminance of the linearized colors.

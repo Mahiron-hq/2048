@@ -119,12 +119,19 @@ static func tile_index(value: int) -> int:
 
 
 func tile_bg(value: int) -> Color:
-	return _tile_bg[mini(tile_index(value), _tile_bg.size() - 1)]
+	return _tile_bg[_ramp_slot(value)]
 
 
 func tile_fg(value: int) -> Color:
-	var i := mini(tile_index(value), _tile_bg.size() - 1)
-	return _INK_DARK if _tile_dark_ink & (1 << i) else _INK_LIGHT
+	return _INK_DARK if _tile_dark_ink & (1 << _ramp_slot(value)) else _INK_LIGHT
+
+
+## Ramp entry for [param value]. Past the last one (131072) the last two alternate, so a 6x6
+## board's larger tiles still differ from their neighbours.
+func _ramp_slot(value: int) -> int:
+	var i := tile_index(value)
+	var last := _tile_bg.size() - 1
+	return i if i <= last else last - (i - last) % 2
 
 
 ## From 128 up a tile is a milestone and gets a fine inner highlight.
