@@ -22,6 +22,8 @@ const KEEP_AWAKE_SEC := 120.0
 const PLAY_IDLE_SEC := 60.0
 
 static var instance: App
+## Message for the next app instance to show on its menu, e.g. after an import reload.
+static var pending_toast := ""
 
 var store := SaveStore.new()
 var sfx := Sfx.new()
@@ -36,6 +38,9 @@ var _settings := SettingsScreen.new()
 var _stats := StatsScreen.new()
 var _confirm := ConfirmDialog.new()
 var _picker := SizePicker.new()
+var _toast := Toast.new()
+var _reset := ResetDialog.new()
+var _about := AboutScreen.new()
 ## Board size for the next new game, remembered between launches.
 var selected_size := Board.DEFAULT_SIZE
 ## Play time not yet added to the statistics.
@@ -49,6 +54,8 @@ var _keep_awake := false
 var _load_result := SaveStore.Load.OK
 ## Text of the last save handed to the writer; an identical one is not written again.
 var _saved_text := ""
+## Set while the app reloads after an import: the state on screen must not be saved over it.
+var _discarding := false
 ## Result of the background write in flight, read once it has completed.
 var _save_error := OK
 ## Background save in flight (WorkerThreadPool task id), or -1.
@@ -84,6 +91,8 @@ func _ready() -> void:
 		_saved_text = store.serialize()
 	selected_size = store.board_size
 	I18n.current = store.language
+	Design.text_scale = _wanted_text_scale()
+	Motion.apply(store.reduce_motion)
 	Palette.current = Palette.make(_wants_dark())
 	DisplayServer.set_system_theme_change_callback(_on_system_theme_changed)
 
@@ -107,14 +116,17 @@ func _ready() -> void:
 	_game.setup(self)
 	_settings.setup(self)
 	_stats.setup(self)
-	for s in [_menu, _game, _settings, _stats]:
+	_about.setup(self)
+	for s in [_menu, _game, _settings, _stats, _about]:
 		s.visible = false
 		_screens.add_child(s)
 	add_overlay(_confirm)
 	add_overlay(_picker)
+	add_overlay(_reset)
+	add_overlay(_toast)
+	_reset.confirmed.connect(_on_reset_confirmed)
 
 	_fps_label.add_theme_font_override("font", Fonts.sans(Design.WEIGHT_BOLD, true))
-	_fps_label.add_theme_font_size_override("font_size", Design.TEXT_CAPTION)
 	_fps_label.add_theme_constant_override("outline_size", int(Design.SPACE_XS))
 	_fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fps_label.z_index = 100
@@ -129,6 +141,8 @@ func _ready() -> void:
 	_picker.chosen.connect(_on_size_chosen)
 	_game.menu_requested.connect(_to_menu)
 	_settings.back_requested.connect(_close_settings)
+	_settings.about_requested.connect(_open_about)
+	_about.back_requested.connect(_close_about)
 	_stats.back_requested.connect(_to_menu)
 	get_viewport().size_changed.connect(_on_viewport_resized)
 
@@ -140,13 +154,22 @@ func _ready() -> void:
 	sfx.music_enabled = store.music_on
 	DisplayRate.apply(store.fps_limit)
 	_to_menu()
+	match _load_result:
+		SaveStore.Load.RECOVERED:
+			toast("SAVE_RECOVERED")
+		SaveStore.Load.LOST:
+			toast("SAVE_LOST")
+	if not pending_toast.is_empty():
+		toast(pending_toast)
+		pending_toast = ""
 	# Launch frames are slow anyway; better here than in the middle of a game.
 	_game.prime_overlays()
 	_confirm.prime()
 
 
 func _exit_tree() -> void:
-	_flush_save()
+	if not _discarding:
+		_flush_save()
 	# Static caches would otherwise outlive the scene tree and show up as leaks at exit.
 	Fonts.clear_cache()
 	TileArt.clear_cache()
@@ -211,6 +234,9 @@ func _notification(what: int) -> void:
 			_apply_safe_area()
 			# The system vibration switch may have changed while the game was away.
 			Haptics.refresh_system_state()
+			_settings.refresh_haptics_note()
+			# So may the font size and the "remove animations" setting.
+			_follow_system_text_and_motion()
 
 
 func _input(event: InputEvent) -> void:
@@ -244,12 +270,17 @@ func add_overlay(c: Control) -> void:
 
 
 func is_modal_open() -> bool:
-	return _confirm.is_open or _picker.is_open
+	return _confirm.is_open or _picker.is_open or _reset.is_open
 
 
 ## True for the screen being shown or transitioned to; a screen fading out ignores input.
 func is_current(screen: Control) -> bool:
 	return _current == screen
+
+
+## Shows a short message that fades away on its own.
+func toast(key: String) -> void:
+	_toast.show_message(key)
 
 
 func confirm(title_key: String, body_key: String, yes_key: String, on_yes: Callable) -> void:
@@ -486,6 +517,133 @@ func _clear_theme_fade() -> void:
 		_theme_snapshot = null
 
 
+## Strength of the move hint.
+func set_hint_level(level: SaveStore.HintLevel) -> void:
+	store.hint_level = level
+	save_now()
+
+
+## Text size: a fixed step or the phone's font size; relays out every screen.
+func set_text_size(size: SaveStore.TextSize) -> void:
+	store.text_size = size
+	save_now()
+	_apply_text_scale()
+
+
+func set_reduce_motion(mode: SaveStore.ReduceMotion) -> void:
+	store.reduce_motion = mode
+	save_now()
+	Motion.apply(mode)
+
+
+## Opens the two-step reset for [param scope].
+func ask_reset(scope: ResetDialog.Scope) -> void:
+	_reset.ask(scope)
+
+
+func _on_reset_confirmed(scope: ResetDialog.Scope, size: int) -> void:
+	if scope != ResetDialog.Scope.RECORDS:
+		flush_play_time()
+		store.reset_stats(size)
+	if scope != ResetDialog.Scope.STATS:
+		store.reset_records(size)
+	_game.on_records_changed()
+	save_now()
+	toast("RESET_DONE")
+
+
+## Asks where to save a copy of the progress (records, statistics, settings, the current game).
+func export_progress() -> void:
+	flush_play_time()
+	_game.save_state()
+	if not DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE):
+		toast("EXPORT_FAILED")
+		return
+	var file_name := "2048-merge-progress-%s.json" % Time.get_date_string_from_system()
+	DisplayServer.file_dialog_show(I18n.t("EXPORT_PROGRESS"), OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS), file_name,
+			false, DisplayServer.FILE_DIALOG_MODE_SAVE_FILE, PackedStringArray(["*.json;JSON"]),
+			func(ok: bool, paths: PackedStringArray, _filter: int) -> void: _write_export.call_deferred(ok, paths))
+
+
+func _write_export(ok: bool, paths: PackedStringArray) -> void:
+	if not ok or paths.is_empty():
+		return
+	var f := FileAccess.open(paths[0], FileAccess.WRITE)
+	if f == null:
+		toast("EXPORT_FAILED")
+		return
+	f.store_string(JSON.stringify(store.to_dict(), "\t"))
+	var err := f.get_error()
+	f.close()
+	toast("EXPORT_DONE" if err == OK else "EXPORT_FAILED")
+
+
+## Asks for an exported file and, after two confirmations, replaces everything with it.
+func import_progress() -> void:
+	if not DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE):
+		toast("IMPORT_FAILED")
+		return
+	DisplayServer.file_dialog_show(I18n.t("IMPORT_PROGRESS"), OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS), "",
+			false, DisplayServer.FILE_DIALOG_MODE_OPEN_FILE, PackedStringArray(["*.json;JSON"]),
+			func(ok: bool, paths: PackedStringArray, _filter: int) -> void: _read_import.call_deferred(ok, paths))
+
+
+func _read_import(ok: bool, paths: PackedStringArray) -> void:
+	if not ok or paths.is_empty():
+		return
+	var data := SaveStore.parse_export(FileAccess.get_file_as_string(paths[0]))
+	if data.is_empty():
+		toast("IMPORT_FAILED")
+		return
+	var preview := SaveStore.new("user://import_preview.json")
+	preview.apply_dict(data)
+	var totals := preview.stats_for(0)
+	var summary := I18n.t("IMPORT_SURE_BODY") % [I18n.tn("N_GAMES", totals.games), I18n.number(totals.best_score)]
+	_reset.ask_import(summary, _apply_import.bind(JSON.stringify(data)))
+
+
+## Writes the imported progress as the save and restarts the app from it.
+func _apply_import(text: String) -> void:
+	_wait_for_save()
+	_queued_save = ""
+	var err := store.write_text(text)
+	if err != OK:
+		_report_save(err)
+		toast("IMPORT_FAILED")
+		return
+	_discarding = true
+	# A static survives the reload, so the new app instance can greet with it.
+	pending_toast = "IMPORT_DONE"
+	get_tree().reload_current_scene()
+
+
+func _wanted_text_scale() -> float:
+	match store.text_size:
+		SaveStore.TextSize.NORMAL:
+			return 1.0
+		SaveStore.TextSize.LARGE:
+			return 1.15
+		SaveStore.TextSize.XLARGE:
+			return AndroidBridge.MAX_FONT_SCALE
+	return AndroidBridge.font_scale()
+
+
+func _apply_text_scale() -> void:
+	var scale := _wanted_text_scale()
+	if is_equal_approx(scale, Design.text_scale):
+		return
+	Design.text_scale = scale
+	_broadcast("_on_skin_changed")
+	_broadcast("_on_language_changed")
+
+
+func _follow_system_text_and_motion() -> void:
+	if store.text_size == SaveStore.TextSize.SYSTEM:
+		_apply_text_scale()
+	if store.reduce_motion == SaveStore.ReduceMotion.SYSTEM:
+		Motion.apply(store.reduce_motion)
+
+
 func set_language(lang: String) -> void:
 	store.language = lang
 	I18n.current = lang
@@ -497,6 +655,7 @@ func _broadcast(method: StringName) -> void:
 	if method == &"_on_skin_changed":
 		theme = Design.make_theme()
 	propagate_call(method, [], true)
+	_fps_label.add_theme_font_size_override("font_size", Design.ts(Design.TEXT_CAPTION))
 	_fps_label.add_theme_color_override("font_color", Palette.current.text)
 	_fps_label.add_theme_color_override("font_outline_color", Palette.current.bg)
 	RenderingServer.set_default_clear_color(Palette.current.bg_deep)
@@ -584,7 +743,7 @@ func _show_screen(next: Control) -> void:
 	_current = next
 	if _transition:
 		_transition.kill()
-		for s in [_menu, _game, _settings, _stats]:
+		for s in [_menu, _game, _settings, _stats, _about]:
 			if s != next and s != prev:
 				s.visible = false
 	_since_input = 0.0
@@ -662,6 +821,15 @@ func _open_settings() -> void:
 	_show_screen(_settings)
 
 
+func _open_about() -> void:
+	_about.refresh()
+	_show_screen(_about)
+
+
+func _close_about() -> void:
+	_show_screen(_settings)
+
+
 func _close_settings() -> void:
 	if _settings_return == _game:
 		_show_screen(_game)
@@ -674,6 +842,10 @@ func _on_back() -> void:
 		_picker.close()
 	elif _confirm.is_open:
 		_confirm.close()
+	elif _reset.is_open:
+		_reset.close()
+	elif _current == _about:
+		_close_about()
 	elif _current == _stats:
 		_to_menu()
 	elif _current == _settings:

@@ -4,6 +4,7 @@ extends Control
 ## under their title.
 
 signal back_requested
+signal about_requested
 
 var _app: App
 var _sound := ToggleSwitch.new()
@@ -18,6 +19,17 @@ var _language := Segmented.make(PackedStringArray([I18n.LANGUAGE_NAMES.ru, I18n.
 var _quality := Segmented.make(PackedStringArray(["QUALITY_LOW", "QUALITY_MEDIUM", "QUALITY_HIGH"]))
 var _quality_hint := SkinLabel.make("QUALITY_HINT", Design.TEXT_CALLOUT, Design.WEIGHT_REGULAR, SkinLabel.Role.MUTED)
 var _undo := Segmented.make(PackedStringArray(["UNDO_OFF", "1", "2", "3", "4", "5"]))
+var _hint_level := Segmented.make(PackedStringArray(["HINT_LEVEL_SIMPLE", "HINT_LEVEL_MEDIUM", "HINT_LEVEL_SMART"]))
+var _text_size := Segmented.make(PackedStringArray(["TEXT_SIZE_SYSTEM", "TEXT_SIZE_NORMAL", "TEXT_SIZE_LARGE", "TEXT_SIZE_XLARGE"]))
+var _motion := Segmented.make(PackedStringArray(["MOTION_SYSTEM", "MOTION_ON", "MOTION_OFF"]))
+## Shown under the vibration switch while the phone's own vibration is turned off.
+var _haptics_note := _note("HAPTICS_SYSTEM_OFF")
+var _export := PillButton.make("EXPORT_PROGRESS", PillButton.Look.SECONDARY)
+var _import := PillButton.make("IMPORT_PROGRESS", PillButton.Look.SECONDARY)
+var _reset_stats := PillButton.make("RESET_STATS", PillButton.Look.GHOST)
+var _reset_records := PillButton.make("RESET_RECORDS", PillButton.Look.GHOST)
+var _reset_all := PillButton.make("RESET_ALL", PillButton.Look.GHOST)
+var _about := PillButton.make("ABOUT", PillButton.Look.SECONDARY)
 ## Options depend on the display, so they are filled in by [method refresh].
 var _fps_limit := Segmented.make(PackedStringArray(["∞"]), false)
 ## Cap behind each [member _fps_limit] option; 0 means none.
@@ -46,15 +58,18 @@ func _init() -> void:
 	scroll.add_child(_centered(col, true))
 
 	col.add_child(_section("APP_SETTINGS"))
+	var haptics_note := _wrap_note(_haptics_note)
 	col.add_child(_card([
 		_row("SOUND", _sound), _volume_row(_sound_volume), _divider(),
 		_row("MUSIC", _music), _volume_row(_music_volume), _divider(),
-		_row("HAPTICS", _haptics),
+		_row("HAPTICS", _haptics), haptics_note,
 	]))
 	_quality_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(_card([
 		_block("THEME", null, _theme), _divider(),
 		_block("LANGUAGE", null, _language), _divider(),
+		_block("TEXT_SIZE", null, _text_size), _divider(),
+		_block("MOTION", _note("MOTION_HINT"), _motion), _divider(),
 		_block("QUALITY", _quality_hint, _quality), _divider(),
 		_row("SHOW_FPS", _fps), _divider(),
 		_block("FPS_LIMIT", _note("FPS_LIMIT_HINT"), _fps_limit),
@@ -63,8 +78,18 @@ func _init() -> void:
 	col.add_child(_section("GAME_SETTINGS"))
 	col.add_child(_card([
 		_row("HINTS", _hints), _note_row("HINTS_HINT"), _divider(),
+		_block("HINT_LEVEL", _note("HINT_LEVEL_HINT"), _hint_level), _divider(),
 		_block("UNDO_LIMIT", _note("UNDO_LIMIT_HINT"), _undo),
 	]))
+
+	col.add_child(_section("DATA"))
+	col.add_child(_card([
+		_buttons_block("TRANSFER_HINT", [_export, _import]), _divider(),
+		_buttons_block("RESET_HINT", [_reset_stats, _reset_records, _reset_all]),
+	]))
+
+	col.add_child(_section("ABOUT_SECTION"))
+	col.add_child(_card([_buttons_block("", [_about])]))
 	col.add_child(Modal.gap(Design.SPACE_LG))
 
 	_sound.toggled.connect(func(on: bool) -> void:
@@ -77,7 +102,9 @@ func _init() -> void:
 	_music_volume.changed.connect(func(step: int) -> void: _app.set_music_volume(step))
 	_haptics.toggled.connect(func(on: bool) -> void: _app.set_haptics(on))
 	_fps.toggled.connect(func(on: bool) -> void: _app.set_show_fps(on))
-	_hints.toggled.connect(func(on: bool) -> void: _app.set_hints(on))
+	_hints.toggled.connect(func(on: bool) -> void:
+		_app.set_hints(on)
+		_hint_level.dimmed = not on)
 	_fps_limit.selected.connect(func(i: int) -> void: _app.set_fps_limit(_fps_limits[i]))
 	_theme.selected.connect(func(i: int) -> void: _app.set_theme_mode(i as SaveStore.ThemeMode))
 	_language.selected.connect(func(i: int) -> void: _app.set_language(I18n.LANGUAGES[i]))
@@ -85,6 +112,15 @@ func _init() -> void:
 		_app.set_quality(i as SaveStore.Quality)
 		_refresh_quality_hint())
 	_undo.selected.connect(func(i: int) -> void: _app.set_undo_limit(i))
+	_hint_level.selected.connect(func(i: int) -> void: _app.set_hint_level(i as SaveStore.HintLevel))
+	_text_size.selected.connect(func(i: int) -> void: _app.set_text_size(i as SaveStore.TextSize))
+	_motion.selected.connect(func(i: int) -> void: _app.set_reduce_motion(i as SaveStore.ReduceMotion))
+	_export.pressed.connect(func() -> void: _app.export_progress())
+	_import.pressed.connect(func() -> void: _app.import_progress())
+	_reset_stats.pressed.connect(func() -> void: _app.ask_reset(ResetDialog.Scope.STATS))
+	_reset_records.pressed.connect(func() -> void: _app.ask_reset(ResetDialog.Scope.RECORDS))
+	_reset_all.pressed.connect(func() -> void: _app.ask_reset(ResetDialog.Scope.ALL))
+	_about.pressed.connect(func() -> void: about_requested.emit())
 
 
 func _notification(what: int) -> void:
@@ -109,6 +145,11 @@ func refresh() -> void:
 	_haptics.set_on_silently(s.haptics_on)
 	_fps.set_on_silently(s.show_fps)
 	_hints.set_on_silently(s.hints_on)
+	_hint_level.set_index_silently(s.hint_level)
+	_hint_level.dimmed = not s.hints_on
+	_text_size.set_index_silently(s.text_size)
+	_motion.set_index_silently(s.reduce_motion)
+	refresh_haptics_note()
 	_refresh_fps_limits()
 	_theme.set_index_silently(s.theme)
 	_language.set_index_silently(I18n.LANGUAGES.find(s.language))
@@ -119,6 +160,16 @@ func refresh() -> void:
 
 func _on_language_changed() -> void:
 	_refresh_quality_hint()
+
+
+## Shows the note under the vibration switch while the phone's own vibration is off.
+func refresh_haptics_note() -> void:
+	_haptics_note.get_parent().visible = Haptics.system_vibration_off()
+
+
+## Lets the hint level look inactive while hints are off; it can still be changed.
+func set_hints_dimmed(dimmed: bool) -> void:
+	_hint_level.dimmed = dimmed
 
 
 func _refresh_quality_hint() -> void:
@@ -213,6 +264,30 @@ func _note(key: String) -> SkinLabel:
 	var l := SkinLabel.make(key, Design.TEXT_CALLOUT, Design.WEIGHT_REGULAR, SkinLabel.Role.MUTED)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return l
+
+
+## Optional note, then [param buttons] stacked across the card.
+func _buttons_block(note_key: String, buttons: Array) -> Control:
+	var wrap := MarginContainer.new()
+	wrap.add_theme_constant_override("margin_top", int(Design.SPACE_LG))
+	wrap.add_theme_constant_override("margin_bottom", int(Design.SPACE_LG))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", int(Design.SPACE_SM))
+	if not note_key.is_empty():
+		box.add_child(_note(note_key))
+		box.add_child(Modal.gap(Design.SPACE_2XS))
+	for b: PillButton in buttons:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		box.add_child(b)
+	wrap.add_child(box)
+	return wrap
+
+
+func _wrap_note(note: Control) -> Control:
+	var wrap := MarginContainer.new()
+	wrap.add_theme_constant_override("margin_bottom", int(Design.SPACE_LG))
+	wrap.add_child(note)
+	return wrap
 
 
 ## Note under a switch row, ending the row's block.

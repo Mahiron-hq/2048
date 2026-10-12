@@ -1,0 +1,386 @@
+# 2048 Merge user interface strings.
+# msgid is a stable key; scripts/ui/i18n.gd looks the strings up by it.
+msgid ""
+msgstr ""
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "ABOUT"
+msgstr "About"
+
+msgid "ABOUT_AUTHOR"
+msgstr "By Lev Burmistrov (Mahiron-hq), © 2026"
+
+msgid "ABOUT_LICENSES"
+msgstr "Licenses"
+
+msgid "ABOUT_LICENSES_HINT"
+msgstr "Tap a name to read its license."
+
+msgid "ABOUT_PRIVACY"
+msgstr "Privacy policy"
+
+msgid "ABOUT_SECTION"
+msgstr "About"
+
+msgid "ABOUT_SOURCE"
+msgstr "Source code"
+
+msgid "ABOUT_THANKS"
+msgstr "Based on the idea of 2048 by Gabriele Cirulli (MIT License), itself grown out of 1024! and Threes!. No code from it is used: this game is written from scratch with the Godot Engine. Move hints come from the game's own Rust engine, built with godot-rust."
+
+msgid "ABOUT_THANKS_TITLE"
+msgstr "Thanks"
+
+msgid "ABOUT_VERSION"
+msgstr "Version %s"
+
+msgid "ABOUT_WRITE"
+msgstr "Write to the author"
+
+msgid "APP_NAME"
+msgstr "2048 Merge"
+
+msgid "APP_SETTINGS"
+msgstr "App settings"
+
+msgid "AVERAGE_SCORE"
+msgstr "Average score"
+
+msgid "BEST"
+msgstr "Best"
+
+msgid "BEST_SCORE"
+msgstr "Best score"
+
+msgid "BEST_TILE"
+msgstr "Best tile"
+
+msgid "CANCEL"
+msgstr "Cancel"
+
+msgid "CLEAN_BEST_SCORE"
+msgstr "Best without help"
+
+msgid "CONFIRM_NEW_BODY"
+msgstr "Current progress will be lost."
+
+msgid "CONFIRM_NEW_TITLE"
+msgstr "Start a new game?"
+
+msgid "CONTINUE"
+msgstr "Continue"
+
+msgid "CONTINUE_STEP"
+msgstr "Next"
+
+msgid "DATA"
+msgstr "Data"
+
+msgid "EXPORT_DONE"
+msgstr "Progress saved to the file."
+
+msgid "EXPORT_FAILED"
+msgstr "Could not write the file."
+
+msgid "EXPORT_PROGRESS"
+msgstr "Save progress to a file"
+
+msgid "FINAL_SCORE"
+msgstr "Score"
+
+msgid "FPS_LIMIT"
+msgstr "Frame rate limit"
+
+msgid "FPS_LIMIT_HINT"
+msgstr "∞ — no limit, as fast as the screen refreshes. A lower limit saves battery."
+
+msgid "GAMES_PLAYED"
+msgstr "Games played"
+
+msgid "GAME_OVER"
+msgstr "No moves left"
+
+msgid "GAME_SETTINGS"
+msgstr "Game settings"
+
+msgid "HAPTICS"
+msgstr "Vibration"
+
+msgid "HAPTICS_SYSTEM_OFF"
+msgstr "Vibration is turned off in the phone's settings, so the game stays silent too. Turn it on there (usually under Sound and vibration or Accessibility)."
+
+msgid "HINTS"
+msgstr "Move hints"
+
+msgid "HINTS_HINT"
+msgstr "The bulb on the game screen suggests the best move. It lights up by itself when you pause for a while."
+
+msgid "HINT_LEVEL"
+msgstr "Hint strength"
+
+msgid "HINT_LEVEL_HINT"
+msgstr "Simple answers at once, Medium in a third of a second, Smart thinks up to 15 seconds and uses every core but one."
+
+msgid "HINT_LEVEL_MEDIUM"
+msgstr "Medium"
+
+msgid "HINT_LEVEL_SIMPLE"
+msgstr "Simple"
+
+msgid "HINT_LEVEL_SMART"
+msgstr "Smart"
+
+msgid "HINT_THINKING"
+msgstr "Thinking…"
+
+msgid "IMPORT_BODY"
+msgstr "Your current records, statistics, settings and game will be replaced by the file's."
+
+msgid "IMPORT_DO"
+msgstr "Replace"
+
+msgid "IMPORT_DONE"
+msgstr "Progress loaded."
+
+msgid "IMPORT_FAILED"
+msgstr "This file is not a 2048 Merge progress file."
+
+msgid "IMPORT_PROGRESS"
+msgstr "Load progress from a file"
+
+msgid "IMPORT_SURE_BODY"
+msgstr "The file holds %s and a best score of %s. What is on this phone now cannot be brought back."
+
+msgid "IMPORT_SURE_TITLE"
+msgstr "Replace everything?"
+
+msgid "IMPORT_TITLE"
+msgstr "Load progress?"
+
+msgid "LANGUAGE"
+msgstr "Language"
+
+msgid "LICENSE_ANDROID"
+msgstr "Android libraries — Apache 2.0"
+
+msgid "LICENSE_FONT"
+msgstr "Manrope font — SIL OFL 1.1"
+
+msgid "LICENSE_GAME"
+msgstr "2048 Merge — Apache 2.0"
+
+msgid "LICENSE_GODOT"
+msgstr "Godot Engine — MIT"
+
+msgid "LICENSE_GODOT_PARTS"
+msgstr "Godot Engine components"
+
+msgid "LICENSE_MISSING"
+msgstr "The license text is missing from this build."
+
+msgid "LICENSE_MUSIC"
+msgstr "Music “2048 Quiet Tiles” — CC BY-NC-ND 4.0"
+
+msgid "LICENSE_RUST"
+msgstr "Rust libraries"
+
+msgid "MENU"
+msgstr "Menu"
+
+msgid "MILESTONE"
+msgstr "Tile %d reached!"
+
+msgid "MOTION"
+msgstr "Reduce motion"
+
+msgid "MOTION_HINT"
+msgstr "No confetti, rings or pulsing; screens change with a plain fade. Tiles still slide."
+
+msgid "MOTION_OFF"
+msgstr "Off"
+
+msgid "MOTION_ON"
+msgstr "On"
+
+msgid "MOTION_SYSTEM"
+msgstr "As in system"
+
+msgid "MOVES"
+msgstr "Moves"
+
+msgid "MUSIC"
+msgstr "Music"
+
+msgid "NEW"
+msgstr "New"
+
+msgid "NEW_RECORD"
+msgstr "New record!"
+
+msgid "NO_GAMES"
+msgstr "No finished games yet. A game counts once it is lost, or after ten moves when you start a new one."
+
+msgid "PLAY"
+msgstr "New game"
+
+msgid "PLAY_TIME"
+msgstr "Time played"
+
+msgid "QUALITY"
+msgstr "Graphics quality"
+
+msgid "QUALITY_HIGH"
+msgstr "High"
+
+msgid "QUALITY_HINT"
+msgstr "Rendering at %s. Lower quality saves battery on sharp screens."
+
+msgid "QUALITY_LOW"
+msgstr "Low"
+
+msgid "QUALITY_MEDIUM"
+msgstr "Medium"
+
+msgid "RESET_ALL"
+msgstr "Reset everything"
+
+msgid "RESET_ALL_BODY"
+msgstr "All statistics and all records go back to zero."
+
+msgid "RESET_ALL_TITLE"
+msgstr "Reset statistics and records?"
+
+msgid "RESET_DO"
+msgstr "Reset"
+
+msgid "RESET_DONE"
+msgstr "Done: the data has been reset."
+
+msgid "RESET_HINT"
+msgstr "The game in progress and the settings are never touched."
+
+msgid "RESET_RECORDS"
+msgstr "Reset records"
+
+msgid "RESET_RECORDS_BODY"
+msgstr "The best score and the best score without help go back to zero. Statistics stay."
+
+msgid "RESET_RECORDS_TITLE"
+msgstr "Reset records?"
+
+msgid "RESET_STATS"
+msgstr "Reset statistics"
+
+msgid "RESET_STATS_BODY"
+msgstr "Games, average score, best tile, moves and time played go back to zero. Records stay."
+
+msgid "RESET_STATS_TITLE"
+msgstr "Reset statistics?"
+
+msgid "RESET_SURE_BODY"
+msgstr "This applies to: %s. It cannot be undone."
+
+msgid "RESET_SURE_TITLE"
+msgstr "Are you sure?"
+
+msgid "SAVE_LOST"
+msgstr "Your save was damaged and could not be restored. The damaged file was kept aside."
+
+msgid "SAVE_RECOVERED"
+msgstr "Your save was damaged and has been restored from its backup."
+
+msgid "SCORE"
+msgstr "Score"
+
+msgid "SETTINGS"
+msgstr "Settings"
+
+msgid "SHOW_FPS"
+msgstr "Show FPS"
+
+msgid "SOUND"
+msgstr "Sound"
+
+msgid "STATS"
+msgstr "Statistics"
+
+msgid "STATS_ALL"
+msgstr "All"
+
+msgid "SUBTITLE"
+msgstr "number puzzle"
+
+msgid "SWIPE_TO_PLAY"
+msgstr "Swipe to move the tiles"
+
+msgid "TEXT_SIZE"
+msgstr "Text size"
+
+msgid "TEXT_SIZE_LARGE"
+msgstr "Large"
+
+msgid "TEXT_SIZE_NORMAL"
+msgstr "Normal"
+
+msgid "TEXT_SIZE_SYSTEM"
+msgstr "System"
+
+msgid "TEXT_SIZE_XLARGE"
+msgstr "Larger"
+
+msgid "THEME"
+msgstr "Theme"
+
+msgid "THEME_DARK"
+msgstr "Dark"
+
+msgid "THEME_LIGHT"
+msgstr "Light"
+
+msgid "THEME_SYSTEM"
+msgstr "Auto"
+
+msgid "TIME_HM"
+msgstr "%d h %d min"
+
+msgid "TIME_MS"
+msgstr "%d min %d s"
+
+msgid "TIME_S"
+msgstr "%d s"
+
+msgid "TOTAL_MOVES"
+msgstr "Total moves"
+
+msgid "TRANSFER_HINT"
+msgstr "Save your records, statistics, settings and the game in progress to a file, or load them on another phone."
+
+msgid "TRY_AGAIN"
+msgstr "Play again"
+
+msgid "UNDO"
+msgstr "Undo"
+
+msgid "UNDO_LAST"
+msgstr "Undo last move"
+
+msgid "UNDO_LIMIT"
+msgstr "Undo moves"
+
+msgid "UNDO_LIMIT_HINT"
+msgstr "How many moves in a row you can take back"
+
+msgid "UNDO_OFF"
+msgstr "Off"
+
+msgid "YES_NEW"
+msgstr "Start over"
+
+msgid "N_GAMES"
+msgid_plural "N_GAMES_PLURAL"
+msgstr[0] "%d game"
+msgstr[1] "%d games"

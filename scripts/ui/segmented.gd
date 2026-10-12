@@ -9,6 +9,11 @@ const TAP_SLOP := 16.0
 const KNOB_INSET := 4.0
 
 var options: PackedStringArray = []
+## Drawn faded while the feature it tunes is switched off; still selectable.
+var dimmed := false:
+	set(v):
+		dimmed = v
+		modulate.a = 0.45 if v else 1.0
 ## When true, [member options] are translation keys; otherwise shown verbatim.
 var translate := true
 var index := 0
@@ -109,7 +114,7 @@ func _draw() -> void:
 			Vector2(seg_w - KNOB_INSET * 2.0, size.y - KNOB_INSET * 2.0)))
 	for i in options.size():
 		var label: String = I18n.t(options[i]) if translate else options[i]
-		var fs := Fonts.fit(_font, label, Design.TEXT_CALLOUT, seg_w - Design.SPACE_MD * 2.0)
+		var fs := Fonts.fit(_font, label, Design.ts(Design.TEXT_CALLOUT), seg_w - Design.SPACE_MD * 2.0)
 		var weight := clampf(1.0 - absf(_slide - i), 0.0, 1.0)
 		var color := p.text_secondary.lerp(p.text, weight)
 		Fonts.draw_centered(self, _font, label, Vector2((i + 0.5) * seg_w, size.y * 0.5), fs, color)

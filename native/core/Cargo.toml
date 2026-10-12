@@ -1,0 +1,15 @@
+[package]
+name = "hint-core"
+description = "Expectimax move search for 2048 Merge boards from 3x3 to 6x6"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

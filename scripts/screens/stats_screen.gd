@@ -54,7 +54,7 @@ func _init() -> void:
 	_grid.add_theme_constant_override("h_separation", int(Design.SPACE_MD))
 	_grid.add_theme_constant_override("v_separation", int(Design.SPACE_MD))
 	inner.add_child(_grid)
-	for key in ["GAMES_PLAYED", "AVERAGE_SCORE", "BEST_TILE", "BEST_SCORE", "TOTAL_MOVES", "PLAY_TIME"]:
+	for key in ["GAMES_PLAYED", "AVERAGE_SCORE", "BEST_SCORE", "CLEAN_BEST_SCORE", "BEST_TILE", "TOTAL_MOVES", "PLAY_TIME"]:
 		var card := _StatCard.new()
 		card.caption_key = key
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -87,6 +87,7 @@ func refresh() -> void:
 	_cards.GAMES_PLAYED.set_value(I18n.number(st.games))
 	_cards.AVERAGE_SCORE.set_value(I18n.number(st.average_score))
 	_cards.BEST_SCORE.set_value(I18n.number(st.best_score))
+	_cards.CLEAN_BEST_SCORE.set_value(I18n.number(st.clean_best_score))
 	_cards.TOTAL_MOVES.set_value(I18n.number(st.moves))
 	_cards.PLAY_TIME.set_value(I18n.duration(st.time))
 	_cards.BEST_TILE.set_value("" if st.best_tile > 0 else "—")

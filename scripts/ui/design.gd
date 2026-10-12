@@ -23,6 +23,15 @@ const TEXT_BODY := 30      ## list labels, buttons
 const TEXT_CALLOUT := 26   ## secondary lines, hints
 const TEXT_CAPTION := 22   ## captions over numbers
 
+## Multiplier on the type scale from the text size setting (or the phone's font size); tile
+## numbers keep their own sizing.
+static var text_scale := 1.0
+
+
+## [param size] from the type scale, adjusted by [member text_scale].
+static func ts(size: int) -> int:
+	return roundi(size * text_scale)
+
 const WEIGHT_REGULAR := 500
 const WEIGHT_MEDIUM := 600
 const WEIGHT_BOLD := 700

@@ -1,0 +1,20 @@
+[workspace]
+members = ["core", "gdext"]
+resolver = "3"
+
+[workspace.package]
+version = "1.3.1"
+edition = "2024"
+rust-version = "1.94"
+license = "Apache-2.0"
+repository = "https://github.com/Mahiron-hq/2048"
+
+[workspace.dependencies]
+hint-core = { path = "core" }
+thiserror = "2.0"
+proptest = "1.12"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "symbols"

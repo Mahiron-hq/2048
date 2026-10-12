@@ -1,0 +1,13 @@
+[configuration]
+
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.7
+reloadable = false
+
+[libraries]
+
+windows.x86_64 = "res://addons/hint_engine/bin/windows-x86_64/hint_engine.dll"
+linux.x86_64 = "res://addons/hint_engine/bin/linux-x86_64/libhint_engine.so"
+android.arm64 = "res://addons/hint_engine/bin/android-arm64-v8a/libhint_engine.so"
+android.arm32 = "res://addons/hint_engine/bin/android-armeabi-v7a/libhint_engine.so"
+android.x86_64 = "res://addons/hint_engine/bin/android-x86_64/libhint_engine.so"

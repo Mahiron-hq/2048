@@ -92,7 +92,7 @@ func prime() -> void:
 func _fit_score_font(score: int) -> void:
 	var font := _score.get_theme_font("font")
 	var room := _card.custom_minimum_size.x - 2.0 * _card.padding
-	var fs := Fonts.fit(font, I18n.number(score), Design.TEXT_DISPLAY, room, Design.TEXT_HEADLINE)
+	var fs := Fonts.fit(font, I18n.number(score), Design.ts(Design.TEXT_DISPLAY), room, Design.ts(Design.TEXT_HEADLINE))
 	_score.add_theme_font_size_override("font_size", fs)
 
 
@@ -118,7 +118,7 @@ class _RecordBadge:
 		_on_language_changed()
 
 	func _on_language_changed() -> void:
-		var w := _font.get_string_size(I18n.t("NEW_RECORD"), HORIZONTAL_ALIGNMENT_LEFT, -1, Design.TEXT_CALLOUT).x
+		var w := _font.get_string_size(I18n.t("NEW_RECORD"), HORIZONTAL_ALIGNMENT_LEFT, -1, Design.ts(Design.TEXT_CALLOUT)).x
 		custom_minimum_size.x = w + Design.ICON_SM + Design.SPACE_XS + Design.SPACE_LG * 2.0
 		queue_redraw()
 
@@ -133,5 +133,5 @@ class _RecordBadge:
 		draw_style_box(_box, Rect2(Vector2.ZERO, size))
 		var x := Design.SPACE_LG
 		Icons.draw(self, Icons.Kind.TROPHY, Vector2(x + Design.ICON_SM * 0.5, size.y * 0.5), Design.ICON_SM, p.accent)
-		draw_string(_font, Vector2(x + Design.ICON_SM + Design.SPACE_XS, Fonts.baseline(size.y * 0.5, Design.TEXT_CALLOUT)),
-				I18n.t("NEW_RECORD"), HORIZONTAL_ALIGNMENT_LEFT, -1, Design.TEXT_CALLOUT, p.accent)
+		draw_string(_font, Vector2(x + Design.ICON_SM + Design.SPACE_XS, Fonts.baseline(size.y * 0.5, Design.ts(Design.TEXT_CALLOUT))),
+				I18n.t("NEW_RECORD"), HORIZONTAL_ALIGNMENT_LEFT, -1, Design.ts(Design.TEXT_CALLOUT), p.accent)

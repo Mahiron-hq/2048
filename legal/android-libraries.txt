@@ -1,0 +1,23 @@
+Android libraries in the 2048 Merge app
+
+The Android build of the game includes these libraries from the Godot Engine's Android
+template. Each is licensed under the Apache License, Version 2.0; the full text is shown
+under "2048 Merge" in this list.
+
+AndroidX (Copyright The Android Open Source Project)
+  activity 1.8.1, annotation-experimental 1.4.0, arch core-runtime, core 1.8.0,
+  core-ktx 1.2.0, core-splashscreen 1.0.1, customview 1.0.0, documentfile 1.1.0,
+  fragment 1.8.6, lifecycle (livedata, livedata-core, runtime, viewmodel,
+  viewmodel-savedstate), loader 1.0.0, profileinstaller 1.3.1, savedstate 1.2.1,
+  startup-runtime 1.1.1, tracing 1.0.0, versionedparcelable 1.1.1, viewpager 1.0.0
+  https://developer.android.com/jetpack/androidx
+
+Kotlin standard library (Copyright JetBrains s.r.o. and Kotlin Programming Language contributors)
+  https://github.com/JetBrains/kotlin
+
+kotlinx.coroutines 1.6.4 (Copyright JetBrains s.r.o. and Kotlin Programming Language contributors)
+  https://github.com/Kotlin/kotlinx.coroutines
+
+LLVM libc++ (libc++_shared.so from the Android NDK)
+  Apache License v2.0 with LLVM Exceptions
+  https://libcxx.llvm.org
