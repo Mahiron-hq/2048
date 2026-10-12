@@ -10,19 +10,18 @@ All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changel
 
 #### Added
 
-- **Hint strength** in Game settings: **Simple** answers at once from a one-level search, **Medium** (the default) thinks about a third of a second on two cores, **Smart** looks as deep as the phone manages in up to 15 seconds on every core but one, and stops early once its answer is settled. Hints now come from a native engine written in Rust, about 40 times faster than before on one core, so every level sees further than 1.3.0 did. While a long search runs, a ring on the bulb fills up; tapping the bulb again, or making a move, calls it off.
-- **Best without help:** a separate record for games played without undo or hints, shown in Statistics.
+- **Hint strength** in Game settings: **Simple** answers at once from a one-level search, **Medium** (the default) thinks for up to a second on up to four cores, always leaving two to the game, **Smart** looks as deep as the phone manages in up to 15 seconds on every core but one, and stops early once its answer is settled. Hints now come from a native engine written in Rust, about 40 times faster than before on one core, so every level sees further than 1.3.0 did. A ring on the bulb fills up from the moment you tap it; tapping the bulb again, or making a move, calls the search off, while a quick double tap does not.
+- **Best without help:** a separate record for games played without undo or hints, shown in Statistics, along with the **longest game** in moves.
 - **Undo the losing move** right from the "No moves left" card. A lost game stays saved until you leave it, so Continue brings the card (and its undo) back.
-- **Data** in Settings: save your progress to a file and load it on another phone through the system file picker; reset statistics, records or both, for every board size or one. Every reset and import asks twice, and the final button wakes up only after three seconds.
+- **Data** in Settings: save your progress to a file and load it on another phone through the system file picker; reset statistics, records or both, for every board size or one. Saving and loading ask before the file picker opens; every reset and every loaded file asks once more, and that final button wakes up only after three seconds.
 - **Text size** (System, 100%, 115%, 130%) and **Reduce motion** (As in system, On, Off): tiles still slide, while confetti, rings, swells, bounces and pulses give way to plain fades.
 - **About** screen: version, contacts, credits and the full license texts of the game, its music and font, the Godot Engine and its components, and the Android and Rust libraries.
 - Android offers to keep the game's data when you uninstall it.
 
 #### Changed
 
-- **Battery:** the swipe tutorial breathes a few times and rests, and shows only in your first three games; an untouched board or the menu after it no longer redraws the screen at full rate. Two seconds after the last touch, with nothing moving, the game lets a fast display drop to its idle rate (60 Hz instead of 120 on the test phone) and wakes less often, which halves its CPU use while idle. The game screen keeps the display awake for two minutes after your last touch instead of forever, and play time stops counting after a minute without a move.
+- **Battery:** a board after the first move, and the menu, no longer redraw the screen while nothing moves; a hidden game screen stops the swipe hint's animation. Two seconds after the last touch, with nothing moving, the game lets a fast display drop to its idle rate (60 Hz instead of 120 on the test phone) and wakes less often, which halves its CPU use while idle. The game screen keeps the display awake for two minutes after your last touch instead of forever, and play time stops counting after a minute without a move.
 - **Vibration follows the phone's own settings.** When vibration is turned off for the whole phone, the game stays silent too and Settings says why; interface taps use the touch feedback channel.
-- **Moves start on the board.** Swipes from the screen's edge stay with Android's back gesture, which used to take them on gesture-navigation phones.
 - **Statistics:** a lost game counts when you leave it; a game left for a new one counts once it had ten moves, so quick restarts no longer drag the average down.
 - **Back** on the menu sends the game to the background, as Android does with other apps, so it reopens instantly.
 - The chosen board size is remembered between launches.
@@ -48,19 +47,18 @@ All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changel
 
 #### Добавлено
 
-- **Ум подсказок** в «Настройках игры»: **Простой** отвечает сразу по поиску на один уровень, **Средний** (по умолчанию) думает около трети секунды на двух ядрах, **Умный** просчитывает настолько глубоко, насколько телефон успевает за 15 секунд на всех ядрах, кроме одного, и останавливается раньше, когда ответ устоялся. Подсказки теперь считает нативный движок на Rust, примерно в 40 раз быстрее прежнего на одном ядре, поэтому каждый уровень видит дальше, чем 1.3.0. Пока идёт долгий поиск, на лампочке заполняется кольцо; повторное нажатие на лампочку или ваш ход его отменяют.
-- **Рекорд без помощи:** отдельный рекорд партий без отмены и подсказок, в статистике.
+- **Ум подсказок** в «Настройках игры»: **Простой** отвечает сразу по поиску на один уровень, **Средний** (по умолчанию) думает до секунды на четырёх ядрах (если они есть), всегда оставляя два игре, **Умный** просчитывает настолько глубоко, насколько телефон успевает за 15 секунд на всех ядрах, кроме одного, и останавливается раньше, когда ответ устоялся. Подсказки теперь считает нативный движок на Rust, примерно в 40 раз быстрее прежнего на одном ядре, поэтому каждый уровень видит дальше, чем 1.3.0. Кольцо на лампочке заполняется с момента нажатия; повторное нажатие или ваш ход отменяют поиск, а случайное двойное касание – нет.
+- **Рекорд без помощи:** отдельный рекорд партий без отмены и подсказок, в статистике – вместе с **самой длинной партией** в ходах.
 - **Отмена проигрышного хода** прямо в окне «Ходов больше нет». Проигранная партия сохраняется, пока вы из неё не выйдете, и «Продолжить» возвращает окно вместе с отменой.
-- **Данные** в настройках: сохранение прогресса в файл и загрузка на другом телефоне через системный выбор файла; сброс статистики, рекордов или всего — для всех размеров поля или одного. Сброс и загрузка спрашивают дважды, а последняя кнопка становится активной только через три секунды.
+- **Данные** в настройках: сохранение прогресса в файл и загрузка на другом телефоне через системный выбор файла; сброс статистики, рекордов или всего — для всех размеров поля или одного. Сохранение и загрузка спрашивают подтверждение до открытия выбора файла; сброс и выбранный файл спрашивают ещё раз, и эта кнопка становится активной только через три секунды.
 - **Размер текста** (Системный, 100%, 115%, 130%) и **«Уменьшить движение»** (Как в системе, Вкл, Выкл): плитки по-прежнему скользят, а конфетти, кольца, увеличения, прыжки и пульсации заменяются простым затуханием.
 - Экран **«О программе»**: версия, контакты, благодарности и полные тексты лицензий игры, музыки и шрифта, Godot Engine и его компонентов, Android- и Rust-библиотек.
 - При удалении игры Android предлагает сохранить её данные.
 
 #### Изменено
 
-- **Батарея:** подсказка свайпа делает несколько вдохов и замирает, а показывается только в первых трёх партиях; нетронутое поле и меню после него больше не перерисовывают экран на полной частоте. Через две секунды после последнего касания, когда на экране ничего не движется, игра отпускает быстрый экран на его частоту покоя (60 Гц вместо 120 на тестовом телефоне) и реже просыпается — в простое она тратит вдвое меньше процессора. Экран игры не гаснет две минуты после последнего касания вместо «всегда», а время в игре перестаёт идти через минуту без хода.
+- **Батарея:** поле после первого хода и меню больше не перерисовывают экран, пока ничего не движется; на скрытом экране игры анимация подсказки свайпа останавливается. Через две секунды после последнего касания, когда на экране ничего не движется, игра отпускает быстрый экран на его частоту покоя (60 Гц вместо 120 на тестовом телефоне) и реже просыпается — в простое она тратит вдвое меньше процессора. Экран игры не гаснет две минуты после последнего касания вместо «всегда», а время в игре перестаёт идти через минуту без хода.
 - **Вибрация следует настройкам телефона.** Если вибрация выключена во всём телефоне, игра тоже молчит, а в настройках объясняется почему; касания интерфейса идут через канал виброотклика.
-- **Ход начинается на поле.** Свайпы от края экрана остаются системному жесту «Назад», который раньше перехватывал их на телефонах с жестовой навигацией.
 - **Статистика:** проигранная партия засчитывается, когда вы из неё выходите; брошенная ради новой — если в ней было не меньше десяти ходов, поэтому быстрые перезапуски больше не занижают средний счёт.
 - **«Назад»** в меню сворачивает игру, как Android делает с другими приложениями, и она открывается мгновенно.
 - Выбранный размер поля запоминается между запусками.

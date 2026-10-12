@@ -232,6 +232,7 @@ func _run() -> void:
 	await _first_toast()
 	await _about_licenses(app)
 	await _data_buttons(app)
+	await _regressions(app)
 	await _quality(app)
 	await _landscape(app)
 
@@ -505,6 +506,64 @@ func _reduced_motion(app: App) -> void:
 	app.set_reduce_motion(SaveStore.ReduceMotion.OFF)
 	check(not Motion.reduced(), "Reduce motion: off")
 	await _wait(0.3)
+
+
+## Earlier fixes without another check: keeping the display awake, the play-time clock, text
+## size, undo from the "No moves left" card, and a lost game coming back with Continue.
+func _regressions(app: App) -> void:
+	var g := app._game
+	app._show_screen(g)
+	g.start_new(4, false)
+	await _wait(0.4)
+	app._since_input = 0.0
+	await _frames(2)
+	check(app._keep_awake, "the game screen keeps the display awake after a touch")
+	app._since_input = App.KEEP_AWAKE_SEC + 1.0
+	await _frames(2)
+	check(not app._keep_awake, "two minutes without a touch hand the screen back to the phone's timeout")
+	app._since_move = App.PLAY_IDLE_SEC + 1.0
+	var t0: float = app._play_time
+	await _wait(0.3)
+	check(is_equal_approx(app._play_time, t0), "play time stops after a minute without a move")
+	app.note_move()
+	await _wait(0.3)
+	check(app._play_time > t0, "a move starts the play-time clock again")
+
+	app.set_text_size(SaveStore.TextSize.XLARGE)
+	check(is_equal_approx(Design.text_scale, AndroidBridge.MAX_FONT_SCALE), "130%% text scales by %.2f" % AndroidBridge.MAX_FONT_SCALE)
+	app.set_text_size(SaveStore.TextSize.NORMAL)
+	check(is_equal_approx(Design.text_scale, 1.0), "100% text is unscaled")
+	app.set_text_size(SaveStore.TextSize.SYSTEM)
+	await _frames(2)
+
+	# A position one move from the end, with a spawn that leaves no move.
+	var stuck := {"size": 4, "values": [2, 4, 2, 4, 4, 2, 4, 2, 2, 4, 2, 4, 4, 2, 8, 8], "score": 10, "moves": 5}
+	var seed := -1
+	for candidate in 64:
+		var probe := Board.new(1)
+		probe.from_dict(stuck)
+		probe.rng.seed = candidate
+		probe.move(Board.Dir.LEFT)
+		if not probe.can_move():
+			seed = candidate
+			break
+	check(seed >= 0, "found a spawn that ends the game")
+	g.board.from_dict(stuck)
+	g.board.undo_limit = 1
+	g.board.rng.seed = seed
+	g._board_view.show_board(g.board)
+	var before := g.board.values.duplicate()
+	g.request_move(Board.Dir.LEFT)
+	await _wait(1.5)
+	check(g._game_over.is_open and g._game_over._undo.visible, "the lost card offers to undo the last move")
+	app._to_menu()
+	await _wait(0.5)
+	app._menu._continue.pressed.emit()
+	await _wait(1.5)
+	check(g._game_over.is_open, "Continue brings the lost game's card back")
+	g._game_over._undo.pressed.emit()
+	await _wait(0.8)
+	check(not g._game_over.is_open and g.board.values == before and g.board.can_move(), "undo from the card restores the board before the losing move")
 
 
 ## Saving and loading progress ask first instead of opening the file picker on a stray tap;
