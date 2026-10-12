@@ -29,6 +29,13 @@ const HINT_IDLE := 15.0
 const ABANDON_MIN_MOVES := 10
 ## A second tap on the bulb this soon after the first is taken for a double tap, not a cancel.
 const HINT_CANCEL_GUARD_MS := 350
+## Holding the bulb this long slides out the hint strengths instead of asking for a hint.
+const HINT_HOLD_SEC := 1.0
+## The hold ring shows only once a press has lasted this long, so a plain tap never flashes it.
+const HINT_HOLD_RING_AFTER := 0.15
+## Long side over short side of the window below which it counts as a tablet's (4:3 to 16:10;
+## phones are 16:9 and longer).
+const TABLET_ASPECT := 1.7
 
 ## Landscape arrangements, preferred first. ROW: logo, menu and score in one line, best on the
 ## right. STACKED: score under logo and menu. ONE_SIDE: everything left of the board.
@@ -74,6 +81,11 @@ var _loss_announced := false
 var _hints := HintRunner.new()
 ## A hint search is running for the board in [member _hint_values].
 var _hint_pending := false
+## Seconds the bulb has been held down, or negative when it is not.
+var _hold := -1.0
+## Set once a hold has opened the strengths, so the release that ends it asks for no hint.
+var _hold_used := false
+var _levels := HintLevelPicker.new()
 ## Board the search started from; the answer is dropped if the board changed since.
 var _hint_values := PackedInt64Array()
 ## Seconds since the last move while a game is waiting for one.
@@ -138,9 +150,14 @@ func _init() -> void:
 
 	_banner.z_index = 10
 	add_child(_banner)
+	_levels.z_index = 15
+	add_child(_levels)
+	_levels.chosen.connect(_on_level_chosen)
 
 	_menu_btn.pressed.connect(func() -> void: menu_requested.emit())
 	_hint_btn.pressed.connect(request_hint)
+	_hint_btn.button_down.connect(_on_hint_down)
+	_hint_btn.button_up.connect(_on_hint_up)
 	_undo_btn.pressed.connect(undo)
 	_new_btn.pressed.connect(_ask_new_game)
 	_board_view.settled.connect(_on_settled)
@@ -164,6 +181,15 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if _hint_pending:
 		_poll_hint()
+	if _hold >= 0.0:
+		_hold += delta
+		if _hold >= HINT_HOLD_SEC:
+			_hold = -1.0
+			_hold_used = true
+			_open_levels()
+		elif not _hint_pending:
+			var shown := (_hold - HINT_HOLD_RING_AFTER) / (HINT_HOLD_SEC - HINT_HOLD_RING_AFTER)
+			_hint_btn.progress = clampf(shown, 0.0, 1.0) if shown >= 0.0 else -1.0
 	var waiting := _app.store.hints_on and is_playing() and _app.is_current(self) \
 			and not _app.is_modal_open() and not _board_view.is_animating() and not _hint_pending \
 			and not _board_view.is_showing_move_hint()
@@ -175,6 +201,7 @@ func _process(delta: float) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
+		_levels.close(true)
 		var wide := size.x > size.y * 1.1
 		if wide != _landscape_mode:
 			_apply_layout(wide)
@@ -204,6 +231,7 @@ func set_hints_enabled(on: bool) -> void:
 	_hint_btn.visible = on
 	if not on:
 		cancel_hint()
+		_levels.close(true)
 		_set_hint_glow(false)
 		_board_view.stop_move_hint()
 	_fit_actions()
@@ -232,6 +260,9 @@ func _fit_actions() -> void:
 ## Works out the best move in the background, then shows it on the board without playing it.
 ## Pressing the bulb again while it thinks calls the search off.
 func request_hint() -> void:
+	if _hold_used:
+		_hold_used = false
+		return
 	_reset_idle()
 	if _hint_pending:
 		if _hints.elapsed_ms() >= HINT_CANCEL_GUARD_MS:
@@ -306,6 +337,50 @@ func _set_hint_glow(on: bool) -> void:
 
 func close_overlays() -> void:
 	_game_over.close()
+	_levels.close(true)
+
+
+func is_level_picker_open() -> bool:
+	return _levels.is_open
+
+
+## Puts the hint strengths away; false when they were not out.
+func close_level_picker() -> bool:
+	if not _levels.is_open:
+		return false
+	_levels.close()
+	return true
+
+
+func _on_hint_down() -> void:
+	_hold_used = false
+	_hold = 0.0
+
+
+func _on_hint_up() -> void:
+	_hold = -1.0
+	if not _hint_pending:
+		_hint_btn.progress = -1.0
+
+
+## Slides the hint strengths out of the bulb: up on a phone held upright, down on one held
+## sideways, to the right on a tablet.
+func _open_levels() -> void:
+	if not _hint_pending:
+		_hint_btn.progress = -1.0
+	var window := get_viewport_rect().size
+	var tablet := maxf(window.x, window.y) / maxf(1.0, minf(window.x, window.y)) < TABLET_ASPECT
+	var flow := HintLevelPicker.Flow.RIGHT
+	if not tablet:
+		flow = HintLevelPicker.Flow.DOWN if _landscape_mode else HintLevelPicker.Flow.UP
+	var bulb := _hint_btn.get_global_rect()
+	bulb.position -= _levels.get_global_rect().position
+	_levels.open(bulb, flow, _app.store.hint_level)
+	_app.haptic(Haptics.Kind.LIGHT)
+
+
+func _on_level_chosen(level: SaveStore.HintLevel) -> void:
+	_app.set_hint_level(level)
 
 
 func is_modal_open() -> bool:
@@ -321,6 +396,7 @@ func is_playing() -> bool:
 ## [param intro]. The game it replaces is counted if it was lost or played long enough.
 func start_new(grid := 0, intro := true) -> void:
 	cancel_hint()
+	_levels.close(true)
 	_record_finished()
 	board.new_game(grid if grid > 0 else board.size)
 	_active = true
@@ -342,6 +418,7 @@ func resume_saved() -> bool:
 	if not _app.store.has_game() or not board.from_dict(_app.store.game):
 		return false
 	cancel_hint()
+	_levels.close(true)
 	_active = true
 	_game_over.close()
 	_pending_over = false
@@ -370,6 +447,8 @@ func set_undo_limit(limit: int) -> void:
 
 
 func request_move(dir: Board.Dir) -> void:
+	# Playing on puts the hint strengths away.
+	_levels.close()
 	if _game_over.is_open or _pending_over:
 		return
 	_reset_idle()

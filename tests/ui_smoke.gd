@@ -227,6 +227,7 @@ func _run() -> void:
 	await _new_features(app)
 	await _fixes_121(app)
 	await _hints(app)
+	await _level_picker(app)
 	await _reduced_motion(app)
 	await _display_rest(app)
 	await _first_toast()
@@ -468,6 +469,87 @@ func _hints(app: App) -> void:
 	app.set_hints(true)
 	await _frames(2)
 	check(g._hint_btn.visible, "turning hints back on shows the button")
+
+
+## Holding the bulb slides out the hint strengths; a choice, a move or a tap elsewhere puts them
+## away, and a plain tap still asks for a hint.
+func _level_picker(app: App) -> void:
+	var g := app._game
+	# A phone held upright; the headless window is square.
+	var original := root.size
+	root.size = Vector2i(1080, 2340)
+	await _frames(6)
+	app._show_screen(g)
+	g.start_new(4, false)
+	await _wait(0.4)
+	var before := app.store.hint_level
+	g._hint_btn.button_down.emit()
+	await _wait(0.3)
+	g._hint_btn.button_up.emit()
+	g._hint_btn.pressed.emit()
+	check(not g.is_level_picker_open() and g.is_hint_busy(), "a short press on the bulb asks for a hint")
+	g.cancel_hint()
+	await _wait(0.4)
+	g._hint_btn.button_down.emit()
+	await _wait(0.6)
+	check(g._hint_btn.progress > 0.0 and not g.is_level_picker_open(), "holding the bulb fills its ring")
+	await _wait(0.6)
+	check(g.is_level_picker_open(), "a one-second hold slides out the hint strengths")
+	g._hint_btn.button_up.emit()
+	g._hint_btn.pressed.emit()
+	check(not g.is_hint_busy() and g._hint_btn.progress < 0.0, "the release after the hold asks for no hint")
+	await _wait(0.5)
+	var bulb := g._hint_btn.get_global_rect()
+	var picks: Array[PillButton] = g._levels._buttons
+	var column := true
+	for b in picks:
+		var r := b.get_global_rect()
+		column = column and r.end.y <= bulb.position.y + 1.0 and r.position.x >= bulb.position.x - 0.5
+	check(column, "upright, the strengths stand in a column above the bulb, not left of it")
+	check(picks[0].get_global_rect().position.y > picks[2].get_global_rect().position.y, "Simple is nearest to the bulb")
+	check(picks[before].look == PillButton.Look.PRIMARY, "the current strength is marked")
+	picks[SaveStore.HintLevel.SMART].pressed.emit()
+	await _wait(0.6)
+	check(app.store.hint_level == SaveStore.HintLevel.SMART and not g.is_level_picker_open() and not g._levels.visible,
+			"choosing a strength switches to it and slides the buttons back into the bulb")
+	g._open_levels()
+	await _wait(0.5)
+	var moved := false
+	for dir in [Board.Dir.LEFT, Board.Dir.RIGHT, Board.Dir.UP, Board.Dir.DOWN]:
+		g.request_move(dir)
+		if g.board.move_count > 0:
+			moved = true
+			break
+	check(moved and not g.is_level_picker_open(), "a move puts the strengths away")
+	await _wait(0.6)
+	g._open_levels()
+	await _wait(0.5)
+	g._levels._gui_input(_click(Vector2(360, 300), true))
+	check(not g.is_level_picker_open(), "a tap anywhere else puts the strengths away")
+	await _wait(0.6)
+	check(not g._levels.visible, "the buttons are back inside the bulb")
+	g._open_levels()
+	await _wait(0.3)
+	app._on_back()
+	check(not g.is_level_picker_open() and app.is_current(g), "Back puts the strengths away and stays in the game")
+	await _wait(0.5)
+	# A tablet lines them up to the right of the bulb.
+	var row := HintLevelPicker.new()
+	root.add_child(row)
+	row.size = Vector2(960, 720)
+	await _frames(2)
+	var spot := Rect2(160, 300, 88, 88)
+	var rects := row.layout(spot, HintLevelPicker.Flow.RIGHT)
+	var in_row := true
+	for i in rects.size():
+		in_row = in_row and rects[i].position.x >= spot.end.x and absf(rects[i].get_center().y - spot.get_center().y) < 1.0
+		if i > 0:
+			in_row = in_row and rects[i].position.x > rects[i - 1].end.x
+	check(in_row, "on a tablet the strengths line up to the right of the bulb")
+	row.queue_free()
+	app.set_hint_level(before)
+	root.size = original
+	await _frames(6)
 
 
 ## With reduced motion tiles still slide, while spawns, merges, the hint, milestones and screen
@@ -749,6 +831,15 @@ func _landscape(app: App) -> void:
 	check(g._landscape_mode, "game switches to the side-panel layout")
 	var board_rect := _board_rect(g)
 	await _check_landscape_game(g, vp, "16:9")
+	g._open_levels()
+	await _wait(0.5)
+	var bulb := g._hint_btn.get_global_rect()
+	var below := true
+	for b: PillButton in g._levels._buttons:
+		var r := b.get_global_rect()
+		below = below and r.position.y >= bulb.end.y - 1.0 and _inside(r, vp)
+	check(below, "sideways on a phone the strengths drop below the bulb and stay on screen")
+	g._levels.close(true)
 	root.size = Vector2i(2400, 1080)
 	await _frames(8)
 	await _wait(0.3)
