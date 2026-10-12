@@ -10,3 +10,11 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+  # The Rust hint engine; one grouped pull request a week, like the actions.
+  - package-ecosystem: cargo
+    directory: /native
+    schedule:
+      interval: weekly
+    groups:
+      cargo:
+        patterns: ["*"]

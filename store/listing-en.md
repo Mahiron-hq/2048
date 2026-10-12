@@ -9,102 +9,104 @@ Copy each block into the matching field. Character limits are in brackets.
 2048 Merge
 ```
 
-### Short description (up to 80 characters, this one is 64)
+### Short description (up to 80 characters, this one is 70)
 ```
-Calm 2048 with no ads or internet: move hints, boards up to 6×6.
+Calm 2048 with no ads or internet: smart move hints, boards up to 6×6.
 ```
 
-### Full description (up to 4000 characters, this one is 1516)
+### Full description (up to 4000 characters, this one is 1703)
 ```
-2048 Merge is a calm, polished take on the famous puzzle. Swipe the tiles, join equal numbers and aim for 2048 and beyond: there is no finish line, the game goes on while the board has moves.
+2048 Merge is a calm, polished take on the famous number puzzle. Swipe to slide the tiles, merge matching numbers and chase 2048 — then keep going: there is no finish line, the game goes on while the board has a move left.
 
 NO ADS, NO INTERNET
-No ads, purchases, accounts or tracking. The game never goes online and asks for a single permission: vibration.
+No ads, no purchases, no accounts, no tracking. The game never goes online and asks for a single permission: vibration.
 
 PLAY YOUR WAY
-• 3×3, 4×4, 5×5 and 6×6 boards, with a record for each size.
-• Undo up to five moves in a row, or no undo at all if you like a pure game.
-• Move hints: the bulb suggests the best move, and the move itself stays yours. Think for a while and it lights up by itself.
-• Statistics: games, average score, best tile, moves and time played.
+• 3×3, 4×4, 5×5 and 6×6 boards, each with its own records — overall and without help.
+• Undo up to five moves in a row — or turn undo off for a pure game.
+• Move hints with three strengths: Simple answers at once, Medium in a third of a second, Smart thinks up to 15 seconds on all of the phone's cores. The move itself is always yours.
+• Statistics: games played, average score, best tile, moves and time played.
 
 FEELS GOOD TO PLAY
 • Smooth animation: tiles glide, merge with a light accent and pop in gently.
-• Undo plays the move backwards, tiles return and merged ones split apart.
-• Haptics grow with the tiles and adapt to the phone's vibration motor.
-• 90, 120 and 144 Hz screens, and a frame rate limit that saves battery.
+• Undo plays the move backwards: tiles glide home and merged tiles split apart.
+• Haptics grow with the tiles and adapt to your phone's vibration motor.
+• 90, 120 and 144 Hz displays, and a frame rate limit that saves battery.
 
 ORIGINAL SOUNDTRACK
-The track "2048 Quiet Tiles" was written for the game. Music and sound volume are set separately.
+"2048 Quiet Tiles" was written for the game. Music and sound effects have separate volume controls.
 
 MADE FOR YOU
-• Light and dark themes, or automatic, following your phone.
-• Graphics quality to choose: low, medium or high (up to 2K).
+• Light and dark themes, or Auto to follow your phone.
+• Text size and reduced motion — as in your phone's settings or your own choice.
+• Graphics quality: low, medium or high (up to 2K).
 • English and Russian.
 • Portrait and landscape, phones and tablets.
-• Your game, records and statistics save automatically, so you can close the game anytime and continue later.
+• Your game, records and statistics save automatically, and a progress file moves them to another phone.
 
 Based on the original 2048 by Gabriele Cirulli.
 Open source: github.com/Mahiron-hq/2048
 ```
 
-### What's new in 1.3.0
+### What's new in 1.3.1 (up to 500 characters, this one is 446)
 ```
-• A new look: one design system, the Manrope font, refreshed tile colors and icon.
-• Auto theme: follows your phone's light or dark mode.
-• Graphics quality: 720p, 1080p or up to 2K.
-• Game buttons moved down, under your thumb.
-• Move hints, boards from 3×3 to 6×6, statistics and up to 5 undo steps.
-• Vibration works whatever the system settings, and is softer on simple motors.
+• Hints run on a new engine, with three strengths: Simple, Medium and Smart.
+• Best score without help, resetting statistics and records, moving progress through a file.
+• Text size, reduced motion and an About screen with the licenses.
+• Undo the losing move right from the "No moves left" card.
+• Less battery drain: the screen and animations no longer run for nothing.
+• Saves are protected by a backup; vibration follows the phone's settings.
 ```
 
 ## itch.io
 
 ### Short description / tagline
 ```
-Calm 2048 with no ads or internet: move hints, boards up to 6×6, own music
+Calm 2048 with no ads or internet: smart hints, boards up to 6×6, own music
 ```
 
 ### Page description
 ```
-2048 Merge is a calm, polished take on the famous puzzle. Swipe the tiles, join equal numbers and aim for 2048 and beyond: there is no finish line, the game goes on while the board has moves.
+2048 Merge is a calm, polished take on the famous number puzzle. Swipe to slide the tiles, merge matching numbers and chase 2048 — then keep going: there is no finish line, the game goes on while the board has a move left.
 
 NO ADS, NO INTERNET
-No ads, purchases, accounts or tracking. The game never goes online and asks for a single permission: vibration.
+No ads, no purchases, no accounts, no tracking. The game never goes online and asks for a single permission: vibration.
 
 PLAY YOUR WAY
-• 3×3, 4×4, 5×5 and 6×6 boards, with a record for each size.
-• Undo up to five moves in a row, or no undo at all if you like a pure game.
-• Move hints: the bulb suggests the best move, and the move itself stays yours. Think for a while and it lights up by itself.
-• Statistics: games, average score, best tile, moves and time played.
+• 3×3, 4×4, 5×5 and 6×6 boards, each with its own records — overall and without help.
+• Undo up to five moves in a row — or turn undo off for a pure game.
+• Move hints with three strengths: Simple answers at once, Medium in a third of a second, Smart thinks up to 15 seconds on all of the phone's cores. The move itself is always yours.
+• Statistics: games played, average score, best tile, moves and time played.
 
 FEELS GOOD TO PLAY
 • Smooth animation: tiles glide, merge with a light accent and pop in gently.
-• Undo plays the move backwards, tiles return and merged ones split apart.
-• Haptics grow with the tiles and adapt to the phone's vibration motor.
-• 90, 120 and 144 Hz screens, and a frame rate limit that saves battery.
+• Undo plays the move backwards: tiles glide home and merged tiles split apart.
+• Haptics grow with the tiles and adapt to your phone's vibration motor.
+• 90, 120 and 144 Hz displays, and a frame rate limit that saves battery.
 
 ORIGINAL SOUNDTRACK
-The track "2048 Quiet Tiles" was written for the game. Music and sound volume are set separately.
+"2048 Quiet Tiles" was written for the game. Music and sound effects have separate volume controls.
 
 MADE FOR YOU
-• Light and dark themes, or automatic, following your phone.
-• Graphics quality to choose: low, medium or high (up to 2K).
+• Light and dark themes, or Auto to follow your phone.
+• Text size and reduced motion — as in your phone's settings or your own choice.
+• Graphics quality: low, medium or high (up to 2K).
 • English and Russian.
 • Portrait and landscape, phones and tablets.
-• Your game, records and statistics save automatically, so you can close the game anytime and continue later.
+• Your game, records and statistics save automatically, and a progress file moves them to another phone.
 
 Based on the original 2048 by Gabriele Cirulli.
 Open source: github.com/Mahiron-hq/2048
 ```
 
-### Devlog for update 1.3.0 (optional)
+### Devlog for update 1.3.1 (optional)
 ```
-• A new look: one design system, the Manrope font, refreshed tile colors and icon.
-• Auto theme: follows your phone's light or dark mode.
-• Graphics quality: 720p, 1080p or up to 2K.
-• Game buttons moved down, under your thumb.
-• Move hints, boards from 3×3 to 6×6, statistics and up to 5 undo steps.
-• Vibration works whatever the system settings, and is softer on simple motors.
+• Hints run on a new engine, with three strengths: Simple, Medium and Smart.
+• Best score without help, resetting statistics and records, moving progress through a file.
+• Text size, reduced motion and an About screen with the licenses.
+• Undo the losing move right from the "No moves left" card.
+• Less battery drain: the screen and animations no longer run for nothing.
+• Saves are protected by a backup; vibration follows the phone's settings.
 ```
 
 ## Google Play
@@ -114,12 +116,12 @@ Open source: github.com/Mahiron-hq/2048
 2048 Merge
 ```
 
-### Short description (up to 80 characters, this one is 74)
+### Short description (up to 80 characters, this one is 70)
 ```
-Calm 2048 with no ads or internet: move hints, boards up to 6×6, own music
+Calm 2048 with no ads or internet: smart move hints, boards up to 6×6.
 ```
 
-### Full description (up to 4000 characters, this one is 1675)
+### Full description (up to 4000 characters, this one is 1809)
 ```
 2048 Merge is a calm, polished take on the famous number puzzle. Swipe to slide the tiles, merge matching numbers and chase 2048 — then keep going: there is no finish line, the game goes on while the board has a move left.
 
@@ -127,40 +129,41 @@ NO ADS, NO INTERNET
 No ads, no purchases, no accounts, no tracking. The game never goes online and asks for a single permission: vibration.
 
 PLAY YOUR WAY
-• 3×3, 4×4, 5×5 and 6×6 boards, with a record for each size.
+• 3×3, 4×4, 5×5 and 6×6 boards, each with its own records — overall and without help.
 • Undo up to five moves in a row — or turn undo off for a pure game.
-• Move hints: the bulb suggests the best move and leaves the move to you. Pause for a while and it lights up by itself.
+• Move hints with three strengths: Simple answers at once, Medium in a third of a second, Smart thinks up to 15 seconds on all of the phone's cores. The move itself is always yours.
 • Statistics: games played, average score, best tile, moves and time played.
 
 FEELS GOOD TO PLAY
 • Smooth animation: tiles glide, merge with a light accent and pop in gently.
-• Undo plays the move backwards — tiles glide home and merged tiles split apart.
+• Undo plays the move backwards: tiles glide home and merged tiles split apart.
 • Celebrations at 128, 256, 512, 1024, 2048 and beyond: a banner and confetti, without pausing your game.
 • Haptics grow with the tiles and adapt to your phone's vibration motor.
 • 90, 120 and 144 Hz displays, and a frame rate limit that saves battery.
 
 ORIGINAL SOUNDTRACK
-"2048 Quiet Tiles" was written for the game and loops without a single seam. Music and sound effects have separate volume controls.
+"2048 Quiet Tiles" was written for the game. Music and sound effects have separate volume controls.
 
 MADE FOR YOU
 • Light and dark themes, or Auto to follow your phone.
+• Text size and reduced motion — as in your phone's settings or your own choice.
 • Graphics quality: low, medium or high (up to 2K).
 • English and Russian.
 • Portrait and landscape, phones and tablets.
-• Your game, records and statistics save automatically — close it anytime and pick up where you left off.
+• Your game, records and statistics save automatically, and a progress file moves them to another phone.
 
 Based on the original 2048 by Gabriele Cirulli.
 Open source: github.com/Mahiron-hq/2048
 ```
 
-### What's new in 1.3.0 (up to 500 characters, this one is 380)
+### What's new in 1.3.1 (up to 500 characters, this one is 446)
 ```
-• A new look: one design system, the Manrope font, refreshed tile colors and icon.
-• Auto theme: follows your phone's light or dark mode.
-• Graphics quality: 720p, 1080p or up to 2K.
-• Game buttons moved down, under your thumb.
-• Move hints, boards from 3×3 to 6×6, statistics and up to 5 undo steps.
-• Vibration works whatever the system settings, and is softer on simple motors.
+• Hints run on a new engine, with three strengths: Simple, Medium and Smart.
+• Best score without help, resetting statistics and records, moving progress through a file.
+• Text size, reduced motion and an About screen with the licenses.
+• Undo the losing move right from the "No moves left" card.
+• Less battery drain: the screen and animations no longer run for nothing.
+• Saves are protected by a backup; vibration follows the phone's settings.
 ```
 
 ## Page settings (for storefronts that ask)
@@ -172,17 +175,19 @@ Open source: github.com/Mahiron-hq/2048
 - Tags (up to 10): `2048`, `puzzle`, `casual`, `minimalist`, `relaxing`, `numbers`, `singleplayer`, `offline`, `godot`, `android`
 - Made with: **Godot**
 - Inputs: **Touchscreen**
-- Links: Source code → `https://github.com/Mahiron-hq/2048`, Soundtrack → `https://youtu.be/hd3Zw0SmdUE`
+- Links: Source code → `https://github.com/Mahiron-hq/2048`, Privacy policy → `https://mahiron-hq.github.io/2048/privacy/`, Soundtrack → `https://youtu.be/hd3Zw0SmdUE`
+- Contact: `Mahiron.HQ@protonmail.com`
 - Community: **Comments** on (optional)
 
 ## Upload labels
 | File | Platform checkbox | Display name |
 |---|---|---|
-| `2048-Merge-v1.3.0-arm64-v8a.apk` | Android | Android — most phones (arm64) |
-| `2048-Merge-v1.3.0-armeabi-v7a.apk` | Android | Android — older 32-bit phones |
+| `2048-Merge-v1.3.1-arm64-v8a.apk` | Android | Android — most phones (arm64) |
+| `2048-Merge-v1.3.1-armeabi-v7a.apk` | Android | Android — older 32-bit phones |
+| `2048-Merge-v1.3.1-universal.apk` | Android | Android — any phone (larger download) |
 | `2048_Quiet_Tiles.flac` *(optional, from the `soundtrack` release)* | — (Soundtrack) | Soundtrack — 2048 Quiet Tiles (FLAC) |
 
 ## Media
-- Screenshots 1080×1920: `store/screenshots/en/` (in numbered order).
+- Screenshots 1080×1920: `store/screenshots/en/` (in numbered order; taken from real games by `tools/make_screenshots.gd`).
 - Video: `store/video/2048-merge-promo-en.mp4` (1080×1920, about 30 s, with music).
 - Icon 512×512: `store/icon-512.png`; banners: `store/banner-1920x1080-en.png`, `store/feature-graphic-1024x500-en.png`, itch.io cover `store/itch-cover-630x500.png`.
