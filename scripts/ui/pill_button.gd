@@ -9,6 +9,7 @@ enum Look { PRIMARY, SECONDARY, GHOST }
 var look: Look = Look.SECONDARY
 var key := ""
 var icon: Icons.Kind = Icons.Kind.NONE
+## Label size from the Design type scale, before the text size setting applies.
 var font_size := Design.TEXT_BODY
 var height := Design.CONTROL_MD
 ## Icon-only buttons are circles.
@@ -47,6 +48,12 @@ var glow := 0.0:
 	set(v):
 		glow = v
 		queue_redraw()
+## Ring around a round button showing how far a long task has got, 0 to 1; none when negative.
+var progress := -1.0:
+	set(v):
+		if v != progress:
+			progress = v
+			queue_redraw()
 
 var _press := 0.0:
 	set(v):
@@ -149,7 +156,8 @@ func _draw() -> void:
 		Icons.draw(self, icon, center, icon_size, fg)
 	else:
 		var label := _label()
-		var text_w := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+		var fs := Design.ts(font_size)
+		var text_w := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		var gap := Design.SPACE_SM
 		var with_icon := icon != Icons.Kind.NONE and not hide_icon
 		var total := text_w + (icon_size + gap if with_icon else 0.0)
@@ -157,14 +165,27 @@ func _draw() -> void:
 		if with_icon:
 			Icons.draw(self, icon, Vector2(x + icon_size * 0.5, center.y), icon_size, fg)
 			x += icon_size + gap
-		draw_string(_font, Vector2(x, Fonts.baseline(center.y, font_size)), label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, fg)
+		draw_string(_font, Vector2(x, Fonts.baseline(center.y, fs)), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, fg)
+	if progress >= 0.0:
+		_draw_progress(p, center)
 	if badge > 0 and not disabled:
 		var r := Design.SPACE_MD
 		var c := Vector2(size.x - r * 0.75, r * 0.75)
 		draw_circle(c, r + Design.HAIRLINE, p.bg, true, -1.0, true)
 		draw_circle(c, r, p.accent, true, -1.0, true)
-		Fonts.draw_centered(self, _font, str(badge), c, Design.TEXT_CAPTION, p.on_accent)
+		Fonts.draw_centered(self, _font, str(badge), c, Design.ts(Design.TEXT_CAPTION), p.on_accent)
 	draw_set_transform(Vector2.ZERO)
+
+
+## Thin track around the button with the done share in the accent; the track breathes gently
+## while it runs, unless motion is reduced.
+func _draw_progress(p: Palette, center: Vector2) -> void:
+	var r := minf(size.x, size.y) * 0.5 - Design.HAIRLINE
+	var breath := 0.0 if Motion.reduced() else 0.5 + 0.5 * sin(Time.get_ticks_msec() / 260.0)
+	var track := Color(p.accent, 0.18 + 0.14 * breath)
+	draw_arc(center, r, 0.0, TAU, 64, track, Design.HAIRLINE + 1, true)
+	if progress > 0.0:
+		draw_arc(center, r, -PI * 0.5, -PI * 0.5 + TAU * clampf(progress, 0.0, 1.0), 64, p.accent, Design.HAIRLINE + 2, true)
 
 
 func _label() -> String:
@@ -177,7 +198,7 @@ func _update_min_size() -> void:
 	if icon_only:
 		custom_minimum_size = Vector2(height, height)
 		return
-	var w := _font.get_string_size(_label(), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var w := _font.get_string_size(_label(), HORIZONTAL_ALIGNMENT_LEFT, -1, Design.ts(font_size)).x
 	if icon != Icons.Kind.NONE and not hide_icon:
 		w += Design.ICON_MD + Design.SPACE_SM
 	var side := Design.SPACE_LG if compact else Design.SPACE_XL

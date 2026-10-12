@@ -197,7 +197,7 @@ func _run() -> void:
 	check(app.store.sound_volume == 3 and app.store.music_volume == Sfx.LEVEL_COUNT, "volume steps survive restart")
 	check(app.sfx._music.playing, "music starts on launch when enabled")
 	check(app.store.theme == SaveStore.ThemeMode.LIGHT and app.store.language == "ru", "theme/language survive restart")
-	check(app._menu._subtitle.text == I18n.STRINGS.ru.SUBTITLE, "labels use the saved language at startup")
+	check(app._menu._subtitle.text == String(TranslationServer.get_translation_object("ru").get_message("SUBTITLE")), "labels use the saved language at startup")
 	app._menu._continue.pressed.emit()
 	await _wait(0.4)
 	check(app._game.board.values == snapshot and app._game.board.score == score, "Continue restores the exact board")

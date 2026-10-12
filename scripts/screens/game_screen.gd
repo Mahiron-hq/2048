@@ -27,8 +27,8 @@ const HINT_IDLE := 15.0
 ## A game left for a new one counts as played only after this many moves; shorter tries are
 ## restarts, not games, and would drag the average score down.
 const ABANDON_MIN_MOVES := 10
-## Thinking time for one hint; the search goes deeper on faster phones in the same time.
-const HINT_BUDGET_MS := 350
+## A search running longer than this shows its progress on the hint button.
+const HINT_PROGRESS_AFTER_MS := 500
 
 ## Landscape arrangements, preferred first. ROW: logo, menu and score in one line, best on the
 ## right. STACKED: score under logo and menu. ONE_SIDE: everything left of the board.
@@ -71,11 +71,9 @@ var _active := false
 var _tutorial := false
 ## The loss was already announced (sound, vibration) before this summary came back on resume.
 var _loss_announced := false
-var _solver := HintSolver.new()
-## Background search in flight (WorkerThreadPool task id), or -1.
-var _hint_task := -1
-## Written by the search task; read once it has completed.
-var _hint_result := -1
+var _hints := HintRunner.new()
+## A hint search is running for the board in [member _hint_values].
+var _hint_pending := false
 ## Board the search started from; the answer is dropped if the board changed since.
 var _hint_values := PackedInt64Array()
 ## Seconds since the last move while a game is waiting for one.
@@ -160,21 +158,14 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	if _hint_task >= 0:
-		WorkerThreadPool.wait_for_task_completion(_hint_task)
-		_hint_task = -1
+	_hints.finish()
 
 
 func _process(delta: float) -> void:
-	if _hint_task >= 0 and WorkerThreadPool.is_task_completed(_hint_task):
-		WorkerThreadPool.wait_for_task_completion(_hint_task)
-		_hint_task = -1
-		if _hint_result >= 0 and board.values == _hint_values and is_playing():
-			# A player asking for a hint knows how to swipe; the tutorial would cover the suggestion.
-			_board_view.hide_hint()
-			_board_view.show_move_hint(_hint_result)
+	if _hint_pending:
+		_poll_hint()
 	var waiting := _app.store.hints_on and is_playing() and _app.is_current(self) \
-			and not _app.is_modal_open() and not _board_view.is_animating() and _hint_task < 0 \
+			and not _app.is_modal_open() and not _board_view.is_animating() and not _hint_pending \
 			and not _board_view.is_showing_move_hint()
 	if waiting:
 		_idle += delta
@@ -212,6 +203,7 @@ func _on_skin_changed() -> void:
 func set_hints_enabled(on: bool) -> void:
 	_hint_btn.visible = on
 	if not on:
+		cancel_hint()
 		_set_hint_glow(false)
 		_board_view.stop_move_hint()
 	_fit_actions()
@@ -238,21 +230,46 @@ func _fit_actions() -> void:
 
 
 ## Works out the best move in the background, then shows it on the board without playing it.
+## Pressing the bulb again while it thinks calls the search off.
 func request_hint() -> void:
 	_reset_idle()
-	if not _app.store.hints_on or not is_playing() or _hint_task >= 0 or not board.can_move():
+	if _hint_pending:
+		cancel_hint()
+		return
+	if not _app.store.hints_on or not is_playing() or not board.can_move():
 		return
 	_board_view.stop_move_hint()
 	_hint_values = board.values.duplicate()
-	var values := _hint_values.duplicate()
-	var grid := board.size
-	_hint_result = -1
-	_hint_task = WorkerThreadPool.add_task(func() -> void:
-		_hint_result = _solver.best_move(values, grid, HINT_BUDGET_MS), false, "move hint")
+	_hint_pending = _hints.start(_hint_values, board.size, _app.store.hint_level)
 
 
 func is_hint_busy() -> bool:
-	return _hint_task >= 0
+	return _hint_pending
+
+
+## Drops the running hint search, e.g. because the player moved meanwhile.
+func cancel_hint() -> void:
+	if not _hint_pending:
+		return
+	_hints.cancel()
+	_hint_pending = false
+	_hint_btn.progress = -1.0
+
+
+func _poll_hint() -> void:
+	var answer := _hints.poll()
+	if answer == HintRunner.RUNNING:
+		# Short searches finish before anything would show; long ones fill a ring on the bulb.
+		_hint_btn.progress = _hints.progress() if _hints.elapsed_ms() >= HINT_PROGRESS_AFTER_MS else -1.0
+		return
+	_hint_pending = false
+	_hint_btn.progress = -1.0
+	if answer >= 0 and board.values == _hint_values and is_playing():
+		board.assisted = true
+		_persist()
+		# A player asking for a hint knows how to swipe; the tutorial would cover the suggestion.
+		_board_view.hide_hint()
+		_board_view.show_move_hint(answer)
 
 
 ## A move happened: the idle clock restarts and a lit hint button goes back to normal.
@@ -296,6 +313,7 @@ func is_playing() -> bool:
 ## Starts a fresh game of side [param grid] (the current size when 0); tiles pop in with
 ## [param intro]. The game it replaces is counted if it was lost or played long enough.
 func start_new(grid := 0, intro := true) -> void:
+	cancel_hint()
 	_record_finished()
 	board.new_game(grid if grid > 0 else board.size)
 	_active = true
@@ -316,6 +334,7 @@ func start_new(grid := 0, intro := true) -> void:
 func resume_saved() -> bool:
 	if not _app.store.has_game() or not board.from_dict(_app.store.game):
 		return false
+	cancel_hint()
 	_active = true
 	_game_over.close()
 	_pending_over = false
@@ -351,6 +370,7 @@ func request_move(dir: Board.Dir) -> void:
 	if not result.moved:
 		_board_view.nudge(dir)
 		return
+	cancel_hint()
 	_board_view.hide_hint()
 	if _tutorial:
 		_tutorial = false
@@ -367,6 +387,7 @@ func undo() -> void:
 	if undone == null:
 		return
 	board.assisted = true
+	cancel_hint()
 	_reset_idle()
 	_app.note_move()
 	_app.store.record_move(board.size, -1)
@@ -463,6 +484,13 @@ static func counts_as_played(b: Board) -> bool:
 	if b.move_count == 0:
 		return false
 	return not b.can_move() or b.move_count >= ABANDON_MIN_MOVES
+
+
+## Records were reset from Settings: the best score shown and the record flash start over.
+func on_records_changed() -> void:
+	_best_at_start = _app.store.best_for(board.size)
+	_record_flashed = false
+	_best_box.set_value(_best_at_start, false)
 
 
 func _refresh_scores(animate: bool) -> void:

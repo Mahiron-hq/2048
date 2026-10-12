@@ -5,6 +5,8 @@ extends RefCounted
 ## previous save is kept as a backup, and a file that cannot be read is set aside, never erased.
 
 const DEFAULT_PATH := "user://save.json"
+## Marks a file as this game's progress, so an import never takes some other JSON for it.
+const APP_ID := "com.mahiron.merge2048"
 const FORMAT_VERSION := 4
 ## Volume steps were 1..5 before format 3; they now span 1..Sfx.LEVEL_COUNT.
 const LEGACY_VOLUME_STEPS := 5
@@ -228,6 +230,7 @@ func stats_for(size: int) -> Dictionary:
 
 func to_dict() -> Dictionary:
 	return {
+		"app": APP_ID,
 		"version": FORMAT_VERSION,
 		"best_scores": _keyed(_best),
 		"clean_best_scores": _keyed(_clean_best),
@@ -309,6 +312,18 @@ func apply_dict(d: Dictionary) -> void:
 			language = lang
 	var g = d.get("game", {})
 	game = g if g is Dictionary else {}
+
+
+## The progress held in an exported file's [param text], or an empty dictionary when it is not
+## this game's progress or comes from a newer version that this one cannot read.
+static func parse_export(text: String) -> Dictionary:
+	var parsed: Variant = JSON.parse_string(text)
+	if not parsed is Dictionary or parsed.get("app") != APP_ID:
+		return {}
+	var version := Board.read_count(parsed.get("version"), 1 << 16)
+	if version < 1 or version > FORMAT_VERSION:
+		return {}
+	return parsed
 
 
 func _apply_loaded(d: Dictionary) -> void:

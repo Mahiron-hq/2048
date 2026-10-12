@@ -125,7 +125,7 @@ class _Row:
 				var value := 2 << ((gx + gy * 2) % 6)
 				var pos := origin + Vector2(gx, gy) * (cell + cell_gap)
 				draw_rect(Rect2(pos, Vector2(cell, cell)), p.tile_bg(value))
-		var fs := Design.TEXT_BODY
+		var fs := Design.ts(Design.TEXT_BODY)
 		draw_string(_font, Vector2(origin.x + preview + Design.SPACE_MD, Fonts.baseline(size.y * 0.5, fs)), I18n.grid(grid),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, fs, p.accent if selected else p.text)
 		if selected:

@@ -1,0 +1,387 @@
+# 2048 Merge user interface strings.
+# msgid is a stable key; scripts/ui/i18n.gd looks the strings up by it.
+msgid ""
+msgstr ""
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid "ABOUT"
+msgstr "О программе"
+
+msgid "ABOUT_AUTHOR"
+msgstr "Автор — Лев Бурмистров (Mahiron-hq), © 2026"
+
+msgid "ABOUT_LICENSES"
+msgstr "Лицензии"
+
+msgid "ABOUT_LICENSES_HINT"
+msgstr "Коснитесь названия, чтобы прочитать текст лицензии."
+
+msgid "ABOUT_PRIVACY"
+msgstr "Политика конфиденциальности"
+
+msgid "ABOUT_SECTION"
+msgstr "О программе"
+
+msgid "ABOUT_SOURCE"
+msgstr "Исходный код"
+
+msgid "ABOUT_THANKS"
+msgstr "Игра создана по мотивам 2048 Габриэле Чирулли (Gabriele Cirulli, лицензия MIT), которая сама выросла из 1024! и Threes!. Код оригинала не используется: игра написана с нуля на Godot Engine. Подсказки считает собственный движок игры на Rust, собранный с godot-rust."
+
+msgid "ABOUT_THANKS_TITLE"
+msgstr "Благодарности"
+
+msgid "ABOUT_VERSION"
+msgstr "Версия %s"
+
+msgid "ABOUT_WRITE"
+msgstr "Написать автору"
+
+msgid "APP_NAME"
+msgstr "2048 Merge"
+
+msgid "APP_SETTINGS"
+msgstr "Настройки приложения"
+
+msgid "AVERAGE_SCORE"
+msgstr "Средний счёт"
+
+msgid "BEST"
+msgstr "Рекорд"
+
+msgid "BEST_SCORE"
+msgstr "Лучший результат"
+
+msgid "BEST_TILE"
+msgstr "Лучшая плитка"
+
+msgid "CANCEL"
+msgstr "Отмена"
+
+msgid "CLEAN_BEST_SCORE"
+msgstr "Рекорд без помощи"
+
+msgid "CONFIRM_NEW_BODY"
+msgstr "Текущий прогресс будет потерян."
+
+msgid "CONFIRM_NEW_TITLE"
+msgstr "Начать новую игру?"
+
+msgid "CONTINUE"
+msgstr "Продолжить"
+
+msgid "CONTINUE_STEP"
+msgstr "Далее"
+
+msgid "DATA"
+msgstr "Данные"
+
+msgid "EXPORT_DONE"
+msgstr "Прогресс сохранён в файл."
+
+msgid "EXPORT_FAILED"
+msgstr "Не удалось записать файл."
+
+msgid "EXPORT_PROGRESS"
+msgstr "Сохранить прогресс в файл"
+
+msgid "FINAL_SCORE"
+msgstr "Счёт"
+
+msgid "FPS_LIMIT"
+msgstr "Ограничение FPS"
+
+msgid "FPS_LIMIT_HINT"
+msgstr "∞ — без ограничений, с частотой обновления экрана. Меньше кадров — меньше расход батареи."
+
+msgid "GAMES_PLAYED"
+msgstr "Сыграно партий"
+
+msgid "GAME_OVER"
+msgstr "Ходов больше нет"
+
+msgid "GAME_SETTINGS"
+msgstr "Настройки игры"
+
+msgid "HAPTICS"
+msgstr "Вибрация"
+
+msgid "HAPTICS_SYSTEM_OFF"
+msgstr "Вибрация выключена в настройках телефона, поэтому игра тоже не вибрирует. Включите её там (обычно в разделе «Звук и вибрация» или «Специальные возможности»)."
+
+msgid "HINTS"
+msgstr "Подсказки хода"
+
+msgid "HINTS_HINT"
+msgstr "Лампочка на экране игры подсказывает лучший ход. Если долго не ходить, она загорается сама."
+
+msgid "HINT_LEVEL"
+msgstr "Ум подсказок"
+
+msgid "HINT_LEVEL_HINT"
+msgstr "Простой отвечает сразу, Средний — за треть секунды, Умный думает до 15 секунд на всех ядрах, кроме одного."
+
+msgid "HINT_LEVEL_MEDIUM"
+msgstr "Средний"
+
+msgid "HINT_LEVEL_SIMPLE"
+msgstr "Простой"
+
+msgid "HINT_LEVEL_SMART"
+msgstr "Умный"
+
+msgid "HINT_THINKING"
+msgstr "Думаю…"
+
+msgid "IMPORT_BODY"
+msgstr "Текущие рекорды, статистика, настройки и партия будут заменены данными из файла."
+
+msgid "IMPORT_DO"
+msgstr "Заменить"
+
+msgid "IMPORT_DONE"
+msgstr "Прогресс загружен."
+
+msgid "IMPORT_FAILED"
+msgstr "Этот файл не похож на файл прогресса 2048 Merge."
+
+msgid "IMPORT_PROGRESS"
+msgstr "Загрузить прогресс из файла"
+
+msgid "IMPORT_SURE_BODY"
+msgstr "В файле %s и лучший результат %s. То, что сейчас на телефоне, вернуть будет нельзя."
+
+msgid "IMPORT_SURE_TITLE"
+msgstr "Заменить всё?"
+
+msgid "IMPORT_TITLE"
+msgstr "Загрузить прогресс?"
+
+msgid "LANGUAGE"
+msgstr "Язык"
+
+msgid "LICENSE_ANDROID"
+msgstr "Android-библиотеки — Apache 2.0"
+
+msgid "LICENSE_FONT"
+msgstr "Шрифт Manrope — SIL OFL 1.1"
+
+msgid "LICENSE_GAME"
+msgstr "2048 Merge — Apache 2.0"
+
+msgid "LICENSE_GODOT"
+msgstr "Godot Engine — MIT"
+
+msgid "LICENSE_GODOT_PARTS"
+msgstr "Компоненты Godot Engine"
+
+msgid "LICENSE_MISSING"
+msgstr "В этой сборке нет текста лицензии."
+
+msgid "LICENSE_MUSIC"
+msgstr "Музыка «2048 Quiet Tiles» — CC BY-NC-ND 4.0"
+
+msgid "LICENSE_RUST"
+msgstr "Rust-библиотеки"
+
+msgid "MENU"
+msgstr "Меню"
+
+msgid "MILESTONE"
+msgstr "Плитка %d собрана!"
+
+msgid "MOTION"
+msgstr "Уменьшить движение"
+
+msgid "MOTION_HINT"
+msgstr "Без конфетти, колец и пульсаций, экраны сменяются простым затуханием. Плитки по-прежнему скользят."
+
+msgid "MOTION_OFF"
+msgstr "Выкл"
+
+msgid "MOTION_ON"
+msgstr "Вкл"
+
+msgid "MOTION_SYSTEM"
+msgstr "Как в системе"
+
+msgid "MOVES"
+msgstr "Ходы"
+
+msgid "MUSIC"
+msgstr "Музыка"
+
+msgid "NEW"
+msgstr "Заново"
+
+msgid "NEW_RECORD"
+msgstr "Новый рекорд!"
+
+msgid "NO_GAMES"
+msgstr "Законченных партий пока нет. Партия засчитывается после проигрыша или, если начать новую, от 10 ходов."
+
+msgid "PLAY"
+msgstr "Новая игра"
+
+msgid "PLAY_TIME"
+msgstr "Время в игре"
+
+msgid "QUALITY"
+msgstr "Качество графики"
+
+msgid "QUALITY_HIGH"
+msgstr "Высокое"
+
+msgid "QUALITY_HINT"
+msgstr "Сейчас картинка %s. На чётких экранах качество пониже бережёт батарею."
+
+msgid "QUALITY_LOW"
+msgstr "Низкое"
+
+msgid "QUALITY_MEDIUM"
+msgstr "Среднее"
+
+msgid "RESET_ALL"
+msgstr "Сбросить всё"
+
+msgid "RESET_ALL_BODY"
+msgstr "Вся статистика и все рекорды обнулятся."
+
+msgid "RESET_ALL_TITLE"
+msgstr "Сбросить статистику и рекорды?"
+
+msgid "RESET_DO"
+msgstr "Сбросить"
+
+msgid "RESET_DONE"
+msgstr "Готово: данные сброшены."
+
+msgid "RESET_HINT"
+msgstr "Текущая партия и настройки при сбросе не меняются."
+
+msgid "RESET_RECORDS"
+msgstr "Сбросить рекорды"
+
+msgid "RESET_RECORDS_BODY"
+msgstr "Лучший результат и рекорд без помощи обнулятся. Статистика останется."
+
+msgid "RESET_RECORDS_TITLE"
+msgstr "Сбросить рекорды?"
+
+msgid "RESET_STATS"
+msgstr "Сбросить статистику"
+
+msgid "RESET_STATS_BODY"
+msgstr "Партии, средний счёт, лучшая плитка, ходы и время в игре обнулятся. Рекорды останутся."
+
+msgid "RESET_STATS_TITLE"
+msgstr "Сбросить статистику?"
+
+msgid "RESET_SURE_BODY"
+msgstr "Сброс для: %s. Отменить его нельзя."
+
+msgid "RESET_SURE_TITLE"
+msgstr "Точно сбросить?"
+
+msgid "SAVE_LOST"
+msgstr "Сохранение повреждено, восстановить его не удалось. Испорченный файл сохранён отдельно."
+
+msgid "SAVE_RECOVERED"
+msgstr "Сохранение было повреждено и восстановлено из резервной копии."
+
+msgid "SCORE"
+msgstr "Счёт"
+
+msgid "SETTINGS"
+msgstr "Настройки"
+
+msgid "SHOW_FPS"
+msgstr "Показывать FPS"
+
+msgid "SOUND"
+msgstr "Звук"
+
+msgid "STATS"
+msgstr "Статистика"
+
+msgid "STATS_ALL"
+msgstr "Все"
+
+msgid "SUBTITLE"
+msgstr "числовая головоломка"
+
+msgid "SWIPE_TO_PLAY"
+msgstr "Проведите пальцем, чтобы сдвинуть плитки"
+
+msgid "TEXT_SIZE"
+msgstr "Размер текста"
+
+msgid "TEXT_SIZE_LARGE"
+msgstr "Крупный"
+
+msgid "TEXT_SIZE_NORMAL"
+msgstr "Обычный"
+
+msgid "TEXT_SIZE_SYSTEM"
+msgstr "Системный"
+
+msgid "TEXT_SIZE_XLARGE"
+msgstr "Очень крупный"
+
+msgid "THEME"
+msgstr "Тема"
+
+msgid "THEME_DARK"
+msgstr "Тёмная"
+
+msgid "THEME_LIGHT"
+msgstr "Светлая"
+
+msgid "THEME_SYSTEM"
+msgstr "Авто"
+
+msgid "TIME_HM"
+msgstr "%d ч %d мин"
+
+msgid "TIME_MS"
+msgstr "%d мин %d с"
+
+msgid "TIME_S"
+msgstr "%d с"
+
+msgid "TOTAL_MOVES"
+msgstr "Всего ходов"
+
+msgid "TRANSFER_HINT"
+msgstr "Сохраните рекорды, статистику, настройки и текущую партию в файл или загрузите их на другом телефоне."
+
+msgid "TRY_AGAIN"
+msgstr "Заново"
+
+msgid "UNDO"
+msgstr "Отменить"
+
+msgid "UNDO_LAST"
+msgstr "Отменить ход"
+
+msgid "UNDO_LIMIT"
+msgstr "Отмена ходов"
+
+msgid "UNDO_LIMIT_HINT"
+msgstr "Сколько ходов подряд можно вернуть назад"
+
+msgid "UNDO_OFF"
+msgstr "Выкл"
+
+msgid "YES_NEW"
+msgstr "Начать заново"
+
+msgid "N_GAMES"
+msgid_plural "N_GAMES_PLURAL"
+msgstr[0] "%d партия"
+msgstr[1] "%d партии"
+msgstr[2] "%d партий"

@@ -98,11 +98,11 @@ func _draw() -> void:
 		draw_style_box(_ring, rect)
 	var room := size.x - Design.SPACE_MD * 2.0
 	var cap := I18n.t(caption_key).to_upper()
-	var cap_size := Fonts.fit(_caption_font, cap, Design.TEXT_CAPTION, room)
+	var cap_size := Fonts.fit(_caption_font, cap, Design.ts(Design.TEXT_CAPTION), room)
 	var cap_color := p.text_secondary.lerp(p.accent, _flash)
 	Fonts.draw_centered(self, _caption_font, cap, Vector2(size.x * 0.5, size.y * 0.3), cap_size, cap_color)
 	var txt := I18n.number(int(round(_shown)))
-	var fs := Fonts.fit(_value_font, txt, Design.TEXT_HEADLINE, room, Design.TEXT_CAPTION)
+	var fs := Fonts.fit(_value_font, txt, Design.ts(Design.TEXT_HEADLINE), room, Design.TEXT_CAPTION)
 	Fonts.draw_centered(self, _value_font, txt, Vector2(size.x * 0.5, size.y * 0.66), fs, p.text)
 
 
@@ -113,7 +113,7 @@ func _take_popup() -> Label:
 	var l := Label.new()
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.add_theme_font_override("font", Fonts.sans(Design.WEIGHT_HEAVY, true))
-	l.add_theme_font_size_override("font_size", Design.TEXT_CALLOUT)
+	l.add_theme_font_size_override("font_size", Design.ts(Design.TEXT_CALLOUT))
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	l.z_index = 5
 	add_child(l)

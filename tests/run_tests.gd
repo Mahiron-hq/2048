@@ -45,6 +45,7 @@ func _initialize() -> void:
 		"test_statistics",
 		"test_haptic_pulses_are_perceptible",
 		"test_formatting",
+		"test_translations_are_complete",
 		"test_merge_haptics_scale_with_tile",
 		"test_game_over_wave",
 		"test_volume_scale_migrates",
@@ -54,6 +55,8 @@ func _initialize() -> void:
 		"test_fps_limit_options_follow_the_panel",
 		"test_fps_limit_persists",
 		"test_hint_solver_basics",
+		"test_native_hint_engine",
+		"test_hint_levels_and_cancel",
 		"test_hint_solver_respects_its_budget",
 		"test_hint_solver_plays_well",
 		"test_hints_setting_persists",
@@ -785,6 +788,34 @@ func test_formatting() -> void:
 	I18n.current = saved
 
 
+func test_translations_are_complete() -> void:
+	var en := TranslationServer.get_translation_object("en")
+	var ru := TranslationServer.get_translation_object("ru")
+	check(en != null and ru != null, "both translations load")
+	if en == null or ru == null:
+		return
+	var en_keys := Array(en.get_message_list())
+	var ru_keys := Array(ru.get_message_list())
+	en_keys.sort()
+	ru_keys.sort()
+	check(en_keys == ru_keys and en_keys.size() > 100, "every key exists in both languages (%d / %d)" % [en_keys.size(), ru_keys.size()])
+	for key in en_keys:
+		if String(en.get_message(key)).is_empty() or String(ru.get_message(key)).is_empty():
+			check(false, "empty translation for %s" % key)
+	var saved := I18n.current
+	I18n.current = "ru"
+	check(I18n.tn("N_GAMES", 1) == "1 партия" and I18n.tn("N_GAMES", 3) == "3 партии" and I18n.tn("N_GAMES", 5) == "5 партий", "russian plural forms: %s, %s, %s" % [I18n.tn("N_GAMES", 1), I18n.tn("N_GAMES", 3), I18n.tn("N_GAMES", 5)])
+	check(I18n.tn("N_GAMES", 11) == "11 партий" and I18n.tn("N_GAMES", 21) == "21 партия" and I18n.tn("N_GAMES", 112) == "112 партий", "russian plurals past ten")
+	I18n.current = "en"
+	check(I18n.tn("N_GAMES", 1) == "1 game" and I18n.tn("N_GAMES", 2) == "2 games", "english plural forms")
+	check(I18n.t("NO_SUCH_KEY") == "NO_SUCH_KEY", "a missing key shows itself")
+	I18n.current = saved
+	for locale in ["ru_RU", "uk_UA", "be", "kk_KZ", "uz", "hy_AM"]:
+		check(I18n.for_locale(locale) == "ru", "%s gets Russian" % locale)
+	for locale in ["en_US", "de_DE", "fr", "zh_CN", ""]:
+		check(I18n.for_locale(locale) == "en", "%s gets English" % locale)
+
+
 func test_volume_scale_migrates() -> void:
 	check(Sfx.LEVEL_COUNT == 7 and Sfx.LEVEL_DB.size() == 7, "seven volume steps")
 	check(Sfx.level_db(Sfx.LEVEL_COUNT) == 0.0 and Sfx.level_db(1) < Sfx.level_db(2), "steps rise to 0 dB")
@@ -859,6 +890,76 @@ func test_fps_limit_persists() -> void:
 		u.fps_limit = 60
 		u.apply_dict({"settings": {"fps_limit": bad}})
 		check(u.fps_limit == 60, "invalid cap %s is ignored" % [bad])
+
+
+## Polls [param runner] until its search ends; returns [answer, milliseconds].
+func _wait_hint(runner: HintRunner) -> Array:
+	var t0 := Time.get_ticks_msec()
+	var answer := runner.poll()
+	while answer == HintRunner.RUNNING and Time.get_ticks_msec() - t0 < 30000:
+		OS.delay_msec(2)
+		answer = runner.poll()
+	return [answer, Time.get_ticks_msec() - t0]
+
+
+func test_native_hint_engine() -> void:
+	check(ClassDB.class_exists(&"HintEngine"), "the Rust hint engine loads (build it with tools/build_native.py)")
+	var runner := HintRunner.new()
+	check(runner.is_native(), "hints run on the native engine")
+	if not runner.is_native():
+		return
+	var engine: Object = ClassDB.instantiate(&"HintEngine")
+	check(not engine.start(PackedInt64Array([3, 0, 0, 0, 0, 0, 0, 0, 0]), 3, 1), "a board with a 3 is refused")
+	check(not engine.start(PackedInt64Array([2, 0, 0]), 3, 1), "a short board is refused")
+	check(not engine.start(PackedInt64Array([2, 0, 0, 0, 0, 0, 0, 0, 0]), 3, 7), "an unknown level is refused")
+	check(engine.core_count() >= 1, "reports the cores")
+	var stuck := board_from([[2, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 2]])
+	runner.start(stuck.values, 4, SaveStore.HintLevel.MEDIUM)
+	check(_wait_hint(runner)[0] == HintRunner.NO_MOVE, "no hint when no move is possible")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	for n in [3, 4, 5, 6]:
+		var b := Board.new(n * 11)
+		b.new_game(n)
+		for i in 40:
+			if b.can_move():
+				b.move(rng.randi_range(0, 3))
+		if not b.can_move():
+			continue
+		runner.start(b.values, n, SaveStore.HintLevel.MEDIUM)
+		var answer: int = _wait_hint(runner)[0]
+		var probe := Board.new(1)
+		probe.from_dict(b.to_dict())
+		check(answer >= 0 and probe.move(answer).moved, "%dx%d: the hint is a move that changes the board (%d)" % [n, n, answer])
+
+
+func test_hint_levels_and_cancel() -> void:
+	var runner := HintRunner.new()
+	if not runner.is_native():
+		check(false, "native engine needed for the level timings")
+		return
+	var open := Board.new(5)
+	open.new_game(6)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	for i in 30:
+		open.move(rng.randi_range(0, 3))
+	runner.start(open.values, 6, SaveStore.HintLevel.SIMPLE)
+	var simple: Array = _wait_hint(runner)
+	check(simple[0] >= 0 and simple[1] < 200, "simple answers at once (%d ms)" % simple[1])
+	runner.start(open.values, 6, SaveStore.HintLevel.MEDIUM)
+	var medium: Array = _wait_hint(runner)
+	check(medium[0] >= 0 and medium[1] < 700, "medium answers within its third of a second (%d ms)" % medium[1])
+	runner.start(open.values, 6, SaveStore.HintLevel.SMART)
+	OS.delay_msec(300)
+	check(runner.poll() == HintRunner.RUNNING, "smart is still thinking on an open 6x6 board")
+	runner.cancel()
+	var cancelled: Array = _wait_hint(runner)
+	check(cancelled[0] >= 0 and cancelled[1] < 1000, "cancel stops smart and still answers (%d ms)" % cancelled[1])
+	var tiny := board_from([[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 2]])
+	runner.start(tiny.values, 4, SaveStore.HintLevel.SMART)
+	var settled: Array = _wait_hint(runner)
+	check(settled[0] >= 0, "smart answers on an almost empty board")
 
 
 func test_hint_solver_basics() -> void:

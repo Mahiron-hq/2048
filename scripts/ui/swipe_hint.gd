@@ -102,7 +102,7 @@ func _draw() -> void:
 
 	var side := board_rect.size.x * 0.6
 	var caption := I18n.t("SWIPE_TO_PLAY")
-	var fs := Fonts.fit(_font, caption, Design.TEXT_BODY, board_rect.size.x - Design.SPACE_2XL * 2.0)
+	var fs := Fonts.fit(_font, caption, Design.ts(Design.TEXT_BODY), board_rect.size.x - Design.SPACE_2XL * 2.0)
 	var c := board_rect.get_center() - Vector2(0, fs)
 	var ink := p.overlay_ink
 	var reach := side * (0.24 + 0.04 * _pulse)

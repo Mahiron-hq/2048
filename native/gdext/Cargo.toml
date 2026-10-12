@@ -1,0 +1,17 @@
+[package]
+name = "hint-engine"
+description = "Godot binding of the 2048 Merge hint search"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "hint_engine"
+crate-type = ["cdylib"]
+
+[dependencies]
+hint-core.workspace = true
+godot = { version = "0.5.5", default-features = false, features = ["api-4-7"] }

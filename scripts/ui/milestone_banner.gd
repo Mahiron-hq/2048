@@ -25,7 +25,7 @@ func celebrate(value: int) -> void:
 	_value = value
 	_box = null
 	var text := I18n.t("MILESTONE") % value
-	var w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, Design.TEXT_BODY).x \
+	var w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, Design.ts(Design.TEXT_BODY)).x \
 			+ Design.ICON_MD + Design.SPACE_SM + Design.SPACE_XL * 2.0
 	var parent_w := get_parent_control().size.x if get_parent_control() else 720.0
 	size = Vector2(minf(w, parent_w - Design.GUTTER), HEIGHT)
@@ -67,8 +67,8 @@ func _draw() -> void:
 	draw_style_box(_box, Rect2(Vector2.ZERO, size))
 	var fg := p.tile_fg(_value)
 	var text := I18n.t("MILESTONE") % _value
-	var w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, Design.TEXT_BODY).x
+	var w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, Design.ts(Design.TEXT_BODY)).x
 	var x := (size.x - w - Design.ICON_MD - Design.SPACE_SM) * 0.5
 	Icons.draw(self, Icons.Kind.TROPHY, Vector2(x + Design.ICON_MD * 0.5, size.y * 0.5), Design.ICON_MD, fg)
-	draw_string(_font, Vector2(x + Design.ICON_MD + Design.SPACE_SM, Fonts.baseline(size.y * 0.5, Design.TEXT_BODY)), text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, Design.TEXT_BODY, fg)
+	draw_string(_font, Vector2(x + Design.ICON_MD + Design.SPACE_SM, Fonts.baseline(size.y * 0.5, Design.ts(Design.TEXT_BODY))), text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, Design.ts(Design.TEXT_BODY), fg)

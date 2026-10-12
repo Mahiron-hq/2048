@@ -1,150 +1,28 @@
 class_name I18n
 extends RefCounted
-## UI strings for the two supported languages. Missing keys fall back to English, then to the key.
+## UI strings for the two supported languages, from locale/*.po through the TranslationServer.
+## Keys missing in a language fall back to English, then to the key itself.
 
 const LANGUAGES := ["ru", "en"]
-
-const STRINGS := {
-	"en": {
-		"TITLE": "2048",
-		"SUBTITLE": "merge puzzle",
-		"PLAY": "New game",
-		"CONTINUE": "Continue",
-		"SETTINGS": "Settings",
-		"BEST": "Best",
-		"SCORE": "Score",
-		"BEST_SCORE": "Best score",
-		"MENU": "Menu",
-		"UNDO": "Undo",
-		"UNDO_LAST": "Undo last move",
-		"NEW": "New",
-		"SOUND": "Sound",
-		"MUSIC": "Music",
-		"HAPTICS": "Vibration",
-		"HINTS": "Move hints",
-		"HINTS_HINT": "The bulb on the game screen suggests the best move. It lights up by itself when you pause for a while.",
-		"THEME": "Theme",
-		"THEME_LIGHT": "Light",
-		"THEME_DARK": "Dark",
-		"THEME_SYSTEM": "Auto",
-		"QUALITY": "Graphics quality",
-		"QUALITY_LOW": "Low",
-		"QUALITY_MEDIUM": "Medium",
-		"QUALITY_HIGH": "High",
-		"QUALITY_HINT": "Rendering at %s. Lower quality saves battery on sharp screens.",
-		"LANGUAGE": "Language",
-		"SHOW_FPS": "Show FPS",
-		"FPS_LIMIT": "Frame rate limit",
-		"FPS_LIMIT_HINT": "∞ — no limit, as fast as the screen refreshes. A lower limit saves battery.",
-		"BACK": "Back",
-		"ON": "On",
-		"OFF": "Off",
-		"GAME_OVER": "No moves left",
-		"FINAL_SCORE": "Score",
-		"BEST_TILE": "Best tile",
-		"MOVES": "Moves",
-		"NEW_RECORD": "New record!",
-		"TRY_AGAIN": "Play again",
-		"CONFIRM_NEW_TITLE": "Start a new game?",
-		"CONFIRM_NEW_BODY": "Current progress will be lost.",
-		"YES_NEW": "Start over",
-		"CANCEL": "Cancel",
-		"MILESTONE": "Tile %d reached!",
-		"HINT": "Swipe to move the tiles",
-		"STATS": "Statistics",
-		"STATS_ALL": "All",
-		"GAMES_PLAYED": "Games played",
-		"AVERAGE_SCORE": "Average score",
-		"TOTAL_MOVES": "Total moves",
-		"PLAY_TIME": "Time played",
-		"BOARD_SIZE": "Board size",
-		"APP_SETTINGS": "App settings",
-		"GAME_SETTINGS": "Game settings",
-		"UNDO_LIMIT": "Undo moves",
-		"UNDO_LIMIT_HINT": "How many moves in a row you can take back",
-		"UNDO_OFF": "Off",
-		"SWIPE_TO_PLAY": "Swipe to move the tiles",
-		"TIME_HM": "%d h %d min",
-		"TIME_MS": "%d min %d s",
-		"TIME_S": "%d s",
-		"NO_GAMES": "Finish a game to see your stats",
-	},
-	"ru": {
-		"TITLE": "2048",
-		"SUBTITLE": "головоломка слияний",
-		"PLAY": "Новая игра",
-		"CONTINUE": "Продолжить",
-		"SETTINGS": "Настройки",
-		"BEST": "Рекорд",
-		"SCORE": "Счёт",
-		"BEST_SCORE": "Лучший результат",
-		"MENU": "Меню",
-		"UNDO": "Отменить",
-		"UNDO_LAST": "Отменить ход",
-		"NEW": "Заново",
-		"SOUND": "Звук",
-		"MUSIC": "Музыка",
-		"HAPTICS": "Вибрация",
-		"HINTS": "Подсказки хода",
-		"HINTS_HINT": "Лампочка на экране игры подсказывает лучший ход. Если долго не ходить, она загорается сама.",
-		"THEME": "Тема",
-		"THEME_LIGHT": "Светлая",
-		"THEME_DARK": "Тёмная",
-		"THEME_SYSTEM": "Авто",
-		"QUALITY": "Качество графики",
-		"QUALITY_LOW": "Низкое",
-		"QUALITY_MEDIUM": "Среднее",
-		"QUALITY_HIGH": "Высокое",
-		"QUALITY_HINT": "Сейчас картинка %s. На чётких экранах качество пониже бережёт батарею.",
-		"LANGUAGE": "Язык",
-		"SHOW_FPS": "Показывать FPS",
-		"FPS_LIMIT": "Ограничение FPS",
-		"FPS_LIMIT_HINT": "∞ — без ограничений, с частотой обновления экрана. Меньше кадров — меньше расход батареи.",
-		"BACK": "Назад",
-		"ON": "Вкл",
-		"OFF": "Выкл",
-		"GAME_OVER": "Ходов больше нет",
-		"FINAL_SCORE": "Счёт",
-		"BEST_TILE": "Лучшая плитка",
-		"MOVES": "Ходов",
-		"NEW_RECORD": "Новый рекорд!",
-		"TRY_AGAIN": "Заново",
-		"CONFIRM_NEW_TITLE": "Начать новую игру?",
-		"CONFIRM_NEW_BODY": "Текущий прогресс будет потерян.",
-		"YES_NEW": "Начать заново",
-		"CANCEL": "Отмена",
-		"MILESTONE": "Плитка %d собрана!",
-		"HINT": "Проведите пальцем, чтобы сдвинуть плитки",
-		"STATS": "Статистика",
-		"STATS_ALL": "Все",
-		"GAMES_PLAYED": "Сыграно партий",
-		"AVERAGE_SCORE": "Средний счёт",
-		"TOTAL_MOVES": "Всего ходов",
-		"PLAY_TIME": "Время в игре",
-		"BOARD_SIZE": "Размер поля",
-		"APP_SETTINGS": "Настройки приложения",
-		"GAME_SETTINGS": "Настройки игры",
-		"UNDO_LIMIT": "Отмена ходов",
-		"UNDO_LIMIT_HINT": "Сколько ходов подряд можно вернуть назад",
-		"UNDO_OFF": "Выкл",
-		"SWIPE_TO_PLAY": "Проведите пальцем, чтобы сдвинуть плитки",
-		"TIME_HM": "%d ч %d мин",
-		"TIME_MS": "%d мин %d с",
-		"TIME_S": "%d с",
-		"NO_GAMES": "Завершите партию, чтобы увидеть статистику",
-	},
-}
-
 const LANGUAGE_NAMES := {"ru": "Русский", "en": "English"}
+## System languages that get Russian on first launch: neighbouring countries where Russian is
+## widely read, while this game speaks only Russian and English.
+const RUSSIAN_READERS := ["ru", "uk", "be", "kk", "ky", "uz", "tg", "hy", "az", "ka", "tk", "mo"]
 
-static var current := "en"
+## Current UI language, one of LANGUAGES.
+static var current := "en":
+	set(v):
+		current = v
+		TranslationServer.set_locale(v)
 
 
 static func t(key: String) -> String:
-	var table: Dictionary = STRINGS.get(current, STRINGS.en)
-	if table.has(key):
-		return table[key]
-	return STRINGS.en.get(key, key)
+	return String(TranslationServer.translate(key))
+
+
+## The plural form of [param key] for [param n], with n filled in, e.g. "5 партий".
+static func tn(key: String, n: int) -> String:
+	return String(TranslationServer.translate_plural(key, key + "_PLURAL", n)) % n
 
 
 ## Formats a duration in whole seconds, e.g. "2 h 15 min" / "2 ч 15 мин".
@@ -174,7 +52,14 @@ static func grid(n: int) -> String:
 	return "%d×%d" % [n, n]
 
 
-## Language to use when the player has not chosen one: the OS language if supported.
+## Language to use when the player has not chosen one: Russian for the system languages in
+## RUSSIAN_READERS, otherwise English.
 static func detect() -> String:
-	var lang := OS.get_locale_language()
-	return lang if LANGUAGES.has(lang) else "en"
+	return for_locale(OS.get_locale())
+
+
+static func for_locale(locale: String) -> String:
+	var lang := locale.get_slice("_", 0).get_slice("-", 0).to_lower()
+	if lang in RUSSIAN_READERS or locale.replace("-", "_") in RUSSIAN_READERS:
+		return "ru"
+	return "en"

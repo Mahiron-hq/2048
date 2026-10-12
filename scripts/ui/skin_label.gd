@@ -9,6 +9,8 @@ var role: Role = Role.TEXT
 var key := ""
 ## Optional value substituted into the translated string with %.
 var arg: Variant = null
+## Size from the Design type scale, before the text size setting applies.
+var base_size := Design.TEXT_BODY
 
 
 ## [param p_size] and [param p_weight] come from the Design type scale.
@@ -16,8 +18,8 @@ static func make(p_key: String, p_size: int, p_weight := Design.WEIGHT_REGULAR, 
 	var l := SkinLabel.new()
 	l.key = p_key
 	l.role = p_role
+	l.base_size = p_size
 	l.add_theme_font_override("font", Fonts.sans(p_weight, tabular))
-	l.add_theme_font_size_override("font_size", p_size)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	l.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	l._refresh_text()
@@ -44,6 +46,7 @@ func _on_language_changed() -> void:
 
 
 func _on_skin_changed() -> void:
+	add_theme_font_size_override("font_size", Design.ts(base_size))
 	var p := Palette.current
 	var c: Color
 	match role:
