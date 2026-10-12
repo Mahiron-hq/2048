@@ -68,6 +68,11 @@ def thermal(serial: str) -> list[str]:
     return re.findall(r"Temperature\{mValue=([\d.]+), mType=\d+, mName=([^,]+),", out)[:6]
 
 
+def save(result: dict, out_path: str) -> None:
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=1)
+
+
 def main() -> None:
     serial = sys.argv[1]
     try:
@@ -134,6 +139,8 @@ def run() -> None:
                 total = re.search(r"TOTAL PSS:\s+(\d+)", mem) or re.search(r"TOTAL\s+(\d+)", mem)
                 result["memory_pss_kb"] = int(total.group(1)) if total else None
             result["phases"][name] = phase
+            # Written after every phase, so a run cut short keeps what it measured.
+            save(result, out_path)
         elif parts[1] == "hint":
             side, level, ms, depth, nodes, finish, answer = parts[2:9]
             result["hints"].append({"side": int(side), "level": int(level), "ms": float(ms), "depth": int(depth),
@@ -143,8 +150,7 @@ def run() -> None:
     log.terminate()
     shell(serial, "dumpsys battery reset")
     shell(serial, f"am force-stop {PACKAGE}")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=1)
+    save(result, out_path)
     print("wrote", out_path)
 
 

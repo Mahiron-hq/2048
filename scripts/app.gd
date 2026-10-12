@@ -312,7 +312,8 @@ func note_move() -> void:
 ## Holds the display awake on the game screen until the player has left it untouched for
 ## KEEP_AWAKE_SEC; the phone's own timeout takes over after that.
 func _update_keep_awake() -> void:
-	var want := _current == _game and _since_input < KEEP_AWAKE_SEC
+	# The measurement build runs untouched for long phases, with Android told the phone is unplugged.
+	var want := (_current == _game and _since_input < KEEP_AWAKE_SEC) or OS.has_feature("bench")
 	if want != _keep_awake:
 		_keep_awake = want
 		DisplayServer.screen_set_keep_on(want)
