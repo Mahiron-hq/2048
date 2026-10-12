@@ -96,7 +96,7 @@ msgid "FPS_LIMIT"
 msgstr "Frame rate limit"
 
 msgid "FPS_LIMIT_HINT"
-msgstr "∞ — no limit, as fast as the screen refreshes. A lower limit saves battery."
+msgstr "Fewer frames – less battery drain."
 
 msgid "GAMES_PLAYED"
 msgstr "Games played"
@@ -117,13 +117,13 @@ msgid "HINTS"
 msgstr "Move hints"
 
 msgid "HINTS_HINT"
-msgstr "The bulb on the game screen suggests the best move. It lights up by itself when you pause for a while."
+msgstr "The bulb on the game screen suggests the best move."
 
 msgid "HINT_LEVEL"
 msgstr "Hint strength"
 
 msgid "HINT_LEVEL_HINT"
-msgstr "Simple answers at once, Medium in a third of a second, Smart thinks up to 15 seconds and uses every core but one."
+msgstr "Simple answers at once, Medium within a second, Smart thinks for up to 15 seconds."
 
 msgid "HINT_LEVEL_MEDIUM"
 msgstr "Medium"
@@ -165,16 +165,16 @@ msgid "LANGUAGE"
 msgstr "Language"
 
 msgid "LICENSE_ANDROID"
-msgstr "Android libraries — Apache 2.0"
+msgstr "Android libraries – Apache 2.0"
 
 msgid "LICENSE_FONT"
-msgstr "Manrope font — OFL 1.1"
+msgstr "Manrope font – OFL 1.1"
 
 msgid "LICENSE_GAME"
-msgstr "2048 Merge — Apache 2.0"
+msgstr "2048 Merge – Apache 2.0"
 
 msgid "LICENSE_GODOT"
-msgstr "Godot Engine — MIT"
+msgstr "Godot Engine – MIT"
 
 msgid "LICENSE_GODOT_PARTS"
 msgstr "Godot Engine components"
@@ -183,7 +183,7 @@ msgid "LICENSE_MISSING"
 msgstr "The license text is missing from this build."
 
 msgid "LICENSE_MUSIC"
-msgstr "Music — CC BY-NC-ND 4.0"
+msgstr "Music – CC BY-NC-ND 4.0"
 
 msgid "LICENSE_RUST"
 msgstr "Rust libraries"
@@ -198,7 +198,7 @@ msgid "MOTION"
 msgstr "Reduce motion"
 
 msgid "MOTION_HINT"
-msgstr "No confetti, rings or pulsing; screens change with a plain fade. Tiles still slide."
+msgstr "No confetti, pulsing or extra animation."
 
 msgid "MOTION_OFF"
 msgstr "Off"
@@ -237,7 +237,7 @@ msgid "QUALITY_HIGH"
 msgstr "High"
 
 msgid "QUALITY_HINT"
-msgstr "Rendering at %s. Lower quality saves battery on sharp screens."
+msgstr "Rendering at %s."
 
 msgid "QUALITY_LOW"
 msgstr "Low"
@@ -388,5 +388,19 @@ msgstr "Start over"
 
 msgid "N_GAMES"
 msgid_plural "N_GAMES_PLURAL"
-msgstr[0] "%d game"
-msgstr[1] "%d games"
+msgstr[0] "%s game"
+msgstr[1] "%s games"
+
+msgid "LONGEST_GAME"
+msgstr "Longest game"
+
+msgid "EXPORT_TITLE"
+msgstr "Save progress to a file?"
+
+msgid "EXPORT_BODY"
+msgstr "Your records, statistics, settings and current game go into a file you can load on another phone."
+
+msgid "N_MOVES"
+msgid_plural "N_MOVES_PLURAL"
+msgstr[0] "%s move"
+msgstr[1] "%s moves"

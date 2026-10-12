@@ -141,6 +141,8 @@ func _device(tag: String, px: Vector2i, dark: bool) -> void:
 	app.store.record_game(4, 12480, 1024)
 	app.store.record_game(6, 48212, 4096)
 	app.store.add_play_time(4, 7560)
+	# A long 6x6 game: the widest value the cards have to fit.
+	app.store.record_longest(6, 12345)
 	for i in 1234:
 		app.store.record_move(4)
 	app._to_menu()

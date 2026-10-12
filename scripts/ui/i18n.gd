@@ -22,7 +22,7 @@ static func t(key: String) -> String:
 
 ## The plural form of [param key] for [param n], with n filled in, e.g. "5 партий".
 static func tn(key: String, n: int) -> String:
-	return String(TranslationServer.translate_plural(key, key + "_PLURAL", n)) % n
+	return String(TranslationServer.translate_plural(key, key + "_PLURAL", n)) % number(n)
 
 
 ## Formats a duration in whole seconds, e.g. "2 h 15 min" / "2 ч 15 мин".

@@ -54,7 +54,7 @@ func _init() -> void:
 	_grid.add_theme_constant_override("h_separation", int(Design.SPACE_MD))
 	_grid.add_theme_constant_override("v_separation", int(Design.SPACE_MD))
 	inner.add_child(_grid)
-	for key in ["GAMES_PLAYED", "AVERAGE_SCORE", "BEST_SCORE", "CLEAN_BEST_SCORE", "BEST_TILE", "TOTAL_MOVES", "PLAY_TIME"]:
+	for key in ["GAMES_PLAYED", "AVERAGE_SCORE", "BEST_SCORE", "CLEAN_BEST_SCORE", "BEST_TILE", "LONGEST_GAME", "TOTAL_MOVES", "PLAY_TIME"]:
 		var card := _StatCard.new()
 		card.caption_key = key
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -70,7 +70,8 @@ func _init() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		_column.custom_minimum_size.x = minf(size.x, COLUMN_MAX_WIDTH)
-		_grid.columns = 3 if size.x > size.y * 1.1 else 2
+		# Eight cards: two even rows of four in landscape, four of two in portrait.
+		_grid.columns = 4 if size.x > size.y * 1.1 else 2
 
 
 func _on_language_changed() -> void:
@@ -89,8 +90,9 @@ func refresh() -> void:
 	_cards.BEST_SCORE.set_value(I18n.number(st.best_score))
 	_cards.CLEAN_BEST_SCORE.set_value(I18n.number(st.clean_best_score))
 	_cards.TOTAL_MOVES.set_value(I18n.number(st.moves))
+	_cards.LONGEST_GAME.set_value(I18n.tn("N_MOVES", st.longest) if st.longest > 0 else "–")
 	_cards.PLAY_TIME.set_value(I18n.duration(st.time))
-	_cards.BEST_TILE.set_value("" if st.best_tile > 0 else "—")
+	_cards.BEST_TILE.set_value("" if st.best_tile > 0 else "–")
 	_tile.visible = st.best_tile > 0
 	if st.best_tile > 0:
 		_tile.value = st.best_tile
@@ -112,7 +114,6 @@ class _StatCard:
 		radius = Design.RADIUS_LG
 		custom_minimum_size = Vector2(0, CARD_HEIGHT)
 		_box.add_theme_constant_override("separation", int(Design.SPACE_SM))
-		_box.alignment = BoxContainer.ALIGNMENT_CENTER
 		add_child(_box)
 		_value.clip_text = true
 
@@ -122,11 +123,39 @@ class _StatCard:
 		_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_box.add_child(_caption)
 		_box.move_child(_caption, 0)
+		# Captions sit at the top and values at the bottom, so a caption that wraps to two lines
+		# does not knock its value out of line with the rest of the row.
+		var gap := Control.new()
+		gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_box.add_child(gap)
+		_box.move_child(gap, 1)
 		_box.add_child(_value)
+		_box.move_child(_value, 2)
 
 	func set_value(text: String) -> void:
 		_value.text = text
 		_value.visible = not text.is_empty()
+		_fit_value.call_deferred()
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_RESIZED:
+			_fit_value.call_deferred()
+
+	func _on_skin_changed() -> void:
+		super._on_skin_changed()
+		# Deferred: the value label resets its own size in the same broadcast.
+		_fit_value.call_deferred()
+
+	## Shrinks the value until it fits the card, e.g. "12 345 moves" in four landscape columns.
+	func _fit_value() -> void:
+		var full := Design.ts(Design.TEXT_HEADLINE)
+		# A little slack: the label's shaped text runs a pixel or two wider than the measured string.
+		var room := _box.size.x - Design.SPACE_SM
+		if room <= Design.SPACE_SM or _value.text.is_empty():
+			return
+		var fs := Fonts.fit(_value.get_theme_font("font"), _value.text, full, room, int(full * 0.6))
+		_value.add_theme_font_size_override("font_size", fs)
 
 	func set_extra(node: Control) -> void:
 		_box.add_child(node)

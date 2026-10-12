@@ -115,8 +115,9 @@ func _init() -> void:
 	_hint_level.selected.connect(func(i: int) -> void: _app.set_hint_level(i as SaveStore.HintLevel))
 	_text_size.selected.connect(func(i: int) -> void: _app.set_text_size(i as SaveStore.TextSize))
 	_motion.selected.connect(func(i: int) -> void: _app.set_reduce_motion(i as SaveStore.ReduceMotion))
-	_export.pressed.connect(func() -> void: _app.export_progress())
-	_import.pressed.connect(func() -> void: _app.import_progress())
+	# A stray tap must not throw the player into the system file picker.
+	_export.pressed.connect(func() -> void: _app.confirm("EXPORT_TITLE", "EXPORT_BODY", "CONTINUE_STEP", _app.export_progress))
+	_import.pressed.connect(func() -> void: _app.confirm("IMPORT_TITLE", "IMPORT_BODY", "CONTINUE_STEP", _app.import_progress))
 	_reset_stats.pressed.connect(func() -> void: _app.ask_reset(ResetDialog.Scope.STATS))
 	_reset_records.pressed.connect(func() -> void: _app.ask_reset(ResetDialog.Scope.RECORDS))
 	_reset_all.pressed.connect(func() -> void: _app.ask_reset(ResetDialog.Scope.ALL))

@@ -69,19 +69,17 @@ func ask(scope: Scope) -> void:
 	open()
 
 
-## Opens the first step of replacing everything with an imported file described by
-## [param summary]; [param on_yes] runs once both steps are confirmed.
+## Asks to replace everything with an imported file described by [param summary]; the button
+## arms after a few seconds and [param on_yes] runs once it is pressed. The first confirmation came
+## before the file picker.
 func ask_import(summary: String, on_yes: Callable) -> void:
 	_on_import = on_yes
 	_import_summary = summary
 	_second_step = false
 	_timer.stop()
 	_sizes.visible = false
-	_title.set_key("IMPORT_TITLE")
-	_text.set_key("IMPORT_BODY")
-	_go.disabled = false
 	_go.text_override = ""
-	_go.set_key("CONTINUE_STEP")
+	_on_go()
 	open()
 
 

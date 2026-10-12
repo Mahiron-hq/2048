@@ -230,6 +230,8 @@ func _run() -> void:
 	await _reduced_motion(app)
 	await _display_rest(app)
 	await _first_toast()
+	await _about_licenses(app)
+	await _data_buttons(app)
 	await _quality(app)
 	await _landscape(app)
 
@@ -243,8 +245,7 @@ func _run() -> void:
 func _new_features(app: App) -> void:
 	var g := app._game
 
-	# Swipe hint: shown when one of the first games starts, gone with the first move.
-	app.store.tutorial_games = 0
+	# Swipe hint: shown when a game starts, gone with the first move.
 	g.start_new(0, false)
 	await _wait(0.4)
 	check(g._board_view.is_hint_visible(), "swipe hint shows at the start of a game")
@@ -339,21 +340,21 @@ func _new_features(app: App) -> void:
 func _fixes_121(app: App) -> void:
 	var g := app._game
 
-	# The swipe hint breathes a few times, then rests so an untouched board stops redrawing.
+	# The swipe hint keeps breathing on an untouched new board; a hidden game screen stops it.
 	app._show_screen(g)
-	app.store.tutorial_games = 0
 	g.start_new(4, false)
 	await _wait(2.5)
 	var hint: SwipeHint = g._board_view._hint
 	check(hint.is_showing() and hint._pulse_tween != null and hint._pulse_tween.is_running(), "hint arrows pulse at first")
 	check(hint.board_rect == g._board_view.board_rect, "hint veil covers the whole board")
 	await _wait(4.0)
-	check(hint.is_showing() and get_processed_tweens().is_empty() and OS.low_processor_usage_mode, "an untouched new game goes idle (tweens: %d)" % get_processed_tweens().size())
+	check(hint.is_showing() and hint._pulse_tween != null and hint._pulse_tween.is_running(), "hint arrows keep pulsing until the first move")
 	app._to_menu()
 	await _wait(1.5)
-	check(get_processed_tweens().is_empty() and OS.low_processor_usage_mode, "the menu after an untouched game goes idle")
+	check(get_processed_tweens().is_empty() and OS.low_processor_usage_mode, "the menu after an untouched game goes idle (tweens: %d)" % get_processed_tweens().size())
 	app._show_screen(g)
 	await _wait(0.5)
+	check(hint._pulse_tween != null and hint._pulse_tween.is_running(), "back on the board the arrows pulse again")
 
 	# Swipes that start on the header/buttons are ignored; on the board they move.
 	var header_point := g._header.get_global_rect().get_center()
@@ -378,19 +379,18 @@ func _fixes_121(app: App) -> void:
 		guard += 1
 	check(app.store.stats_for(0).moves == before, "an undone move does not stay in the move count")
 
-	# The screen's edges belong to the system back gesture: a swipe starting there is not a move.
+	# Swipes work from anywhere between the scores and the buttons, not only on the board.
 	var board_rect := g._board_view.board_global_rect()
+	var below := Vector2(board_rect.get_center().x, (board_rect.end.y + g._actions.get_global_rect().position.y) * 0.5)
+	check(below.y - board_rect.end.y > 8.0 and not board_rect.has_point(below), "there is room below the board to start a swipe")
 	var before_edge := g.board.move_count
-	for d in [Vector2.RIGHT, Vector2.DOWN, Vector2.UP]:
-		await _swipe(Vector2(2.0, board_rect.get_center().y), d * 160.0)
-	check(g.board.move_count == before_edge, "a swipe from the screen's edge beside the board does not move")
-	var inside := false
+	var off_board := false
 	for d in [Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN, Vector2.UP]:
-		await _swipe(Vector2(board_rect.position.x + 6.0, board_rect.get_center().y), d * 160.0)
+		await _swipe(below, d * 160.0)
 		if g.board.move_count > before_edge:
-			inside = true
+			off_board = true
 			break
-	check(inside, "a swipe starting just inside the board's edge moves")
+	check(off_board, "a swipe starting off the board, between it and the buttons, moves")
 
 	# The size picker keeps its size when reopened.
 	app._to_menu()
@@ -431,10 +431,13 @@ func _hints(app: App) -> void:
 	var values := g.board.values.duplicate()
 	g._hint_btn.pressed.emit()
 	check(g.is_hint_busy(), "pressing the bulb starts thinking")
-	for i in 120:
+	check(g._hint_btn.progress >= 0.0, "the ring shows as soon as the bulb is pressed")
+	g._hint_btn.pressed.emit()
+	check(g.is_hint_busy(), "a quick second tap does not call the hint off")
+	for i in 60:
 		if not g.is_hint_busy():
 			break
-		await _frames(1)
+		await _wait(0.05)
 	await _frames(2)
 	check(g._board_view.is_showing_move_hint(), "the suggestion plays on the board")
 	check(g.board.values == values, "a hint never makes the move itself")
@@ -502,6 +505,44 @@ func _reduced_motion(app: App) -> void:
 	app.set_reduce_motion(SaveStore.ReduceMotion.OFF)
 	check(not Motion.reduced(), "Reduce motion: off")
 	await _wait(0.3)
+
+
+## Saving and loading progress ask first instead of opening the file picker on a stray tap;
+## a picked file then goes straight to the final, delayed confirmation.
+func _data_buttons(app: App) -> void:
+	app._open_settings()
+	await _wait(0.4)
+	for b: PillButton in [app._settings._export, app._settings._import]:
+		b.pressed.emit()
+		await _frames(2)
+		check(app._confirm.is_open, "%s asks before opening the file picker" % b.key)
+		app._confirm.close()
+		await _wait(0.3)
+	app._reset.ask_import("summary", func() -> void: pass)
+	await _frames(2)
+	check(app._reset.is_open and app._reset._second_step and app._reset._go.disabled, "a picked file goes to the delayed final step")
+	app._reset.close()
+	await _wait(0.3)
+
+
+## Opened licenses are let go when the About screen closes, so settings stay quick afterwards.
+func _about_licenses(app: App) -> void:
+	app._open_about()
+	await _wait(0.5)
+	for sec in app._about._sections:
+		sec._flip()
+	await _frames(2)
+	check(app._about._sections.all(func(sec) -> bool: return sec.is_open()), "every license opens")
+	app._close_about()
+	await _wait(0.5)
+	check(app._about._sections.all(func(sec) -> bool: return not sec.is_open() and sec._body.text.is_empty()),
+			"leaving About drops the license texts")
+	var t0 := Time.get_ticks_usec()
+	for mode in [SaveStore.ThemeMode.LIGHT, SaveStore.ThemeMode.DARK, SaveStore.ThemeMode.LIGHT, SaveStore.ThemeMode.DARK]:
+		app.set_theme_mode(mode)
+		await _frames(1)
+	var ms := (Time.get_ticks_usec() - t0) / 1000.0
+	check(ms < 600.0, "four theme switches after reading the licenses stay quick (%.0f ms)" % ms)
 
 
 ## The first message of a fresh app is a one-line pill, not a column of single letters.

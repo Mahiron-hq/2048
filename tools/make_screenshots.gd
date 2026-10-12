@@ -135,7 +135,6 @@ func _docs_tall() -> void:
 	await _begin("big")
 	_replay(big, big.size())
 	await _capture(dir + "board_6x6.png", 0.5)
-	app.store.tutorial_games = 0
 	app._game.start_new(4, true)
 	await _capture(dir + "swipe_hint.png", 1.0)
 	app._to_menu()
@@ -214,7 +213,6 @@ func _open(px: Vector2i, base: Vector2i, lang: String) -> void:
 	root.add_child(_vp)
 	app = load("res://scenes/main.tscn").instantiate()
 	app.store = SaveStore.new(SAVE)
-	app.store.tutorial_games = SaveStore.TUTORIAL_GAMES
 	_vp.add_child(app)
 	await _frames(3)
 	app.sfx.music_enabled = false

@@ -10,8 +10,6 @@ signal menu_requested
 const SWIPE_COMMIT := 44.0
 ## Shorter flicks still count when the finger lifts quickly.
 const SWIPE_FLICK := 22.0
-## How far outside the board a swipe may start and still move the tiles.
-const SWIPE_MARGIN := Design.SPACE_MD
 const FLICK_TIME_MS := 220
 ## Landscape: scores sit this close to the board's edges.
 const BOARD_GAP := Design.SPACE_LG
@@ -29,8 +27,8 @@ const HINT_IDLE := 15.0
 ## A game left for a new one counts as played only after this many moves; shorter tries are
 ## restarts, not games, and would drag the average score down.
 const ABANDON_MIN_MOVES := 10
-## A search running longer than this shows its progress on the hint button.
-const HINT_PROGRESS_AFTER_MS := 500
+## A second tap on the bulb this soon after the first is taken for a double tap, not a cancel.
+const HINT_CANCEL_GUARD_MS := 350
 
 ## Landscape arrangements, preferred first. ROW: logo, menu and score in one line, best on the
 ## right. STACKED: score under logo and menu. ONE_SIDE: everything left of the board.
@@ -236,13 +234,17 @@ func _fit_actions() -> void:
 func request_hint() -> void:
 	_reset_idle()
 	if _hint_pending:
-		cancel_hint()
+		if _hints.elapsed_ms() >= HINT_CANCEL_GUARD_MS:
+			cancel_hint()
 		return
 	if not _app.store.hints_on or not is_playing() or not board.can_move():
 		return
 	_board_view.stop_move_hint()
 	_hint_values = board.values.duplicate()
 	_hint_pending = _hints.start(_hint_values, board.size, _app.store.hint_level)
+	# The ring appears with the tap, so the bulb never looks unresponsive.
+	if _hint_pending:
+		_hint_btn.progress = 0.0
 
 
 func is_hint_busy() -> bool:
@@ -261,8 +263,7 @@ func cancel_hint() -> void:
 func _poll_hint() -> void:
 	var answer := _hints.poll()
 	if answer == HintRunner.RUNNING:
-		# Short searches finish before anything would show; long ones fill a ring on the bulb.
-		_hint_btn.progress = _hints.progress() if _hints.elapsed_ms() >= HINT_PROGRESS_AFTER_MS else -1.0
+		_hint_btn.progress = _hints.progress()
 		return
 	_hint_pending = false
 	_hint_btn.progress = -1.0
@@ -329,7 +330,7 @@ func start_new(grid := 0, intro := true) -> void:
 	_record_flashed = false
 	_refresh_scores(false)
 	_board_view.show_board(board, BoardView.Appear.POP if intro else BoardView.Appear.NONE)
-	_show_tutorial_if_new()
+	_show_tutorial()
 	_reset_idle()
 	_app.note_move()
 	_persist()
@@ -350,7 +351,7 @@ func resume_saved() -> bool:
 	_board_view.hide_hint(true)
 	_tutorial = false
 	if board.move_count == 0:
-		_show_tutorial_if_new()
+		_show_tutorial()
 	# A lost game stays saved until it is left, so its summary (and its undo) come back.
 	_pending_over = not board.can_move()
 	_loss_announced = _pending_over
@@ -377,9 +378,7 @@ func request_move(dir: Board.Dir) -> void:
 		return
 	cancel_hint()
 	_board_view.hide_hint()
-	if _tutorial:
-		_tutorial = false
-		_app.store.tutorial_games = mini(_app.store.tutorial_games + 1, SaveStore.TUTORIAL_GAMES)
+	_tutorial = false
 	_board_view.play_move(result)
 	_app.note_move()
 	_on_moved(result)
@@ -431,6 +430,7 @@ func _on_moved(result: Board.MoveResult) -> void:
 		_score_box.pop_gain(result.gained)
 	_app.store.record_move(board.size)
 	_app.store.record_best_tile(board.size, board.best_tile)
+	_app.store.record_longest(board.size, board.move_count)
 	if _app.store.submit_score(board.score, board.size) and _best_at_start > 0 and not _record_flashed:
 		_record_flashed = true
 		_best_box.flash()
@@ -539,13 +539,10 @@ func _undo_from_over() -> void:
 	undo()
 
 
-## Shows the swipe tutorial over a fresh board during the player's first games.
-func _show_tutorial_if_new() -> void:
-	_tutorial = _app.store.tutorial_games < SaveStore.TUTORIAL_GAMES
-	if _tutorial:
-		_board_view.show_hint()
-	else:
-		_board_view.hide_hint(true)
+## Shows the swipe tutorial over a fresh board until the first move.
+func _show_tutorial() -> void:
+	_tutorial = true
+	_board_view.show_hint()
 
 
 ## Portrait: header above the board, action bar below. Landscape: board in the middle, controls
@@ -745,10 +742,23 @@ func _input(event: InputEvent) -> void:
 		_try_swipe(event.position - _touch_start, SWIPE_COMMIT)
 
 
-## Swipes start on the board or just around it. The screen's edges stay with the system, whose
-## back gesture there would otherwise take a swipe meant for the tiles.
+## Swipes may start anywhere except on the scores and buttons or past the screen's edge, so
+## checking the time or pulling the notification shade never moves tiles.
 func _in_swipe_area(point: Vector2) -> bool:
-	return _board_view.board_global_rect().grow(SWIPE_MARGIN).has_point(point)
+	if not get_global_rect().has_point(point):
+		return false
+	if not _landscape_mode:
+		return point.y > _header.get_global_rect().end.y + Design.SPACE_XS 				and point.y < _actions.get_global_rect().position.y - Design.SPACE_XS
+	if _side_actions.get_global_rect().grow(Design.SPACE_SM).has_point(point):
+		return false
+	var board := _board_view.get_global_rect()
+	if point.x >= board.position.x - Design.SPACE_XS and point.x <= board.end.x + Design.SPACE_XS:
+		return true
+	var top_end := 0.0
+	for node: Control in [_brand, _score_box, _best_box, _hint_btn]:
+		if node.visible:
+			top_end = maxf(top_end, node.get_global_rect().end.y)
+	return point.y > top_end + Design.SPACE_SM
 
 
 func _unhandled_input(event: InputEvent) -> void:

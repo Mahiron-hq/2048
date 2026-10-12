@@ -41,7 +41,6 @@ func _ready() -> void:
 func _run() -> void:
 	await _wait(3.0)
 	app.sfx.music_enabled = true
-	app.store.tutorial_games = SaveStore.TUTORIAL_GAMES
 	print("BENCH|info|cores %d|refresh %d|native %s" % [OS.get_processor_count(),
 			roundi(DisplayServer.screen_get_refresh_rate()), ClassDB.class_exists(&"HintEngine")])
 	for phase in PHASES:
