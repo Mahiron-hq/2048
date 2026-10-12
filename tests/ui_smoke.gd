@@ -257,6 +257,7 @@ func _new_features(app: App) -> void:
 			break
 	await _wait(0.5)
 	check(not g._board_view.is_hint_visible(), "swipe hint fades after the first move")
+	check(Engine.max_fps == app.store.fps_limit, "the frame rate goes back to the player's cap once the arrows are gone")
 	await _swipe(Vector2(360, 700), Vector2(0, 0))
 	check(not g._board_view.is_hint_visible(), "swipe hint stays hidden for the rest of the game")
 
@@ -351,6 +352,8 @@ func _fixes_121(app: App) -> void:
 	check(hint.board_rect == g._board_view.board_rect, "hint veil covers the whole board")
 	await _wait(4.0)
 	check(hint.is_showing() and hint._pulse_tween != null and hint._pulse_tween.is_running(), "hint arrows keep pulsing until the first move")
+	if not app.store.show_fps and (app.store.fps_limit == 0 or app.store.fps_limit > App.AMBIENT_FPS):
+		check(Engine.max_fps == App.AMBIENT_FPS and DisplayRate._resting, "the breathing arrows alone draw at %d fps and let the display rest" % App.AMBIENT_FPS)
 	app._to_menu()
 	await _wait(1.5)
 	check(get_processed_tweens().is_empty() and OS.low_processor_usage_mode, "the menu after an untouched game goes idle (tweens: %d)" % get_processed_tweens().size())

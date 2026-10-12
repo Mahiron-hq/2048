@@ -2,6 +2,8 @@
 
 Usage: python tools/device_bench.py <adb serial> <bench apk> <out.json> [package]
   package: com.mahiron.merge2048.bench (default), or com.mahiron.merge2048 for the in-place build
+  BENCH_RESTORE_APK: the real build to install again afterwards, also when the run fails, so a
+  player never opens the measurement build by accident (needed with the in-place build)
 
 The bench build keeps its own save file, and under the default package the player's game is not
 touched at all. For each phase the bench prints, this samples /proc for the game process, its GPU
@@ -21,6 +23,7 @@ import time
 PACKAGE = sys.argv[4] if len(sys.argv) > 4 else "com.mahiron.merge2048.bench"
 ACTIVITY = PACKAGE + "/com.godot.game.GodotAppLauncher"
 ADB = os.environ.get("ADB", "adb")
+RESTORE_APK = os.environ.get("BENCH_RESTORE_APK", "")
 HZ = 100  # USER_HZ on Android kernels
 
 
@@ -66,6 +69,18 @@ def thermal(serial: str) -> list[str]:
 
 
 def main() -> None:
+    serial = sys.argv[1]
+    try:
+        run()
+    finally:
+        shell(serial, "dumpsys battery reset")
+        if RESTORE_APK:
+            shell(serial, f"am force-stop {PACKAGE}")
+            adb(serial, "install", "-r", RESTORE_APK, check=False)
+            print("restored", RESTORE_APK)
+
+
+def run() -> None:
     serial, apk, out_path = sys.argv[1:4]
     adb(serial, "install", "-r", apk)
     shell(serial, f"am force-stop {PACKAGE}")
