@@ -53,14 +53,15 @@ func set_value(v: int, animate := true) -> void:
 ## Floats "+[param amount]" up from below the box.
 func pop_gain(amount: int) -> void:
 	var l := _take_popup()
-	l.text = "+%d" % amount
+	l.text = "+" + I18n.number(amount)
 	l.add_theme_color_override("font_color", Palette.current.accent)
 	l.size = Vector2(size.x, Design.SPACE_XL)
 	l.position = Vector2(0, size.y + Design.SPACE_MD)
 	l.modulate.a = 1.0
 	l.visible = true
 	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "position:y", size.y - Design.SPACE_XS, GAIN_TIME)
+	if not Motion.reduced():
+		tw.tween_property(l, "position:y", size.y - Design.SPACE_XS, GAIN_TIME)
 	tw.tween_property(l, "modulate:a", 0.0, GAIN_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.chain().tween_callback(l.hide)
 

@@ -109,6 +109,7 @@ proptest! {
             budget: Duration::from_millis(20),
             threads: NonZeroUsize::new(2).expect("two is not zero"),
             min_probability: 1e-3,
+            min_probability_floor: 1e-3,
             max_depth: 3,
             stop_when_stable: false,
             table_bits: 12,

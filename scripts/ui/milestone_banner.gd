@@ -34,10 +34,11 @@ func celebrate(value: int) -> void:
 		_tween.kill()
 	position.x = (parent_w - size.x) * 0.5
 	var rest := rest_y
-	var away := rest - HEIGHT - Design.SPACE_2XL
+	# Reduced motion: the banner fades in and out in place instead of dropping in.
+	var away := rest if Motion.reduced() else rest - HEIGHT - Design.SPACE_2XL
 	position.y = away
 	modulate.a = 0.0
-	scale = Vector2(0.94, 0.94)
+	scale = Vector2.ONE if Motion.reduced() else Vector2(0.94, 0.94)
 	show()
 	queue_redraw()
 	_tween = create_tween()

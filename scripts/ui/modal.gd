@@ -53,7 +53,7 @@ func open() -> void:
 	_scrim.modulate.a = 0.0
 	_card.modulate.a = 0.0
 	_fit_card()
-	_pop = 0.94
+	_pop = 1.0 if Motion.reduced() else 0.94
 	_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(_scrim, "modulate:a", 1.0, Design.DUR_SLOW)
 	_tween.tween_property(_card, "modulate:a", 1.0, Design.DUR_BASE).set_delay(Design.DUR_INSTANT * 0.5)
@@ -69,7 +69,7 @@ func close() -> void:
 	_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 	_tween.tween_property(_scrim, "modulate:a", 0.0, Design.DUR_BASE)
 	_tween.tween_property(_card, "modulate:a", 0.0, Design.DUR_FAST)
-	_tween.tween_property(self, "_pop", 0.96, Design.DUR_FAST)
+	_tween.tween_property(self, "_pop", 1.0 if Motion.reduced() else 0.96, Design.DUR_FAST)
 	_tween.chain().tween_callback(hide)
 	closed.emit()
 

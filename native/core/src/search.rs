@@ -21,6 +21,9 @@ pub struct Limits {
     pub threads: NonZeroUsize,
     /// Chance branches less likely than this are scored by the heuristic instead of searched.
     pub min_probability: f64,
+    /// When every branch is cut by probability before the time is up, the cut-off is lowered
+    /// tenfold (and the search goes on) down to this floor; equal to `min_probability` for none.
+    pub min_probability_floor: f64,
     pub max_depth: u8,
     /// Stop early once the best move has held for several depths with a clear lead.
     pub stop_when_stable: bool,
@@ -136,7 +139,9 @@ pub fn search(grid: &Grid, limits: &Limits, control: &Control) -> Outcome {
     let mut growth = GROWTH_UNKNOWN;
     let mut finish = Finish::MaxDepth;
 
-    for depth in 1..=limits.max_depth {
+    let mut min_probability = limits.min_probability;
+    let mut depth = 1;
+    while depth <= limits.max_depth {
         if control.is_cancelled() {
             finish = Finish::Cancelled;
             break;
@@ -167,18 +172,34 @@ pub fn search(grid: &Grid, limits: &Limits, control: &Control) -> Outcome {
         history.push(best);
         control.depth.store(depth, Ordering::Relaxed);
         control.nodes.fetch_add(round.nodes, Ordering::Relaxed);
-        if !round.depth_limited {
-            finish = Finish::Exhausted;
-            break;
-        }
         if limits.stop_when_stable && is_stable(&history, depth, lead) {
             finish = Finish::Stable;
             break;
+        }
+        if round.depth_limited {
+            depth += 1;
+        } else {
+            // Probability, not depth, ended every branch, so a deeper round would repeat this one;
+            // only a finer cut-off looks further.
+            let finer = min_probability / 10.0;
+            if finer < limits.min_probability_floor {
+                finish = Finish::Exhausted;
+                break;
+            }
+            min_probability = finer;
+            for w in workers.iter_mut() {
+                w.refine(min_probability);
+            }
+            last_time = None;
+            growth = GROWTH_UNKNOWN;
         }
         if Instant::now() >= deadline {
             finish = Finish::Budget;
             break;
         }
+    }
+    if depth > limits.max_depth {
+        finish = Finish::MaxDepth;
     }
     finish_with(Some(best), control.completed_depth(), finish)
 }
@@ -326,6 +347,12 @@ impl Worker {
         }
     }
 
+    /// Switches to a finer probability cut-off; table entries scored under the old one are dropped.
+    fn refine(&mut self, min_probability: f64) {
+        self.min_probability = min_probability;
+        self.table.clear();
+    }
+
     fn begin_round(&mut self, candidates: usize) {
         self.sums = vec![0.0; candidates];
         self.round_nodes = 0;
@@ -439,6 +466,10 @@ impl Table {
         }
     }
 
+    fn clear(&mut self) {
+        self.entries.fill(Entry::default());
+    }
+
     fn slot(&self, key: u64) -> usize {
         (key >> (64 - self.bits)) as usize
     }
@@ -477,6 +508,7 @@ mod tests {
             budget: Duration::from_millis(ms),
             threads: NonZeroUsize::new(threads).expect("tests use at least one thread"),
             min_probability: 1e-4,
+            min_probability_floor: 1e-4,
             max_depth: 8,
             stop_when_stable: false,
             table_bits: 16,
@@ -516,9 +548,31 @@ mod tests {
         let g = grid(&[&[2, 0, 0], &[0, 0, 0], &[0, 0, 2]]);
         let mut l = limits(5_000, 2);
         l.min_probability = 1e-3;
+        l.min_probability_floor = 1e-3;
         let out = search(&g, &l, &Control::new());
         assert_eq!(out.finish, Finish::Exhausted);
         assert!(out.best.is_some());
+    }
+
+    #[test]
+    fn spare_time_refines_the_cut_off() {
+        let g = grid(&[&[2, 0, 0], &[0, 0, 0], &[0, 0, 2]]);
+        let mut coarse = limits(5_000, 2);
+        coarse.min_probability = 1e-2;
+        coarse.min_probability_floor = 1e-2;
+        coarse.max_depth = 30;
+        let quick = search(&g, &coarse, &Control::new());
+        let mut fine = coarse.clone();
+        fine.min_probability_floor = 1e-5;
+        let deep = search(&g, &fine, &Control::new());
+        assert_eq!(quick.finish, Finish::Exhausted);
+        assert!(
+            deep.depth > quick.depth,
+            "{} vs {}",
+            deep.depth,
+            quick.depth
+        );
+        assert!(deep.best.is_some());
     }
 
     #[test]

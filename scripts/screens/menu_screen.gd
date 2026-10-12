@@ -138,6 +138,9 @@ func _refresh_labels() -> void:
 func play_intro() -> void:
 	for i in _logo_tiles.size():
 		var t := _logo_tiles[i]
+		if Motion.reduced():
+			t.scale = Vector2.ONE
+			continue
 		t.scale = Vector2.ZERO
 		var tw := create_tween()
 		tw.tween_property(t, "scale", Vector2.ONE, Design.DUR_SLOW * 1.4).set_delay(Design.DUR_INSTANT + i * Design.DUR_INSTANT) \

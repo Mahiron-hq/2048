@@ -9,6 +9,8 @@ const SIDE_PADDING := Design.GUTTER
 const VERTICAL_PADDING := Design.SPACE_LG
 ## Idle loop pacing while nothing animates; input still wakes the loop immediately.
 const IDLE_SLEEP_USEC := 8000
+## Pacing once the screen rests (see REST_AFTER_SEC): the loop alone cost a tenth of a core at 8 ms.
+const REST_SLEEP_USEC := 33000
 ## Stretch base per orientation: the short side is always 720 units, so controls keep their size
 ## when the device turns.
 const BASE_PORTRAIT := Vector2i(720, 1280)
@@ -20,12 +22,17 @@ const QUALITY_SHORT_SIDE: Array[int] = [720, 1080, 1440]
 const KEEP_AWAKE_SEC := 120.0
 ## Play time stops counting once this long has passed without a move.
 const PLAY_IDLE_SEC := 60.0
+## After this long with no touch and nothing animating the game stops asking for a high refresh
+## rate, so a still screen runs at the system's idle rate; the next touch asks again.
+const REST_AFTER_SEC := 2.0
 
 static var instance: App
 ## Message for the next app instance to show on its menu, e.g. after an import reload.
 static var pending_toast := ""
 
-var store := SaveStore.new()
+## The measurement build keeps its own file, so even run over an installed game it never reads
+## or writes the player's save.
+var store := SaveStore.new("user://bench.json" if OS.has_feature("bench") else SaveStore.DEFAULT_PATH)
 var sfx := Sfx.new()
 
 var _background := Background.new()
@@ -47,6 +54,7 @@ var selected_size := Board.DEFAULT_SIZE
 var _play_time := 0.0
 ## Seconds since the last touch or key press, for the screen keep-awake.
 var _since_input := 0.0
+var _still := 0.0
 ## Seconds since the last move (or since play resumed), for the play-time clock.
 var _since_move := 0.0
 var _keep_awake := false
@@ -165,6 +173,9 @@ func _ready() -> void:
 	if not pending_toast.is_empty():
 		toast(pending_toast)
 		pending_toast = ""
+	if OS.has_feature("bench"):
+		# The measurement builds only: tools/device_bench.py reads its log.
+		add_child(load("res://tests/bench/driver.gd").new())
 	# Launch frames are slow anyway; better here than in the middle of a game.
 	_game.prime_overlays()
 	_confirm.prime()
@@ -193,6 +204,8 @@ func _process(delta: float) -> void:
 	_update_keep_awake()
 	var animating := not get_tree().get_processed_tweens().is_empty() or _game.is_celebrating()
 	OS.low_processor_usage_mode = not animating and not store.show_fps
+	_still = 0.0 if animating else _still + delta
+	_rest(_still >= REST_AFTER_SEC and not store.show_fps)
 	if store.show_fps:
 		_fps_accum += delta
 		if _fps_accum >= 0.5:
@@ -245,12 +258,20 @@ func _notification(what: int) -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch or event is InputEventKey or event is InputEventMouseButton:
 		_since_input = 0.0
+	if event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventKey 			or event is InputEventMouseButton or event is InputEventMouseMotion:
+		_still = 0.0
+		_rest(false)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE:
 		_on_back()
 		get_viewport().set_input_as_handled()
+
+
+func _rest(resting: bool) -> void:
+	DisplayRate.rest(resting)
+	OS.low_processor_usage_mode_sleep_usec = REST_SLEEP_USEC if resting else IDLE_SLEEP_USEC
 
 
 ## A move was played or undone, or a game started or resumed: the play-time clock runs again.
@@ -754,12 +775,14 @@ func _show_screen(next: Control) -> void:
 	next.visible = true
 	next.modulate.a = 0.0
 	next.pivot_offset = _screens.size * 0.5
-	next.scale = Vector2(0.97, 0.97)
+	# With reduced motion screens only cross-fade.
+	var still := Motion.reduced()
+	next.scale = Vector2.ONE if still else Vector2(0.97, 0.97)
 	_transition = create_tween().set_parallel()
 	if prev:
 		prev.pivot_offset = _screens.size * 0.5
 		_transition.tween_property(prev, "modulate:a", 0.0, TRANSITION_OUT)
-		_transition.tween_property(prev, "scale", Vector2(1.02, 1.02), TRANSITION_OUT)
+		_transition.tween_property(prev, "scale", Vector2.ONE if still else Vector2(1.02, 1.02), TRANSITION_OUT)
 		_transition.chain().tween_callback(prev.hide)
 		_transition.chain()
 	_transition.tween_property(next, "modulate:a", 1.0, TRANSITION_IN).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

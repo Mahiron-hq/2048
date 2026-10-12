@@ -58,6 +58,7 @@ func _initialize() -> void:
 		"test_hint_solver_basics",
 		"test_native_hint_engine",
 		"test_hint_levels_and_cancel",
+		"test_hint_solver_without_time_scores_the_moves",
 		"test_hint_solver_respects_its_budget",
 		"test_hint_solver_plays_well",
 		"test_hints_setting_persists",
@@ -991,6 +992,39 @@ func test_hint_solver_basics() -> void:
 			if dir < 0 or not probe.move(dir).moved:
 				illegal += 1
 	check(illegal == 0, "every hint on random 3x3..6x6 boards is a legal move (%d illegal)" % illegal)
+
+
+func test_hint_solver_without_time_scores_the_moves() -> void:
+	# With no time for even one level, the hint is the move whose board scores best as it stands,
+	# not simply the first legal one.
+	var solver := HintSolver.new()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var checked := 0
+	var wrong := 0
+	for trial in 40:
+		var b := Board.new(rng.randi_range(0, 1 << 30), 4)
+		b.new_game()
+		for step in rng.randi_range(5, 60):
+			if b.can_move():
+				b.move(rng.randi_range(0, 3))
+		if not b.can_move():
+			continue
+		solver._prepare(4)
+		var state := solver._ranks(b.values)
+		var expected := -1
+		var top := -INF
+		for dir: int in HintSolver.ORDER:
+			var moved := solver._move(state, dir)
+			if moved != state and solver._evaluate(moved) > top:
+				top = solver._evaluate(moved)
+				expected = dir
+		if expected == HintSolver.ORDER[0]:
+			continue
+		checked += 1
+		if solver.best_move(b.values, 4, 0) != expected:
+			wrong += 1
+	check(checked >= 5 and wrong == 0, "a hint without time picks the best-scoring move (%d of %d wrong)" % [wrong, checked])
 
 
 func test_hint_solver_respects_its_budget() -> void:

@@ -292,6 +292,9 @@ func _set_hint_glow(on: bool) -> void:
 	if not on:
 		_hint_btn.glow = 0.0
 		return
+	if Motion.reduced():
+		_hint_btn.glow = 1.0
+		return
 	_hint_glow_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_hint_glow_tween.tween_property(_hint_btn, "glow", 1.0, 0.5)
 	for pulse in 3:
@@ -444,6 +447,8 @@ func _on_moved(result: Board.MoveResult) -> void:
 func _celebrate(value: int) -> void:
 	_banner.celebrate(value)
 	_app.sfx.play(Sfx.Kind.MILESTONE, 1.0, -1.0)
+	if Motion.reduced():
+		return
 	_confetti.amount = CONFETTI if value < 2048 else CONFETTI * 2
 	_confetti.restart()
 
