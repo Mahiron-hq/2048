@@ -22,10 +22,16 @@ func _initialize() -> void:
 		"test_undo_replay_survives_save",
 		"test_undo_of_legacy_save_rebuilds",
 		"test_milestones_fire_once",
+		"test_milestones_survive_undo",
+		"test_rejects_mistyped_fields",
+		"test_clean_record_and_reset",
+		"test_new_settings_persist",
+		"test_what_counts_as_played",
 		"test_serialization_round_trip",
 		"test_rejects_malformed_state",
 		"test_store_survives_restart",
 		"test_store_ignores_corrupt_file",
+		"test_store_recovers_from_the_backup",
 		"test_store_best_score_only_increases",
 		"test_music_loop_is_seamless",
 		"test_every_size_plays",
@@ -274,6 +280,111 @@ func test_milestones_fire_once() -> void:
 	check(r3.milestones.is_empty(), "plain swipe fires nothing: %s" % [r3.milestones])
 
 
+func test_milestones_survive_undo() -> void:
+	var b := board_from([[64, 64, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]])
+	b.undo_limit = 3
+	check(b.move(Board.Dir.LEFT).milestones == PackedInt64Array([128]), "128 is celebrated")
+	b.undo()
+	check(b.move(Board.Dir.LEFT).milestones.is_empty(), "undoing and merging again does not celebrate 128 twice")
+	var c := Board.new(1)
+	check(c.from_dict(JSON.parse_string(JSON.stringify(b.to_dict()))) and c.celebrated == 128, "celebrated milestone persists")
+	var old := Board.new(1)
+	var legacy := {"size": 4, "values": [256, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "score": 2000, "moves": 300}
+	check(old.from_dict(legacy) and old.celebrated == 256, "a 1.3.0 save counts the milestones up to its best tile as celebrated")
+	b.new_game()
+	check(b.celebrated == 0 and not b.assisted, "a new game starts with nothing celebrated and no help")
+
+
+func test_rejects_mistyped_fields() -> void:
+	var cells := []
+	cells.resize(16)
+	cells.fill(0)
+	cells[0] = 2
+	var bad := [
+		{"size": 4, "values": cells, "score": [1], "moves": 0},
+		{"size": 4, "values": cells, "score": "12", "moves": 0},
+		{"size": 4, "values": cells, "score": 0, "moves": {}},
+		{"size": 4, "values": cells, "score": 0, "moves": 1.5},
+		{"size": 4, "values": cells, "score": 0, "moves": 0, "best_tile": "big"},
+		{"size": 4, "values": cells, "score": 0, "moves": 0, "best_tile": 3},
+		{"size": 4.5, "values": cells, "score": 0, "moves": 0},
+		{"size": "4", "values": cells, "score": 0, "moves": 0},
+		{"size": 4, "values": cells, "score": 1e300, "moves": 0},
+		{"size": 4, "values": cells, "score": 0, "moves": 0, "milestone": 100},
+		{"size": 4, "values": cells, "score": 0, "moves": 0, "assisted": "yes"},
+		{"size": 4, "values": cells, "score": 0, "moves": 0, "undo_stack": [{"size": 4, "values": cells, "score": null, "moves": 0}]},
+	]
+	for d in bad:
+		var b := Board.new(1)
+		check(not b.from_dict(d), "rejects %s" % [JSON.stringify(d).left(80)])
+	var huge_ids := cells.map(func(v: int) -> int: return 0)
+	huge_ids[0] = 1e12
+	var c := Board.new(1)
+	check(c.from_dict({"size": 4, "values": cells, "score": 0, "moves": 0, "ids": huge_ids}), "out-of-range ids are reissued")
+	check(c.ids[0] > 0 and c.ids[0] < Board.MAX_ID, "reissued id is a small positive number: %d" % c.ids[0])
+	var s := SaveStore.new("user://unused.json")
+	s.apply_dict({"best_scores": {"4": 1e30, "5": -1, "x": 3}, "stats": {"4": {"games": 1.5, "time": 1e300}}, "settings": "nope", "game": [1, 2]})
+	check(s.best_for(4) == 0 and s.best_for(5) == 0 and s.stats_for(4).games == 0 and s.stats_for(4).time == 0.0 and s.game.is_empty(), "store ignores absurd values")
+
+
+func test_clean_record_and_reset() -> void:
+	var s := SaveStore.new("user://unused.json")
+	s.submit_score(5000, 4)
+	s.submit_clean_score(3000, 4)
+	s.submit_clean_score(1000, 4)
+	s.submit_score(800, 5)
+	s.submit_clean_score(800, 5)
+	s.record_game(4, 5000, 512)
+	s.record_game(5, 800, 64)
+	check(s.clean_best_for(4) == 3000 and s.stats_for(0).clean_best_score == 3000, "unassisted best is kept apart")
+	var t := SaveStore.new("user://unused.json")
+	t.apply_dict(JSON.parse_string(s.serialize()))
+	check(t.clean_best_for(4) == 3000 and t.clean_best_for(5) == 800, "unassisted best survives a save")
+	t.reset_stats(4)
+	check(t.stats_for(4).games == 0 and t.stats_for(5).games == 1 and t.best_for(4) == 5000, "resetting 4x4 statistics keeps records and other sizes")
+	t.reset_records(5)
+	check(t.best_for(5) == 0 and t.clean_best_for(5) == 0 and t.best_for(4) == 5000, "resetting 5x5 records keeps 4x4")
+	t.reset_stats(0)
+	t.reset_records(0)
+	var all := t.stats_for(0)
+	check(all.games == 0 and all.best_score == 0 and all.clean_best_score == 0 and all.moves == 0, "resetting everything clears every size")
+
+
+func test_new_settings_persist() -> void:
+	var s := SaveStore.new("user://unused.json")
+	check(s.hint_level == SaveStore.HintLevel.MEDIUM and s.board_size == 4 and s.text_size == SaveStore.TextSize.SYSTEM and s.reduce_motion == SaveStore.ReduceMotion.SYSTEM, "defaults")
+	s.hint_level = SaveStore.HintLevel.SMART
+	s.board_size = 6
+	s.text_size = SaveStore.TextSize.XLARGE
+	s.reduce_motion = SaveStore.ReduceMotion.ON
+	s.tutorial_games = 2
+	var t := SaveStore.new("user://unused.json")
+	t.apply_dict(JSON.parse_string(s.serialize()))
+	check(t.hint_level == SaveStore.HintLevel.SMART and t.board_size == 6 and t.text_size == SaveStore.TextSize.XLARGE, "hint level, board size and text size persist")
+	check(t.reduce_motion == SaveStore.ReduceMotion.ON and t.tutorial_games == 2, "reduced motion and tutorial count persist")
+	var u := SaveStore.new("user://unused.json")
+	u.apply_dict({"settings": {"hint_level": "genius", "board_size": 9, "text_size": 2, "reduce_motion": true, "tutorial_games": -1}})
+	check(u.hint_level == SaveStore.HintLevel.MEDIUM and u.board_size == 4 and u.text_size == SaveStore.TextSize.SYSTEM and u.reduce_motion == SaveStore.ReduceMotion.SYSTEM and u.tutorial_games == 0, "invalid values keep the defaults")
+
+
+func test_what_counts_as_played() -> void:
+	var b := Board.new(3)
+	b.new_game()
+	check(not GameScreen.counts_as_played(b), "an untouched game is not counted")
+	var guard := 0
+	while b.move_count < 3 and guard < 50:
+		b.move(guard % 4)
+		guard += 1
+	check(not GameScreen.counts_as_played(b), "a few moves are a restart, not a game")
+	while b.move_count < GameScreen.ABANDON_MIN_MOVES and b.can_move() and guard < 500:
+		b.move(guard % 4)
+		guard += 1
+	check(GameScreen.counts_as_played(b), "ten moves count")
+	var lost := board_from([[2, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 2]])
+	lost.move_count = 4
+	check(GameScreen.counts_as_played(lost), "a lost game always counts")
+
+
 func test_serialization_round_trip() -> void:
 	var b := Board.new(11)
 	b.new_game()
@@ -323,7 +434,7 @@ func test_store_survives_restart() -> void:
 	s.game = b.to_dict()
 	check(s.save_to_disk() == OK, "save ok")
 	var t := SaveStore.new(path)
-	check(t.load_from_disk() and t.existed, "load ok")
+	check(t.load_from_disk() == SaveStore.Load.OK and t.existed, "load ok")
 	check(t.best_for(4) == 12345 and t.undo_limit == 3 and t.music_on and t.theme == SaveStore.ThemeMode.LIGHT and t.language == "ru", "settings restored")
 	check(t.sound_volume == 2 and t.music_volume == 5, "volume steps restored")
 	var junk := SaveStore.new("user://unused.json")
@@ -334,17 +445,59 @@ func test_store_survives_restart() -> void:
 	check(c.can_undo() == b.can_undo(), "undo step restored")
 	check(not FileAccess.file_exists(path + ".tmp"), "no temp file left")
 	DirAccess.remove_absolute(path)
+	DirAccess.remove_absolute(path + ".bak")
 
 
 func test_store_ignores_corrupt_file() -> void:
 	var path := "user://test_corrupt.json"
+	_remove_save_files(path)
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	f.store_string("{not json")
 	f.close()
 	var s := SaveStore.new(path)
-	check(not s.load_from_disk(), "reports corrupt file")
+	check(s.load_from_disk() == SaveStore.Load.LOST, "reports a save that could not be read")
 	check(s.best_for(4) == 0 and not s.has_game(), "defaults kept")
+	check(not FileAccess.file_exists(path) and _corrupt_copies(path).size() == 1, "the unreadable file is set aside, not erased")
+	_remove_save_files(path)
+
+
+func test_store_recovers_from_the_backup() -> void:
+	var path := "user://test_backup.json"
+	_remove_save_files(path)
+	var s := SaveStore.new(path)
+	s.submit_score(1111, 4)
+	check(s.save_to_disk() == OK, "first save")
+	s.submit_score(2222, 4)
+	check(s.save_to_disk() == OK, "second save keeps the first as the backup")
+	check(FileAccess.file_exists(path + ".bak"), "backup written")
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string("{\"best_scores\": {\"4\": 99")
+	f.close()
+	var t := SaveStore.new(path)
+	check(t.load_from_disk() == SaveStore.Load.RECOVERED and t.best_for(4) == 1111 and t.existed, "a cut-off save falls back to the backup")
+	check(_corrupt_copies(path).size() == 1, "the cut-off save is kept aside")
 	DirAccess.remove_absolute(path)
+	var u := SaveStore.new(path)
+	check(u.load_from_disk() == SaveStore.Load.OK and u.best_for(4) == 1111, "a save lost between the two renames comes back from the backup")
+	_remove_save_files(path)
+	var fresh := SaveStore.new(path)
+	check(fresh.load_from_disk() == SaveStore.Load.FRESH and not fresh.existed, "no files at all is a first launch")
+
+
+func _corrupt_copies(path: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var name := path.get_file()
+	for file in DirAccess.get_files_at(path.get_base_dir()):
+		if file.begins_with(name + ".corrupt-"):
+			out.append(file)
+	return out
+
+
+func _remove_save_files(path: String) -> void:
+	for file in [path, path + ".bak", path + ".tmp"]:
+		DirAccess.remove_absolute(file)
+	for file in _corrupt_copies(path):
+		DirAccess.remove_absolute(path.get_base_dir().path_join(file))
 
 
 func test_store_best_score_only_increases() -> void:

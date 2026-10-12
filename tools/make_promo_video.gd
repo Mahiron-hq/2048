@@ -56,7 +56,8 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(_out)
 	for f in DirAccess.get_files_at(_out):
 		DirAccess.remove_absolute(_out + f)
-	DirAccess.remove_absolute(SAVE)
+	for f in [SAVE, SAVE + ".bak", SAVE + ".tmp"]:
+		DirAccess.remove_absolute(f)
 	_build()
 	_run.call_deferred()
 	_record.call_deferred()

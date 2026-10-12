@@ -1,9 +1,11 @@
 class_name GameOverOverlay
 extends Modal
-## End-of-game summary: final score, best tile, move count and record badge.
+## End-of-game summary: final score, best tile, move count and record badge, with a way back
+## when the last move can still be undone.
 
 signal restart_requested
 signal menu_requested
+signal undo_requested
 
 const STAT_TILE := Design.CONTROL_LG
 
@@ -17,6 +19,7 @@ var _moves := SkinLabel.make("", Design.TEXT_TITLE, Design.WEIGHT_HEAVY, SkinLab
 var _moves_caption := SkinLabel.caption("MOVES")
 var _again := PillButton.make("TRY_AGAIN", PillButton.Look.PRIMARY, Icons.Kind.RESTART)
 var _menu := PillButton.make("MENU", PillButton.Look.SECONDARY, Icons.Kind.MENU)
+var _undo := PillButton.make("UNDO_LAST", PillButton.Look.GHOST, Icons.Kind.UNDO)
 var _shown_score := 0.0:
 	set(v):
 		_shown_score = v
@@ -54,11 +57,15 @@ func _init() -> void:
 	body.add_child(stats)
 	body.add_child(Modal.gap(Design.SPACE_XL))
 	body.add_child(Modal.button_row([_menu, _again]))
+	body.add_child(Modal.button_row([_undo]))
 	_again.pressed.connect(func() -> void: restart_requested.emit())
 	_menu.pressed.connect(func() -> void: menu_requested.emit())
+	_undo.pressed.connect(func() -> void: undo_requested.emit())
 
 
-func present(score: int, best_tile: int, moves: int, record: bool) -> void:
+## Opens the summary; [param can_undo] offers to take the losing move back.
+func present(score: int, best_tile: int, moves: int, record: bool, can_undo := false) -> void:
+	_undo.get_parent().visible = can_undo
 	_tile.value = best_tile
 	_moves.text = I18n.number(moves)
 	_record.visible = record

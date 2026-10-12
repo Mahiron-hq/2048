@@ -35,7 +35,8 @@ func _run() -> void:
 
 
 func _device(tag: String, px: Vector2i, dark: bool) -> void:
-	DirAccess.remove_absolute(SAVE)
+	for f in [SAVE, SAVE + ".bak", SAVE + ".tmp"]:
+		DirAccess.remove_absolute(f)
 	_vp = SubViewport.new()
 	_vp.size = px
 	var base := Vector2(1280, 720) if px.x > px.y else Vector2(720, 1280)

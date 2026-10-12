@@ -24,6 +24,9 @@ const CONFETTI := 70
 
 ## Seconds without a move before the hint button lights up on its own.
 const HINT_IDLE := 15.0
+## A game left for a new one counts as played only after this many moves; shorter tries are
+## restarts, not games, and would drag the average score down.
+const ABANDON_MIN_MOVES := 10
 ## Thinking time for one hint; the search goes deeper on faster phones in the same time.
 const HINT_BUDGET_MS := 350
 
@@ -64,8 +67,10 @@ var _best_at_start := 0
 var _record_flashed := false
 ## False until a game is started or resumed, so an empty board never overwrites a save.
 var _active := false
-## The current game already counts towards statistics (it ended in a loss).
-var _recorded := false
+## The swipe tutorial is on the board for this game; the first move completes it.
+var _tutorial := false
+## The loss was already announced (sound, vibration) before this summary came back on resume.
+var _loss_announced := false
 var _solver := HintSolver.new()
 ## Background search in flight (WorkerThreadPool task id), or -1.
 var _hint_task := -1
@@ -143,6 +148,7 @@ func _init() -> void:
 	_board_view.settled.connect(_on_settled)
 	_game_over.restart_requested.connect(_restart_from_over)
 	_game_over.menu_requested.connect(_menu_from_over)
+	_game_over.undo_requested.connect(_undo_from_over)
 
 
 func _ready() -> void:
@@ -186,6 +192,11 @@ func _notification(what: int) -> void:
 		_confetti.position = Vector2(size.x * 0.5, size.y * 0.55)
 	elif what == NOTIFICATION_VISIBILITY_CHANGED and is_visible_in_tree() and _pending_over:
 		_on_settled()
+	elif what == NOTIFICATION_PREDELETE:
+		# The layout not in use is held outside the tree and would outlive the screen.
+		for node: Node in [_brand, _side_actions, _header, _actions, _portrait, _landscape]:
+			if is_instance_valid(node) and node.get_parent() == null:
+				node.free()
 
 
 func _on_skin_changed() -> void:
@@ -283,20 +294,21 @@ func is_playing() -> bool:
 
 
 ## Starts a fresh game of side [param grid] (the current size when 0); tiles pop in with
-## [param intro]. A replaced unfinished game counts as played.
+## [param intro]. The game it replaces is counted if it was lost or played long enough.
 func start_new(grid := 0, intro := true) -> void:
-	_record_abandoned()
+	_record_finished()
 	board.new_game(grid if grid > 0 else board.size)
 	_active = true
-	_recorded = false
 	_game_over.close()
 	_pending_over = false
+	_loss_announced = false
 	_best_at_start = _app.store.best_for(board.size)
 	_record_flashed = false
 	_refresh_scores(false)
 	_board_view.show_board(board, BoardView.Appear.POP if intro else BoardView.Appear.NONE)
-	_board_view.show_hint()
+	_show_tutorial_if_new()
 	_reset_idle()
+	_app.note_move()
 	_persist()
 
 
@@ -305,20 +317,21 @@ func resume_saved() -> bool:
 	if not _app.store.has_game() or not board.from_dict(_app.store.game):
 		return false
 	_active = true
-	_recorded = false
 	_game_over.close()
 	_pending_over = false
 	_best_at_start = _app.store.best_for(board.size)
 	_record_flashed = false
 	_refresh_scores(false)
 	_board_view.show_board(board, BoardView.Appear.POP)
+	_board_view.hide_hint(true)
+	_tutorial = false
 	if board.move_count == 0:
-		_board_view.show_hint()
-	else:
-		_board_view.hide_hint(true)
-	if not board.can_move():
-		_pending_over = true
+		_show_tutorial_if_new()
+	# A lost game stays saved until it is left, so its summary (and its undo) come back.
+	_pending_over = not board.can_move()
+	_loss_announced = _pending_over
 	_reset_idle()
+	_app.note_move()
 	return true
 
 
@@ -339,7 +352,11 @@ func request_move(dir: Board.Dir) -> void:
 		_board_view.nudge(dir)
 		return
 	_board_view.hide_hint()
+	if _tutorial:
+		_tutorial = false
+		_app.store.tutorial_games = mini(_app.store.tutorial_games + 1, SaveStore.TUTORIAL_GAMES)
 	_board_view.play_move(result)
+	_app.note_move()
 	_on_moved(result)
 
 
@@ -349,9 +366,12 @@ func undo() -> void:
 	var undone := board.undo()
 	if undone == null:
 		return
+	board.assisted = true
 	_reset_idle()
+	_app.note_move()
 	_app.store.record_move(board.size, -1)
 	_pending_over = false
+	_loss_announced = false
 	if undone.moved:
 		_board_view.play_undo(undone)
 	else:
@@ -361,10 +381,10 @@ func undo() -> void:
 	_persist()
 
 
-## Persists the game in progress; a finished game is not resumable.
+## Persists the game in progress, a lost one included: it stays until the player leaves it.
 func save_state() -> void:
 	if _active:
-		_app.store.game = board.to_dict() if board.can_move() else {}
+		_app.store.game = board.to_dict()
 
 
 ## True while the milestone banner or confetti is on screen.
@@ -388,6 +408,8 @@ func _on_moved(result: Board.MoveResult) -> void:
 	if _app.store.submit_score(board.score, board.size) and _best_at_start > 0 and not _record_flashed:
 		_record_flashed = true
 		_best_box.flash()
+	if not board.assisted:
+		_app.store.submit_clean_score(board.score, board.size)
 	_refresh_scores(true)
 	if not result.milestones.is_empty():
 		_celebrate(result.milestones[result.milestones.size() - 1])
@@ -410,31 +432,37 @@ func _on_settled() -> void:
 	# Not over the menu or settings if the player left meanwhile; it shows on return instead.
 	if not _pending_over or _game_over.is_open or not _app.is_current(self):
 		return
-	_app.sfx.play(Sfx.Kind.LOSE)
-	_app.haptic_game_over()
-	if not _recorded:
-		_recorded = true
-		_app.store.record_game(board.size, board.score, board.best_tile)
-		_app.save_now()
+	if not _loss_announced:
+		_loss_announced = true
+		_app.sfx.play(Sfx.Kind.LOSE)
+		_app.haptic_game_over()
+	_app.save_now()
 	var record := board.score > _best_at_start and board.score > 0
-	_game_over.present(board.score, board.best_tile, board.move_count, record)
+	_game_over.present(board.score, board.best_tile, board.move_count, record, board.can_undo())
 
 
 func prime_overlays() -> void:
 	_game_over.prime()
 
 
-## Counts the game being replaced if it had any moves and was not already counted.
-func _record_abandoned() -> void:
-	if _active:
-		if board.move_count > 0 and not _recorded:
-			_app.store.record_game(board.size, board.score, board.best_tile)
-		return
-	# Not loaded yet (fresh launch): the saved game from disk is the one being replaced.
-	if _app.store.has_game():
-		var saved := Board.new(1)
-		if saved.from_dict(_app.store.game) and saved.move_count > 0:
-			_app.store.record_game(saved.size, saved.score, saved.best_tile)
+## Counts the game being replaced: always when it was lost, otherwise once it had
+## ABANDON_MIN_MOVES moves.
+func _record_finished() -> void:
+	var replaced := board
+	if not _active:
+		# Not loaded yet (fresh launch): the saved game from disk is the one being replaced.
+		replaced = Board.new(1)
+		if not _app.store.has_game() or not replaced.from_dict(_app.store.game):
+			return
+	if counts_as_played(replaced):
+		_app.store.record_game(replaced.size, replaced.score, replaced.best_tile)
+
+
+## True when leaving [param b] now should count it in the statistics.
+static func counts_as_played(b: Board) -> bool:
+	if b.move_count == 0:
+		return false
+	return not b.can_move() or b.move_count >= ABANDON_MIN_MOVES
 
 
 func _refresh_scores(animate: bool) -> void:
@@ -469,6 +497,20 @@ func _restart_from_over() -> void:
 func _menu_from_over() -> void:
 	_game_over.close()
 	menu_requested.emit()
+
+
+func _undo_from_over() -> void:
+	_game_over.close()
+	undo()
+
+
+## Shows the swipe tutorial over a fresh board during the player's first games.
+func _show_tutorial_if_new() -> void:
+	_tutorial = _app.store.tutorial_games < SaveStore.TUTORIAL_GAMES
+	if _tutorial:
+		_board_view.show_hint()
+	else:
+		_board_view.hide_hint(true)
 
 
 ## Portrait: header above the board, action bar below. Landscape: board in the middle, controls
