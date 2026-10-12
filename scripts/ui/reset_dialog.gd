@@ -108,7 +108,7 @@ func _on_go() -> void:
 			_text.text = _import_summary
 			_go.set_key("IMPORT_DO")
 		else:
-			var what := I18n.t("STATS_ALL") if selected_size() == 0 else I18n.grid(selected_size())
+			var what := I18n.t("RESET_SCOPE_ALL") if selected_size() == 0 else I18n.t("RESET_SCOPE_ONE") % I18n.grid(selected_size())
 			_text.set_key("RESET_SURE_BODY", what)
 			_go.set_key("RESET_DO")
 		_left = ARM_SECONDS

@@ -168,7 +168,7 @@ msgid "LICENSE_ANDROID"
 msgstr "Android libraries — Apache 2.0"
 
 msgid "LICENSE_FONT"
-msgstr "Manrope font — SIL OFL 1.1"
+msgstr "Manrope font — OFL 1.1"
 
 msgid "LICENSE_GAME"
 msgstr "2048 Merge — Apache 2.0"
@@ -183,7 +183,7 @@ msgid "LICENSE_MISSING"
 msgstr "The license text is missing from this build."
 
 msgid "LICENSE_MUSIC"
-msgstr "Music “2048 Quiet Tiles” — CC BY-NC-ND 4.0"
+msgstr "Music — CC BY-NC-ND 4.0"
 
 msgid "LICENSE_RUST"
 msgstr "Rust libraries"
@@ -272,6 +272,12 @@ msgstr "The best score and the best score without help go back to zero. Statisti
 msgid "RESET_RECORDS_TITLE"
 msgstr "Reset records?"
 
+msgid "RESET_SCOPE_ALL"
+msgstr "every board size"
+
+msgid "RESET_SCOPE_ONE"
+msgstr "the %s board"
+
 msgid "RESET_STATS"
 msgstr "Reset statistics"
 
@@ -282,7 +288,7 @@ msgid "RESET_STATS_TITLE"
 msgstr "Reset statistics?"
 
 msgid "RESET_SURE_BODY"
-msgstr "This applies to: %s. It cannot be undone."
+msgstr "This applies to %s. It cannot be undone."
 
 msgid "RESET_SURE_TITLE"
 msgstr "Are you sure?"
@@ -321,16 +327,16 @@ msgid "TEXT_SIZE"
 msgstr "Text size"
 
 msgid "TEXT_SIZE_LARGE"
-msgstr "Large"
+msgstr "115%"
 
 msgid "TEXT_SIZE_NORMAL"
-msgstr "Normal"
+msgstr "100%"
 
 msgid "TEXT_SIZE_SYSTEM"
 msgstr "System"
 
 msgid "TEXT_SIZE_XLARGE"
-msgstr "Larger"
+msgstr "130%"
 
 msgid "THEME"
 msgstr "Theme"

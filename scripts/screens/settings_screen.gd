@@ -282,6 +282,7 @@ func _buttons_block(note_key: String, buttons: Array) -> Control:
 		box.add_child(Modal.gap(Design.SPACE_2XS))
 	for b: PillButton in buttons:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.fit_text = true
 		box.add_child(b)
 	wrap.add_child(box)
 	return wrap

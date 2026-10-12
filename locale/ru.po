@@ -168,7 +168,7 @@ msgid "LICENSE_ANDROID"
 msgstr "Android-библиотеки — Apache 2.0"
 
 msgid "LICENSE_FONT"
-msgstr "Шрифт Manrope — SIL OFL 1.1"
+msgstr "Шрифт Manrope — OFL 1.1"
 
 msgid "LICENSE_GAME"
 msgstr "2048 Merge — Apache 2.0"
@@ -183,7 +183,7 @@ msgid "LICENSE_MISSING"
 msgstr "В этой сборке нет текста лицензии."
 
 msgid "LICENSE_MUSIC"
-msgstr "Музыка «2048 Quiet Tiles» — CC BY-NC-ND 4.0"
+msgstr "Музыка — CC BY-NC-ND 4.0"
 
 msgid "LICENSE_RUST"
 msgstr "Rust-библиотеки"
@@ -272,6 +272,12 @@ msgstr "Лучший результат и рекорд без помощи об
 msgid "RESET_RECORDS_TITLE"
 msgstr "Сбросить рекорды?"
 
+msgid "RESET_SCOPE_ALL"
+msgstr "все размеры поля"
+
+msgid "RESET_SCOPE_ONE"
+msgstr "поле %s"
+
 msgid "RESET_STATS"
 msgstr "Сбросить статистику"
 
@@ -282,7 +288,7 @@ msgid "RESET_STATS_TITLE"
 msgstr "Сбросить статистику?"
 
 msgid "RESET_SURE_BODY"
-msgstr "Сброс для: %s. Отменить его нельзя."
+msgstr "Сброс коснётся: %s. Отменить его нельзя."
 
 msgid "RESET_SURE_TITLE"
 msgstr "Точно сбросить?"
@@ -321,16 +327,16 @@ msgid "TEXT_SIZE"
 msgstr "Размер текста"
 
 msgid "TEXT_SIZE_LARGE"
-msgstr "Крупный"
+msgstr "115%"
 
 msgid "TEXT_SIZE_NORMAL"
-msgstr "Обычный"
+msgstr "100%"
 
 msgid "TEXT_SIZE_SYSTEM"
 msgstr "Системный"
 
 msgid "TEXT_SIZE_XLARGE"
-msgstr "Очень крупный"
+msgstr "130%"
 
 msgid "THEME"
 msgstr "Тема"

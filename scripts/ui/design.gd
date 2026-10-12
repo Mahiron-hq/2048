@@ -112,9 +112,10 @@ static func make_theme() -> Theme:
 	grabber.content_margin_right = 3
 	var grabber_hot := grabber.duplicate()
 	grabber_hot.bg_color = Color(p.text_secondary, 0.55)
+	# The track keeps a gap on its left, so the thumb never sits on the edge of the cards.
 	var empty := StyleBoxEmpty.new()
-	empty.content_margin_left = 3
-	empty.content_margin_right = 3
+	empty.content_margin_left = SPACE_XS
+	empty.content_margin_right = 2
 	t.set_stylebox("scroll", "VScrollBar", empty)
 	t.set_stylebox("scroll_focus", "VScrollBar", empty)
 	t.set_stylebox("grabber", "VScrollBar", grabber)

@@ -23,6 +23,7 @@ const LICENSES := [
 var _app: App
 var _version := SkinLabel.make("", Design.TEXT_BODY, Design.WEIGHT_MEDIUM)
 var _column := VBoxContainer.new()
+var _header: ScreenHeader
 var _sections: Array[_LicenseSection] = []
 
 
@@ -36,7 +37,8 @@ func _init() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_theme_constant_override("separation", int(Design.SPACE_LG))
 	add_child(root)
-	root.add_child(_centered(ScreenHeader.make("ABOUT", func() -> void: back_requested.emit())))
+	_header = ScreenHeader.make("ABOUT", func() -> void: back_requested.emit())
+	root.add_child(_centered(_header))
 
 	var scroll := TouchScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -81,6 +83,11 @@ func _init() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		_column.custom_minimum_size.x = minf(size.x, Design.COLUMN_MAX)
+		_header.custom_minimum_size.x = _column.custom_minimum_size.x
+
+
+func _on_language_changed() -> void:
+	_version.text = I18n.t("ABOUT_VERSION") % ProjectSettings.get_setting("application/config/version", "")
 
 
 ## Updates the version line and closes every open license.
@@ -115,6 +122,7 @@ func _card(rows: Array) -> Card:
 	for r: Control in rows:
 		if r is PillButton:
 			r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			r.fit_text = true
 		box.add_child(r)
 	card.add_child(box)
 	return card
@@ -163,6 +171,7 @@ class _LicenseSection:
 	func _ready() -> void:
 		_toggle = PillButton.make(title_key, PillButton.Look.GHOST)
 		_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_toggle.fit_text = true
 		_toggle.pressed.connect(_flip)
 		add_child(_toggle)
 		add_child(_body)

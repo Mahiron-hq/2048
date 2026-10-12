@@ -1092,7 +1092,10 @@ func test_palette_roles_and_tiles() -> void:
 		check(worst >= 3.0, "tile numbers keep 3:1 contrast (%s theme, worst %.2f)" % ["dark" if dark else "light", worst])
 		check(distinct, "neighbouring tiles differ in color")
 		check(_contrast(p.text, p.bg) >= 7.0 and _contrast(p.text_secondary, p.surface) >= 4.5, "body and secondary text meet AA on their surfaces")
-		check(_contrast(p.on_accent, p.accent) >= 4.5, "accent buttons keep 4.5:1 for their labels")
+		check(_contrast(p.on_accent, p.accent) >= 4.5 and _contrast(p.on_accent, p.accent_pressed) >= 4.5, "accent buttons keep 4.5:1 for their labels")
+		var soft := p.surface.blend(p.accent_soft)
+		check(_contrast(p.accent, soft) >= 4.5 and _contrast(p.accent, p.bg) >= 4.5 and _contrast(p.accent, p.surface) >= 4.5,
+				"accent text keeps 4.5:1 on its soft badge, the background and cards (%s theme)" % ["dark" if dark else "light"])
 	check(Palette.make(false).tile_bg(1 << 40) == Palette.make(false).tile_bg(1 << 17), "tiles past the ramp keep its last color")
 
 
