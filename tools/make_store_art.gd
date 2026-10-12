@@ -30,7 +30,8 @@ func _run() -> void:
 
 
 func _screenshots() -> void:
-	DirAccess.remove_absolute(SAVE)
+	for f in [SAVE, SAVE + ".bak", SAVE + ".tmp"]:
+		DirAccess.remove_absolute(f)
 	_vp = _make_viewport(Vector2i(1080, 1920))
 	_vp.size_2d_override = Vector2i(720, 1280)
 	_vp.size_2d_override_stretch = true

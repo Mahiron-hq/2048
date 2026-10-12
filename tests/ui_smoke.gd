@@ -8,7 +8,8 @@ var _failed := 0
 
 
 func _initialize() -> void:
-	DirAccess.remove_absolute(SAVE)
+	for f in [SAVE, SAVE + ".bak", SAVE + ".tmp"]:
+		DirAccess.remove_absolute(f)
 	# UI_SMOKE_FONT=<path to .ttf> lays everything out with that font instead of the bundled one,
 	# e.g. DejaVu Sans, a much wider face, to prove the layouts tolerate it.
 	var font_path := OS.get_environment("UI_SMOKE_FONT")
@@ -232,7 +233,8 @@ func _run() -> void:
 
 	app.queue_free()
 	await _frames(2)
-	DirAccess.remove_absolute(SAVE)
+	for f in [SAVE, SAVE + ".bak", SAVE + ".tmp"]:
+		DirAccess.remove_absolute(f)
 	print("\nui smoke: %d failed" % _failed)
 	quit(_failed)
 
@@ -240,7 +242,8 @@ func _run() -> void:
 func _new_features(app: App) -> void:
 	var g := app._game
 
-	# Swipe hint: shown when a game starts, gone with the first move.
+	# Swipe hint: shown when one of the first games starts, gone with the first move.
+	app.store.tutorial_games = 0
 	g.start_new(0, false)
 	await _wait(0.4)
 	check(g._board_view.is_hint_visible(), "swipe hint shows at the start of a game")
@@ -276,14 +279,20 @@ func _new_features(app: App) -> void:
 	check(not g._undo_btn.visible, "undo button hides when undo is off")
 	app.set_undo_limit(1)
 
-	# Statistics: replacing a game after a move counts it as played.
+	# Statistics: a game left early is a restart; one left after ten moves counts as played.
 	var played: int = app.store.stats_for(0).games
 	guard = 0
 	while g.board.move_count == 0 and guard < 4:
 		g.request_move(guard)
 		guard += 1
 	g.start_new(0, false)
-	check(app.store.stats_for(0).games == played + 1, "an abandoned game counts as played")
+	check(app.store.stats_for(0).games == played, "a game left after a few moves is not counted")
+	guard = 0
+	while g.board.move_count < GameScreen.ABANDON_MIN_MOVES and guard < 200:
+		g.request_move(guard % 4)
+		guard += 1
+	g.start_new(0, false)
+	check(app.store.stats_for(0).games == played + 1, "a game left after ten moves counts as played")
 
 	# Board size from the menu: picker, 5x5 game.
 	app._to_menu()
@@ -329,13 +338,21 @@ func _new_features(app: App) -> void:
 func _fixes_121(app: App) -> void:
 	var g := app._game
 
-	# The swipe hint keeps pulsing until the first move and covers the whole board.
+	# The swipe hint breathes a few times, then rests so an untouched board stops redrawing.
 	app._show_screen(g)
+	app.store.tutorial_games = 0
 	g.start_new(4, false)
 	await _wait(2.5)
 	var hint: SwipeHint = g._board_view._hint
-	check(hint.is_showing() and hint._pulse_tween != null and hint._pulse_tween.is_running(), "hint arrows keep pulsing")
+	check(hint.is_showing() and hint._pulse_tween != null and hint._pulse_tween.is_running(), "hint arrows pulse at first")
 	check(hint.board_rect == g._board_view.board_rect, "hint veil covers the whole board")
+	await _wait(4.0)
+	check(hint.is_showing() and get_processed_tweens().is_empty() and OS.low_processor_usage_mode, "an untouched new game goes idle (tweens: %d)" % get_processed_tweens().size())
+	app._to_menu()
+	await _wait(1.5)
+	check(get_processed_tweens().is_empty() and OS.low_processor_usage_mode, "the menu after an untouched game goes idle")
+	app._show_screen(g)
+	await _wait(0.5)
 
 	# Swipes that start on the header/buttons are ignored; on the board they move.
 	var header_point := g._header.get_global_rect().get_center()

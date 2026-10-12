@@ -105,6 +105,11 @@ func _notification(what: int) -> void:
 		var wide := size.x > size.y * 1.1
 		if wide != _landscape_mode:
 			_apply_layout(wide)
+	elif what == NOTIFICATION_PREDELETE:
+		# The landscape column is held outside the tree while the portrait layout is shown.
+		for node: Node in [_left, _brand, _best_card, _buttons, _version]:
+			if is_instance_valid(node) and node.get_parent() == null:
+				node.free()
 
 
 ## Updates the best score, the chosen board size and the Continue button.

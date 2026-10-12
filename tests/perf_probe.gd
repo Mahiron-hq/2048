@@ -10,7 +10,8 @@ var app: App
 
 
 func _initialize() -> void:
-	DirAccess.remove_absolute(SAVE)
+	for f in [SAVE, SAVE + ".bak", SAVE + ".tmp"]:
+		DirAccess.remove_absolute(f)
 	_run.call_deferred()
 
 
@@ -53,7 +54,8 @@ func _run() -> void:
 	print("games %d, top score %d, best tile %d" % [games, top_score, app.store.stats_for(6).best_tile])
 	app.queue_free()
 	await process_frame
-	DirAccess.remove_absolute(SAVE)
+	for f in [SAVE, SAVE + ".bak", SAVE + ".tmp"]:
+		DirAccess.remove_absolute(f)
 	quit(0)
 
 

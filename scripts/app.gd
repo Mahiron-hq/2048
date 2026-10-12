@@ -15,6 +15,11 @@ const BASE_PORTRAIT := Vector2i(720, 1280)
 const BASE_LANDSCAPE := Vector2i(1280, 720)
 ## Short side of the rendered picture per [enum SaveStore.Quality]; smaller screens render natively.
 const QUALITY_SHORT_SIDE: Array[int] = [720, 1080, 1440]
+## The game screen keeps the display awake this long after the last touch, then the phone's own
+## screen timeout applies again.
+const KEEP_AWAKE_SEC := 120.0
+## Play time stops counting once this long has passed without a move.
+const PLAY_IDLE_SEC := 60.0
 
 static var instance: App
 
@@ -31,10 +36,21 @@ var _settings := SettingsScreen.new()
 var _stats := StatsScreen.new()
 var _confirm := ConfirmDialog.new()
 var _picker := SizePicker.new()
-## Board size for the next new game; every launch starts at the classic 4x4.
+## Board size for the next new game, remembered between launches.
 var selected_size := Board.DEFAULT_SIZE
 ## Play time not yet added to the statistics.
 var _play_time := 0.0
+## Seconds since the last touch or key press, for the screen keep-awake.
+var _since_input := 0.0
+## Seconds since the last move (or since play resumed), for the play-time clock.
+var _since_move := 0.0
+var _keep_awake := false
+## Outcome of reading the save at launch, shown once on the menu when it was not clean.
+var _load_result := SaveStore.Load.OK
+## Text of the last save handed to the writer; an identical one is not written again.
+var _saved_text := ""
+## Result of the background write in flight, read once it has completed.
+var _save_error := OK
 ## Background save in flight (WorkerThreadPool task id), or -1.
 var _save_task := -1
 ## Newer save text waiting for the one in flight to finish.
@@ -60,9 +76,13 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	store.load_from_disk()
+	_load_result = store.load_from_disk()
 	if not store.existed:
 		store.language = I18n.detect()
+	elif _load_result == SaveStore.Load.OK:
+		# Nothing to write until something changes; a recovered state is written back at once.
+		_saved_text = store.serialize()
+	selected_size = store.board_size
 	I18n.current = store.language
 	Palette.current = Palette.make(_wants_dark())
 	DisplayServer.set_system_theme_change_callback(_on_system_theme_changed)
@@ -140,8 +160,11 @@ func _process(delta: float) -> void:
 		if _save_countdown < 0.0:
 			save_now()
 	_pump_saves()
-	if _focused and _current == _game and _game.is_playing():
+	_since_input += delta
+	_since_move += delta
+	if _focused and _current == _game and _game.is_playing() and _since_move <= PLAY_IDLE_SEC:
 		_play_time += delta
+	_update_keep_awake()
 	var animating := not get_tree().get_processed_tweens().is_empty() or _game.is_celebrating()
 	OS.low_processor_usage_mode = not animating and not store.show_fps
 	if store.show_fps:
@@ -180,6 +203,8 @@ func _notification(what: int) -> void:
 			_follow_system_theme()
 		NOTIFICATION_APPLICATION_RESUMED:
 			_focused = true
+			_since_input = 0.0
+			_since_move = 0.0
 			_follow_system_theme()
 			# The system refresh rate setting may have changed while the game was away.
 			DisplayRate.apply(store.fps_limit)
@@ -188,10 +213,29 @@ func _notification(what: int) -> void:
 			Haptics.refresh_system_state()
 
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch or event is InputEventKey or event is InputEventMouseButton:
+		_since_input = 0.0
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE:
 		_on_back()
 		get_viewport().set_input_as_handled()
+
+
+## A move was played or undone, or a game started or resumed: the play-time clock runs again.
+func note_move() -> void:
+	_since_move = 0.0
+
+
+## Holds the display awake on the game screen until the player has left it untouched for
+## KEEP_AWAKE_SEC; the phone's own timeout takes over after that.
+func _update_keep_awake() -> void:
+	var want := _current == _game and _since_input < KEEP_AWAKE_SEC
+	if want != _keep_awake:
+		_keep_awake = want
+		DisplayServer.screen_set_keep_on(want)
 
 
 ## Adds a full-screen modal above all screens (outside the safe-area margins).
@@ -217,6 +261,9 @@ func confirm(title_key: String, body_key: String, yes_key: String, on_yes: Calla
 func save_now(sync := false) -> void:
 	_save_countdown = -1.0
 	var text := store.serialize()
+	if text == _saved_text and _queued_save.is_empty():
+		return
+	_saved_text = text
 	if sync:
 		_wait_for_save()
 		_queued_save = ""
@@ -230,11 +277,13 @@ func save_now(sync := false) -> void:
 
 
 func _write_save(text: String) -> void:
-	_report_save(store.write_text(text))
+	_save_error = store.write_text(text)
 
 
+## Main thread only. A failed write forgets the saved text, so the same state is written again.
 func _report_save(err: Error) -> void:
 	if err != OK:
+		_saved_text = ""
 		push_error("Saving failed: %s" % error_string(err))
 
 
@@ -242,6 +291,8 @@ func _wait_for_save() -> void:
 	if _save_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_save_task)
 		_save_task = -1
+		_report_save(_save_error)
+		_save_error = OK
 
 
 ## Schedules a save; requests within SAVE_DEBOUNCE collapse into one write.
@@ -536,7 +587,8 @@ func _show_screen(next: Control) -> void:
 		for s in [_menu, _game, _settings, _stats]:
 			if s != next and s != prev:
 				s.visible = false
-	DisplayServer.screen_set_keep_on(next == _game)
+	_since_input = 0.0
+	_update_keep_awake()
 	next.visible = true
 	next.modulate.a = 0.0
 	next.pivot_offset = _screens.size * 0.5
@@ -563,10 +615,18 @@ func _to_menu() -> void:
 
 
 func _on_menu_new_game() -> void:
-	if store.has_game() and int(store.game.get("moves", 0)) > 0:
+	if _saved_game_in_play():
 		confirm("CONFIRM_NEW_TITLE", "CONFIRM_NEW_BODY", "YES_NEW", _start_new_game)
 	else:
 		_start_new_game()
+
+
+## A saved game with moves that is not lost yet: replacing it loses progress.
+func _saved_game_in_play() -> bool:
+	if not store.has_game():
+		return false
+	var saved := Board.new(1)
+	return saved.from_dict(store.game) and saved.move_count > 0 and saved.can_move()
 
 
 func _start_new_game() -> void:
@@ -580,6 +640,8 @@ func _refresh_menu() -> void:
 
 func _on_size_chosen(n: int) -> void:
 	selected_size = n
+	store.board_size = n
+	request_save()
 	_refresh_menu()
 
 
@@ -620,7 +682,10 @@ func _on_back() -> void:
 		_to_menu()
 	else:
 		_flush_save()
-		get_tree().quit()
+		# Android keeps a backed-out app alive rather than ending it; doing the same makes the
+		# next launch instant.
+		if not AndroidBridge.move_to_background():
+			get_tree().quit()
 
 
 func _flush_save() -> void:

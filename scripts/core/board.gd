@@ -13,6 +13,12 @@ const MAX_UNDO := 5
 const DEFAULT_UNDO := 1
 const SPAWN_FOUR_CHANCE := 0.1
 const FIRST_MILESTONE := 128
+## Largest tile rank a board can hold: a 6x6 board tops out at 2^37.
+const MAX_RANK := 37
+## Ceilings for loaded counters; anything above them is not a real game.
+const MAX_SCORE := 1 << 53
+const MAX_MOVES := 1 << 31
+const MAX_ID := (1 << 31) - 1
 
 
 ## Everything a view needs to replay one move.
@@ -39,6 +45,11 @@ var ids := PackedInt32Array()
 var score := 0
 var best_tile := 0
 var move_count := 0
+## Highest milestone already celebrated this game. Undo leaves it alone, so replaying a merge
+## never celebrates the same tile twice.
+var celebrated := 0
+## The game has used an undo or a hint; such games do not count for the unassisted record.
+var assisted := false
 var rng := RandomNumberGenerator.new()
 ## How many moves can be undone in a row (0 disables undo). Lowering it drops the oldest steps.
 var undo_limit := DEFAULT_UNDO:
@@ -73,6 +84,8 @@ func new_game(p_size := -1) -> void:
 	score = 0
 	best_tile = 0
 	move_count = 0
+	celebrated = 0
+	assisted = false
 	_undo_stack.clear()
 	_spawn_random()
 	_spawn_random()
@@ -129,9 +142,10 @@ func move(dir: Dir) -> MoveResult:
 		best_tile = maxi(best_tile, m[3])
 	score += result.gained
 	move_count += 1
-	var milestone := maxi(FIRST_MILESTONE, _next_power_of_two(prev_best + 1))
+	var milestone := maxi(FIRST_MILESTONE, _next_power_of_two(maxi(prev_best, celebrated) + 1))
 	while milestone <= best_tile:
 		result.milestones.append(milestone)
+		celebrated = milestone
 		milestone *= 2
 	result.spawn = _spawn_random()
 	return result
@@ -165,6 +179,8 @@ func to_dict() -> Dictionary:
 		"score": score,
 		"best_tile": best_tile,
 		"moves": move_count,
+		"milestone": celebrated,
+		"assisted": assisted,
 	}
 	var stack := []
 	for snap in _undo_stack:
@@ -187,7 +203,7 @@ func to_dict() -> Dictionary:
 ## Loads [method to_dict] output (or a 1.x save). Returns false and leaves the board untouched
 ## on malformed data. Missing tile ids are reissued; undo then works without animation.
 func from_dict(d: Dictionary) -> bool:
-	var n := int(d.get("size", 0)) if (d.get("size") is int or d.get("size") is float) else 0
+	var n := read_count(d.get("size"), MAX_SIZE)
 	if not is_valid_size(n):
 		return false
 	var main := _parse_state(d, n)
@@ -211,11 +227,21 @@ func from_dict(d: Dictionary) -> bool:
 	while stack.size() > MAX_UNDO:
 		stack.pop_front()
 
+	var milestone := read_count(d.get("milestone"), 1 << MAX_RANK)
+	if d.has("milestone") and (milestone < 0 or (milestone != 0 and (milestone & (milestone - 1)) != 0)):
+		return false
+	var helped = d.get("assisted", false)
+	if not helped is bool:
+		return false
+
 	_resize(n)
 	values = main.values
 	score = main.score
 	best_tile = main.best_tile
 	move_count = main.move_count
+	# Saves before 1.3.1 do not record it: every milestone up to the best tile was celebrated.
+	celebrated = milestone if d.has("milestone") else _milestone_at_or_below(best_tile)
+	assisted = helped
 	_undo_stack = stack
 	while _undo_stack.size() > undo_limit:
 		_undo_stack.pop_front()
@@ -318,8 +344,22 @@ func _slide(dir: Dir, src_values: PackedInt64Array, src_ids: PackedInt32Array) -
 	return {"values": new_values, "ids": new_ids, "result": result}
 
 
+## [param value] as a whole number in 0..[param ceiling], or -1 when it is anything else: a string,
+## a fraction, out of range. JSON numbers arrive as floats, so whole floats are accepted.
+static func read_count(value: Variant, ceiling: int) -> int:
+	if value is int:
+		return value if value >= 0 and value <= ceiling else -1
+	if value is float and is_finite(value) and value >= 0.0 and value <= float(ceiling) and floorf(value) == value:
+		return int(value)
+	return -1
+
+
+static func _is_tile(v: int) -> bool:
+	return v == 0 or (v >= 2 and v <= 1 << MAX_RANK and (v & (v - 1)) == 0)
+
+
 func _parse_state(d: Dictionary, n: int) -> Dictionary:
-	if int(d.get("size", 0)) != n:
+	if read_count(d.get("size"), MAX_SIZE) != n:
 		return {}
 	var cells := n * n
 	var raw = d.get("values")
@@ -329,45 +369,57 @@ func _parse_state(d: Dictionary, n: int) -> Dictionary:
 	parsed.resize(cells)
 	var max_value := 0
 	for i in cells:
-		if not (raw[i] is int or raw[i] is float):
-			return {}
-		var v := int(raw[i])
-		if v < 0 or (v != 0 and (v < 2 or (v & (v - 1)) != 0)):
+		var v := read_count(raw[i], 1 << MAX_RANK)
+		if v < 0 or not _is_tile(v):
 			return {}
 		parsed[i] = v
 		max_value = maxi(max_value, v)
-	var s := int(d.get("score", -1))
-	var m := int(d.get("moves", -1))
+	var s := read_count(d.get("score"), MAX_SCORE)
+	var m := read_count(d.get("moves"), MAX_MOVES)
 	if s < 0 or m < 0:
 		return {}
-	var dir = d.get("dir", -1)
+	var best := max_value
+	if d.has("best_tile"):
+		var stored := read_count(d.best_tile, 1 << MAX_RANK)
+		if stored < 0 or not _is_tile(stored):
+			return {}
+		best = maxi(best, stored)
+	var dir := read_count(d.get("dir"), Dir.RIGHT) if d.has("dir") else -1
 	return {
 		"values": parsed,
 		"ids": _parse_ids(d.get("ids"), parsed),
-		"dir": int(dir) if (dir is int or dir is float) else -1,
+		"dir": dir,
 		"score": s,
-		"best_tile": maxi(int(d.get("best_tile", 0)), max_value),
+		"best_tile": best,
 		"move_count": m,
 	}
 
 
 ## Tile ids aligned with [param cells]: positive and unique exactly where a tile is. Returns an
 ## empty array when missing or inconsistent, which callers treat as "reissue".
-static func _parse_ids(raw, cells: PackedInt64Array) -> PackedInt32Array:
+static func _parse_ids(raw: Variant, cells: PackedInt64Array) -> PackedInt32Array:
 	if not (raw is Array or raw is PackedInt32Array) or raw.size() != cells.size():
 		return PackedInt32Array()
 	var parsed := PackedInt32Array()
 	parsed.resize(cells.size())
 	var seen := {}
 	for i in cells.size():
-		if not (raw[i] is int or raw[i] is float):
-			return PackedInt32Array()
-		var id := int(raw[i])
-		if (id > 0) != (cells[i] != 0) or (id > 0 and seen.has(id)):
+		var id := read_count(raw[i], MAX_ID)
+		if id < 0 or (id > 0) != (cells[i] != 0) or (id > 0 and seen.has(id)):
 			return PackedInt32Array()
 		seen[id] = true
 		parsed[i] = id
 	return parsed
+
+
+## The largest milestone (a power of two from FIRST_MILESTONE up) not above [param tile], or 0.
+static func _milestone_at_or_below(tile: int) -> int:
+	if tile < FIRST_MILESTONE:
+		return 0
+	var m := FIRST_MILESTONE
+	while m * 2 <= tile:
+		m *= 2
+	return m
 
 
 func _reissue_ids() -> void:

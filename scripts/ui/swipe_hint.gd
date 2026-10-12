@@ -2,6 +2,10 @@ class_name SwipeHint
 extends Control
 ## Light veil over the board with four breathing chevrons and a caption: the board is played by
 ## swiping. The tiles stay visible and every touch passes through.
+## The chevrons breathe a few times and then rest, so a board left untouched stops redrawing.
+
+## Breaths before the chevrons come to rest.
+const PULSES := 4
 
 ## Area of the board inside the parent, set by [BoardView] on layout.
 var board_rect := Rect2():
@@ -36,7 +40,13 @@ func _on_skin_changed() -> void:
 	queue_redraw()
 
 
-## Fades in; the chevrons keep breathing until the hint is dismissed by the first move.
+func _notification(what: int) -> void:
+	# A hidden screen must not keep the frame loop busy with its animation.
+	if what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree():
+		_stop_pulse()
+
+
+## Fades in; the chevrons breathe PULSES times, or not at all with reduced motion.
 func appear() -> void:
 	if _tween:
 		_tween.kill()
@@ -46,7 +56,9 @@ func appear() -> void:
 	_pulse = 0.0
 	_tween = create_tween()
 	_tween.tween_property(self, "modulate:a", 1.0, Design.DUR_SLOW).set_trans(Tween.TRANS_SINE)
-	_pulse_tween = create_tween().set_loops()
+	if Motion.reduced():
+		return
+	_pulse_tween = create_tween().set_loops(PULSES)
 	_pulse_tween.tween_property(self, "_pulse", 1.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_pulse_tween.tween_property(self, "_pulse", 0.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 

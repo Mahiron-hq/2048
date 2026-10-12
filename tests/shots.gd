@@ -10,7 +10,8 @@ var app: App
 
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
-	DirAccess.remove_absolute(SAVE)
+	for f in [SAVE, SAVE + ".bak", SAVE + ".tmp"]:
+		DirAccess.remove_absolute(f)
 	app = load("res://scenes/main.tscn").instantiate()
 	app.store = SaveStore.new(SAVE)
 	root.add_child(app)
