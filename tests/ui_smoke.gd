@@ -229,6 +229,7 @@ func _run() -> void:
 	await _hints(app)
 	await _reduced_motion(app)
 	await _display_rest(app)
+	await _first_toast()
 	await _quality(app)
 	await _landscape(app)
 
@@ -501,6 +502,19 @@ func _reduced_motion(app: App) -> void:
 	app.set_reduce_motion(SaveStore.ReduceMotion.OFF)
 	check(not Motion.reduced(), "Reduce motion: off")
 	await _wait(0.3)
+
+
+## The first message of a fresh app is a one-line pill, not a column of single letters.
+func _first_toast() -> void:
+	var fresh := Toast.new()
+	fresh.size = Vector2(720, 1600)
+	root.add_child(fresh)
+	fresh.show_message("EXPORT_DONE")
+	await _frames(3)
+	var card: Control = fresh._card
+	check(card.size.y < 120.0 and card.size.x > 300.0, "the first toast is one short line (%s)" % card.size)
+	fresh.queue_free()
+	await _frames(1)
 
 
 ## A still screen withdraws the refresh rate request; a touch asks for it again.
