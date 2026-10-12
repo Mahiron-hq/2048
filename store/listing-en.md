@@ -1,4 +1,4 @@
-# Store page texts — English
+# Store page texts – English
 
 Copy each block into the matching field. Character limits are in brackets.
 
@@ -14,17 +14,17 @@ Copy each block into the matching field. Character limits are in brackets.
 Calm 2048 with no ads or internet: smart move hints, boards up to 6×6.
 ```
 
-### Full description (up to 4000 characters, this one is 1703)
+### Full description (up to 4000 characters, this one is 1675)
 ```
-2048 Merge is a calm, polished take on the famous number puzzle. Swipe to slide the tiles, merge matching numbers and chase 2048 — then keep going: there is no finish line, the game goes on while the board has a move left.
+2048 Merge is a calm, polished take on the famous number puzzle. Swipe to slide the tiles, merge matching numbers and chase 2048 – then keep going: there is no finish line, the game goes on while the board has a move left.
 
 NO ADS, NO INTERNET
 No ads, no purchases, no accounts, no tracking. The game never goes online and asks for a single permission: vibration.
 
 PLAY YOUR WAY
-• 3×3, 4×4, 5×5 and 6×6 boards, each with its own records — overall and without help.
-• Undo up to five moves in a row — or turn undo off for a pure game.
-• Move hints with three strengths: Simple answers at once, Medium in a third of a second, Smart thinks up to 15 seconds on all of the phone's cores. The move itself is always yours.
+• 3×3, 4×4, 5×5 and 6×6 boards, each with its own records – overall and without help.
+• Undo up to five moves in a row – or turn undo off for a pure game.
+• Move hints with three strengths: Simple answers at once, Medium thinks for up to a second, Smart for up to 15 seconds. The move itself is always yours.
 • Statistics: games played, average score, best tile, moves and time played.
 
 FEELS GOOD TO PLAY
@@ -38,7 +38,7 @@ ORIGINAL SOUNDTRACK
 
 MADE FOR YOU
 • Light and dark themes, or Auto to follow your phone.
-• Text size and reduced motion — as in your phone's settings or your own choice.
+• Text size and reduced motion – as in your phone's settings or your own choice.
 • Graphics quality: low, medium or high (up to 2K).
 • English and Russian.
 • Portrait and landscape, phones and tablets.
@@ -67,15 +67,15 @@ Calm 2048 with no ads or internet: smart hints, boards up to 6×6, own music
 
 ### Page description
 ```
-2048 Merge is a calm, polished take on the famous number puzzle. Swipe to slide the tiles, merge matching numbers and chase 2048 — then keep going: there is no finish line, the game goes on while the board has a move left.
+2048 Merge is a calm, polished take on the famous number puzzle. Swipe to slide the tiles, merge matching numbers and chase 2048 – then keep going: there is no finish line, the game goes on while the board has a move left.
 
 NO ADS, NO INTERNET
 No ads, no purchases, no accounts, no tracking. The game never goes online and asks for a single permission: vibration.
 
 PLAY YOUR WAY
-• 3×3, 4×4, 5×5 and 6×6 boards, each with its own records — overall and without help.
-• Undo up to five moves in a row — or turn undo off for a pure game.
-• Move hints with three strengths: Simple answers at once, Medium in a third of a second, Smart thinks up to 15 seconds on all of the phone's cores. The move itself is always yours.
+• 3×3, 4×4, 5×5 and 6×6 boards, each with its own records – overall and without help.
+• Undo up to five moves in a row – or turn undo off for a pure game.
+• Move hints with three strengths: Simple answers at once, Medium thinks for up to a second, Smart for up to 15 seconds. The move itself is always yours.
 • Statistics: games played, average score, best tile, moves and time played.
 
 FEELS GOOD TO PLAY
@@ -89,7 +89,7 @@ ORIGINAL SOUNDTRACK
 
 MADE FOR YOU
 • Light and dark themes, or Auto to follow your phone.
-• Text size and reduced motion — as in your phone's settings or your own choice.
+• Text size and reduced motion – as in your phone's settings or your own choice.
 • Graphics quality: low, medium or high (up to 2K).
 • English and Russian.
 • Portrait and landscape, phones and tablets.
@@ -121,17 +121,17 @@ Open source: github.com/Mahiron-hq/2048
 Calm 2048 with no ads or internet: smart move hints, boards up to 6×6.
 ```
 
-### Full description (up to 4000 characters, this one is 1809)
+### Full description (up to 4000 characters, this one is 1781)
 ```
-2048 Merge is a calm, polished take on the famous number puzzle. Swipe to slide the tiles, merge matching numbers and chase 2048 — then keep going: there is no finish line, the game goes on while the board has a move left.
+2048 Merge is a calm, polished take on the famous number puzzle. Swipe to slide the tiles, merge matching numbers and chase 2048 – then keep going: there is no finish line, the game goes on while the board has a move left.
 
 NO ADS, NO INTERNET
 No ads, no purchases, no accounts, no tracking. The game never goes online and asks for a single permission: vibration.
 
 PLAY YOUR WAY
-• 3×3, 4×4, 5×5 and 6×6 boards, each with its own records — overall and without help.
-• Undo up to five moves in a row — or turn undo off for a pure game.
-• Move hints with three strengths: Simple answers at once, Medium in a third of a second, Smart thinks up to 15 seconds on all of the phone's cores. The move itself is always yours.
+• 3×3, 4×4, 5×5 and 6×6 boards, each with its own records – overall and without help.
+• Undo up to five moves in a row – or turn undo off for a pure game.
+• Move hints with three strengths: Simple answers at once, Medium thinks for up to a second, Smart for up to 15 seconds. The move itself is always yours.
 • Statistics: games played, average score, best tile, moves and time played.
 
 FEELS GOOD TO PLAY
@@ -146,7 +146,7 @@ ORIGINAL SOUNDTRACK
 
 MADE FOR YOU
 • Light and dark themes, or Auto to follow your phone.
-• Text size and reduced motion — as in your phone's settings or your own choice.
+• Text size and reduced motion – as in your phone's settings or your own choice.
 • Graphics quality: low, medium or high (up to 2K).
 • English and Russian.
 • Portrait and landscape, phones and tablets.
@@ -182,10 +182,10 @@ Open source: github.com/Mahiron-hq/2048
 ## Upload labels
 | File | Platform checkbox | Display name |
 |---|---|---|
-| `2048-Merge-v1.3.1-arm64-v8a.apk` | Android | Android — most phones (arm64) |
-| `2048-Merge-v1.3.1-armeabi-v7a.apk` | Android | Android — older 32-bit phones |
-| `2048-Merge-v1.3.1-universal.apk` | Android | Android — any phone (larger download) |
-| `2048_Quiet_Tiles.flac` *(optional, from the `soundtrack` release)* | — (Soundtrack) | Soundtrack — 2048 Quiet Tiles (FLAC) |
+| `2048-Merge-v1.3.1-arm64-v8a.apk` | Android | Android – most phones (arm64) |
+| `2048-Merge-v1.3.1-armeabi-v7a.apk` | Android | Android – older 32-bit phones |
+| `2048-Merge-v1.3.1-universal.apk` | Android | Android – any phone (larger download) |
+| `2048_Quiet_Tiles.flac` *(optional, from the `soundtrack` release)* | – (Soundtrack) | Soundtrack – 2048 Quiet Tiles (FLAC) |
 
 ## Media
 - Screenshots 1080×1920: `store/screenshots/en/` (in numbered order; taken from real games by `tools/make_screenshots.gd`).
