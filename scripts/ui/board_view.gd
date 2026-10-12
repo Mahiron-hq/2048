@@ -74,7 +74,9 @@ func is_animating() -> bool:
 ## Suggests a move without making it: the tiles lean towards [param dir] twice and that edge glows.
 func show_move_hint(dir: Board.Dir) -> void:
 	stop_move_hint()
-	var off := _dir_vector(dir) * minf(cell_size * HINT_PUSH, gap * 0.85)
+	# Reduced motion: the tiles stay put and only the edge lights up.
+	var reach := 0.0 if Motion.reduced() else minf(cell_size * HINT_PUSH, gap * 0.85)
+	var off := _dir_vector(dir) * reach
 	_hint_glow.setup(dir, board_rect.grow(-gap * 0.5))
 	_hint_tween = create_tween()
 	for push in 2:
@@ -112,7 +114,7 @@ func show_board(board: Board, appear := Appear.NONE) -> void:
 		if board.values[i] == 0:
 			continue
 		var t := _acquire(board.ids[i], board.values[i], i)
-		match appear:
+		match Appear.FADE if appear != Appear.NONE and Motion.reduced() else appear:
 			Appear.POP:
 				t.scale = Vector2.ZERO
 				var tw := _fx_tween()
@@ -121,10 +123,11 @@ func show_board(board: Board, appear := Appear.NONE) -> void:
 				order += 1
 			Appear.FADE:
 				t.modulate.a = 0.0
-				t.scale = Vector2(0.92, 0.92)
 				var tw := _fx_tween().set_parallel()
 				tw.tween_property(t, "modulate:a", 1.0, 0.16)
-				tw.tween_property(t, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				if not Motion.reduced():
+					t.scale = Vector2(0.92, 0.92)
+					tw.tween_property(t, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_watch_settle()
 
 
@@ -193,7 +196,7 @@ func is_hint_visible() -> bool:
 
 ## Small bump towards [param dir] for a swipe that changes nothing.
 func nudge(dir: Board.Dir) -> void:
-	if _nudge_tween and _nudge_tween.is_valid():
+	if (_nudge_tween and _nudge_tween.is_valid()) or Motion.reduced():
 		return
 	stop_move_hint()
 	var off := _dir_vector(dir)
@@ -312,6 +315,8 @@ func _after_slide(result: Board.MoveResult) -> void:
 			continue
 		survivor.set_meta("cell", m[2])
 		survivor.set_value(m[3])
+		if Motion.reduced():
+			continue
 		survivor.z_index = 2
 		var tw := _fx_tween()
 		tw.tween_property(survivor, "scale", Vector2.ONE * MERGE_SCALE, MERGE_TIME * 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -325,10 +330,14 @@ func _after_slide(result: Board.MoveResult) -> void:
 			t.set_meta("cell", s[2])
 	if not result.spawn.is_empty():
 		var t := _acquire(result.spawn[0], result.spawn[2], result.spawn[1])
-		t.scale = Vector2.ZERO
 		var tw := _fx_tween()
 		tw.tween_interval(0.03)
-		tw.tween_property(t, "scale", Vector2.ONE, SPAWN_TIME).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+		if Motion.reduced():
+			t.modulate.a = 0.0
+			tw.tween_property(t, "modulate:a", 1.0, SPAWN_TIME)
+		else:
+			t.scale = Vector2.ZERO
+			tw.tween_property(t, "scale", Vector2.ONE, SPAWN_TIME).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	_watch_settle()
 
 

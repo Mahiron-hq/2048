@@ -16,6 +16,8 @@ const EMPTY_WEIGHT := 270.0
 const MIN_PROBABILITY := 0.0001
 const SPAWN_FOUR_CHANCE := 0.1
 const MAX_DEPTH := 12
+## Line scores kept between searches; past this the cache starts over, so long 6x6 sessions stay bounded.
+const LINE_CACHE_MAX := 1 << 16
 ## Moves in the order they are preferred when two score the same.
 const ORDER := [Board.Dir.LEFT, Board.Dir.DOWN, Board.Dir.RIGHT, Board.Dir.UP]
 
@@ -27,7 +29,8 @@ var _size := 0
 var _lines := {}
 ## Heuristic score per packed line of ranks.
 var _line_scores := {}
-## Expectimax value per board state for the search in progress: {state: [depth, value]}.
+## Expectimax value per board state for the search in progress: {state: [depth, value]}. The
+## probability a state was reached with is not part of the key, as in nneonneo's solver.
 var _memo := {}
 var _deadline := 0
 var _timed_out := false
@@ -46,9 +49,16 @@ func best_move(values: PackedInt64Array, size: int, budget_ms: int) -> int:
 	last_depth = 0
 	if moves.is_empty():
 		return -1
-	var best: int = moves.keys()[0]
 	if moves.size() == 1:
-		return best
+		return moves.keys()[0]
+	# Until depth 1 completes, the best is the move whose board scores highest as it stands.
+	var best: int = moves.keys()[0]
+	var best_score := -INF
+	for dir: int in moves:
+		var score := _evaluate(moves[dir])
+		if score > best_score:
+			best_score = score
+			best = dir
 	_deadline = Time.get_ticks_usec() + budget_ms * 1000
 	_timed_out = false
 	for depth in range(1, MAX_DEPTH + 1):
@@ -191,6 +201,8 @@ func _evaluate(state: PackedByteArray) -> float:
 			var score = _line_scores.get(key)
 			if score == null:
 				score = _line_score(state, cells)
+				if _line_scores.size() >= LINE_CACHE_MAX:
+					_line_scores.clear()
 				_line_scores[key] = score
 			total += score
 	return total

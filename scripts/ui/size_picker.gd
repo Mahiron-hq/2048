@@ -62,7 +62,7 @@ func open_at(anchor: Rect2, current: int) -> void:
 	if fit < 1.0:
 		_card.position.y = Design.SPACE_XS
 		_card.pivot_offset = Vector2(card_size.x * 0.2, 0.0)
-	_card.scale = Vector2(0.94, 0.94) * fit
+	_card.scale = Vector2.ONE * fit if Motion.reduced() else Vector2(0.94, 0.94) * fit
 	if _tween:
 		_tween.kill()
 	_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

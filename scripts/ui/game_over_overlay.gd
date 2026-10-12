@@ -75,6 +75,9 @@ func present(score: int, best_tile: int, moves: int, record: bool, can_undo := f
 	var tw := create_tween()
 	tw.tween_interval(Design.DUR_BASE)
 	tw.tween_property(self, "_shown_score", float(score), 0.8).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	if Motion.reduced():
+		_tile.scale = Vector2.ONE
+		return
 	_tile.scale = Vector2.ZERO
 	tw.parallel().tween_property(_tile, "scale", Vector2.ONE, Design.DUR_SLOW).set_delay(Design.DUR_SLOW) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

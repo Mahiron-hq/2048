@@ -17,6 +17,8 @@ const ALWAYS_OFFERED := [30, 60]
 const MULTIPLE_TOLERANCE := 0.02
 
 static var _limit := 0
+## While true the game states no preference, so a still screen can drop to the system's idle rate.
+static var _resting := false
 ## Guards the two fields below: the Android query writes them on the UI thread.
 static var _lock := Mutex.new()
 ## Refresh rates of the display modes at the current resolution, highest first. Empty until the
@@ -36,8 +38,17 @@ static func apply(limit: int) -> void:
 	var activity = runtime.getActivity()
 	if activity == null:
 		return
-	var runnable = runtime.createRunnableFromGodotCallable(_apply.bind(activity))
+	var runnable = runtime.createRunnableFromGodotCallable(_apply.bind(activity, _resting))
 	activity.runOnUiThread(runnable)
+
+
+## Lets the display fall back to the system's idle rate while nothing on screen moves
+## ([param resting] true), or asks for the game's rate again. Unchanged state costs nothing.
+static func rest(resting: bool) -> void:
+	if resting == _resting:
+		return
+	_resting = resting
+	apply(_limit)
 
 
 ## True once the Android query has read the panel's modes.
@@ -100,7 +111,7 @@ static func _fits_evenly(limit: int, rates: PackedFloat32Array) -> bool:
 
 
 ## Runs on the Android UI thread; only JNI calls, no scene access.
-static func _apply(activity) -> void:
+static func _apply(activity, resting: bool) -> void:
 	var display = activity.getDisplay() if activity.has_java_method("getDisplay") else null
 	if display == null:
 		var wm = activity.getWindowManager()
@@ -116,6 +127,9 @@ static func _apply(activity) -> void:
 		_lock.unlock()
 	if target <= 0.0:
 		target = display.getRefreshRate()
+	# A rate of 0 withdraws the request.
+	if resting:
+		target = 0.0
 	var surface = _find_render_surface(activity.getWindow().getDecorView())
 	if surface == null or not surface.has_java_method("setFrameRate"):
 		return

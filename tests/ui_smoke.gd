@@ -64,7 +64,7 @@ func _run() -> void:
 	rng.seed = 11
 	for i in 60:
 		if not board.can_move():
-			app._game.start_new(false)
+			app._game.start_new(0, false)
 		app._game.request_move(rng.randi_range(0, 3))
 		if i % 3 == 0:
 			await _frames(2)
@@ -227,6 +227,8 @@ func _run() -> void:
 	await _new_features(app)
 	await _fixes_121(app)
 	await _hints(app)
+	await _reduced_motion(app)
+	await _display_rest(app)
 	await _quality(app)
 	await _landscape(app)
 
@@ -457,6 +459,69 @@ func _hints(app: App) -> void:
 	app.set_hints(true)
 	await _frames(2)
 	check(g._hint_btn.visible, "turning hints back on shows the button")
+
+
+## With reduced motion tiles still slide, while spawns, merges, the hint, milestones and screen
+## changes only fade.
+func _reduced_motion(app: App) -> void:
+	var g := app._game
+	app.set_reduce_motion(SaveStore.ReduceMotion.ON)
+	check(Motion.reduced(), "Reduce motion: on")
+	app._to_menu()
+	await _frames(1)
+	check(app._menu.scale == Vector2.ONE, "screens change without scaling")
+	check(app._menu._logo_tiles.all(func(t: Control) -> bool: return t.scale == Vector2.ONE), "the logo appears without popping")
+	await _wait(0.5)
+	g.start_new(4, false)
+	app._show_screen(g)
+	await _wait(0.5)
+	g.board.from_dict({"size": 4, "values": [64, 64, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "score": 0, "moves": 3})
+	g.board.rng.seed = 3
+	g._board_view.show_board(g.board)
+	await _frames(2)
+	g.request_move(Board.Dir.LEFT)
+	var scaled := false
+	for i in 20:
+		await _frames(1)
+		for t: Control in g._board_view._tiles.values():
+			scaled = scaled or not t.scale.is_equal_approx(Vector2.ONE)
+	check(not scaled, "no tile swells, pops or shrinks")
+	check(not g._confetti.emitting, "no confetti for a milestone")
+	await _wait(0.5)
+	g._set_hint_glow(true)
+	check(g._hint_btn.glow == 1.0 and not g._hint_glowing(), "the idle bulb is lit without pulsing")
+	g._reset_idle()
+	g._board_view.show_move_hint(Board.Dir.RIGHT)
+	var moved := false
+	for i in 30:
+		await _frames(1)
+		moved = moved or g._board_view._layer.position != Vector2.ZERO
+	check(g._board_view.is_showing_move_hint() and not moved, "the hint lights the edge and leaves the tiles in place")
+	g._board_view.stop_move_hint()
+	app.set_reduce_motion(SaveStore.ReduceMotion.OFF)
+	check(not Motion.reduced(), "Reduce motion: off")
+	await _wait(0.3)
+
+
+## A still screen withdraws the refresh rate request; a touch asks for it again.
+func _display_rest(app: App) -> void:
+	app._to_menu()
+	await _wait(App.REST_AFTER_SEC)
+	for i in 40:
+		if DisplayRate._resting:
+			break
+		await _wait(0.1)
+	check(DisplayRate._resting, "a still screen lets the display rest (still for %.1f s)" % app._still)
+	check(OS.low_processor_usage_mode_sleep_usec == App.REST_SLEEP_USEC, "a resting screen wakes the loop less often")
+	var t := InputEventScreenTouch.new()
+	t.pressed = true
+	t.position = Vector2(4, 4)
+	Input.parse_input_event(t)
+	await _frames(2)
+	check(not DisplayRate._resting and OS.low_processor_usage_mode_sleep_usec == App.IDLE_SLEEP_USEC, "a touch asks for the full rate again")
+	t.pressed = false
+	Input.parse_input_event(t)
+	await _frames(2)
 
 
 ## Each quality level renders at its own resolution while the layout keeps the same units;
