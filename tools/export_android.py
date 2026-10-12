@@ -1,7 +1,7 @@
 """Builds the Android packages exactly as the release workflow does, here or in CI.
 
 Usage: python tools/export_android.py [preset ...]
-  presets: arm64, armv7, universal, aab (default: all four)
+  presets: arm64, armv7, universal, aab (default), and bench (the measurement build)
 
 Steps: builds the Rust hint engine for Android, installs the Gradle build template if missing,
 exports each preset with Godot, re-signs the APKs with APK Signature Scheme v2 and v3 (v3 allows
@@ -41,6 +41,11 @@ PRESETS = {
     "armv7": ("Android armeabi-v7a", "armeabi-v7a", "apk", ["armeabi-v7a"]),
     "universal": ("Android universal", "universal", "apk", ["arm64-v8a", "armeabi-v7a"]),
     "aab": ("Android AAB", "", "aab", ["arm64-v8a", "armeabi-v7a"]),
+    # Measurement build for tools/device_bench.py: its own package, never published.
+    "bench": ("Android bench", "bench", "apk", ["arm64-v8a"]),
+    # The same, under the game's own package: installs as an update where a phone asks the user
+    # to confirm new packages. It keeps its own save file; reinstall the real build afterwards.
+    "bench-in-place": ("Android bench in place", "bench-in-place", "apk", ["arm64-v8a"]),
 }
 
 
@@ -109,7 +114,13 @@ def export(key: str, version: str) -> Path:
     out.unlink(missing_ok=True)
     # Fresh Gradle intermediates per preset: switching ABIs must not reuse old outputs.
     shutil.rmtree(ROOT / "android/build/build", ignore_errors=True)
-    run([godot(), "--headless", "--path", str(ROOT), "--export-release", preset, str(out)], timeout=1800)
+    # Godot exits 0 even when a script fails to parse, so its log decides.
+    log = run([godot(), "--headless", "--path", str(ROOT), "--export-release", preset, str(out)],
+              timeout=1800, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    print(log.stdout + log.stderr, end="")
+    errors = [l for l in (log.stdout + log.stderr).splitlines() if l.startswith(("ERROR:", "SCRIPT ERROR:"))]
+    if errors:
+        sys.exit(f"export of {preset} reported errors:\n" + "\n".join(errors[:10]))
     if not out.exists() or out.stat().st_size == 0:
         sys.exit(f"export of {preset} produced no file")
     if ext == "apk":
@@ -161,7 +172,7 @@ def verify(package: Path, version: str, abis: list[str]) -> None:
 
 
 def main() -> None:
-    keys = sys.argv[1:] or list(PRESETS)
+    keys = sys.argv[1:] or ["arm64", "armv7", "universal", "aab"]
     unknown = set(keys) - set(PRESETS)
     if unknown:
         sys.exit(f"unknown preset(s): {', '.join(sorted(unknown))}")
