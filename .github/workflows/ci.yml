@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   workflow_call:
 
@@ -17,16 +17,76 @@ env:
   GODOT_VERSION: 4.7.2
   # From the release's SHA512-SUMS.txt; a mismatch fails the job instead of running a tampered binary.
   GODOT_SHA512: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
+  RUST_TOOLCHAIN: 1.95.0
+  GDTOOLKIT_VERSION: 4.5.0
 
 jobs:
-  test:
-    name: Logic and UI tests
+  rust:
+    name: Rust hint engine
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component clippy,rustfmt
+          rustup default "$RUST_TOOLCHAIN"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/target
+          key: cargo-${{ env.RUST_TOOLCHAIN }}-${{ hashFiles('native/Cargo.lock') }}
+
+      - name: Format, lints, build without warnings, tests
+        working-directory: native
+        env:
+          RUSTFLAGS: -D warnings
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets --all-features -- -D warnings
+          cargo build --locked --all-targets
+          cargo test --locked --all-features
+
+  test:
+    name: Logic and UI tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The version check compares with the previous release tag.
+          fetch-depth: 0
+
+      - name: Version is consistent and moves forward
+        run: python3 tools/check_version.py
+
+      - name: GDScript lint
+        run: |
+          python3 -m pip install --user "gdtoolkit==$GDTOOLKIT_VERSION"
+          python3 -m gdtoolkit.linter scripts tests tools
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup default "$RUST_TOOLCHAIN"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/target
+          key: cargo-host-${{ env.RUST_TOOLCHAIN }}-${{ hashFiles('native/Cargo.lock') }}
+
+      - name: Build the hint engine for the tests
+        run: python3 tools/build_native.py host
 
       - name: Cache Godot
         id: godot-cache
@@ -49,13 +109,13 @@ jobs:
         run: timeout 600 ~/godot/godot --headless --path . --import
 
       - name: Logic tests
-        run: timeout 600 ~/godot/godot --headless --path . --script res://tests/run_tests.gd
+        run: tools/ci_godot.sh --script res://tests/run_tests.gd
 
       - name: UI tests
-        run: timeout 600 ~/godot/godot --headless --path . --script res://tests/ui_smoke.gd
+        run: tools/ci_godot.sh --script res://tests/ui_smoke.gd
 
       - name: UI tests with a wide font
         run: |
           font=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
           test -f "$font" || sudo apt-get install -y --no-install-recommends fonts-dejavu-core
-          UI_SMOKE_FONT="$font" timeout 600 ~/godot/godot --headless --path . --script res://tests/ui_smoke.gd
+          UI_SMOKE_FONT="$font" tools/ci_godot.sh --script res://tests/ui_smoke.gd

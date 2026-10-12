@@ -83,6 +83,9 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	# One line in the log tells which hint engine this build runs; the emulator check reads it.
+	print("2048 Merge %s: hints on the %s engine" % [ProjectSettings.get_setting("application/config/version"),
+			"native" if ClassDB.class_exists(&"HintEngine") else "GDScript"])
 	_load_result = store.load_from_disk()
 	if not store.existed:
 		store.language = I18n.detect()
