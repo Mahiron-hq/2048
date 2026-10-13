@@ -3,9 +3,10 @@
 Usage: python tools/export_android.py [preset ...]
   presets: arm64, armv7, universal, aab (default), and bench (the measurement build)
 
-Steps: builds the Rust hint engine for Android, installs the Gradle build template if missing,
-exports each preset with Godot, re-signs the APKs with APK Signature Scheme v2 and v3 (v3 allows
-a later key rotation), and checks every package carries the expected certificate, version and ABIs.
+Steps: builds the Rust hint engine for Android and for the exporting editor, installs the Gradle
+build template if missing, exports each preset with Godot, re-signs the APKs with APK Signature
+Scheme v2 and v3 (v3 allows a later key rotation), and checks every package carries the expected
+certificate, version and ABIs.
 
 Environment:
   GODOT                                  Godot executable (default: godot)
@@ -187,7 +188,8 @@ def main() -> None:
         if not os.environ.get(var):
             sys.exit(f"{var} is not set")
     BUILD.mkdir(exist_ok=True)
-    run([sys.executable, str(ROOT / "tools/build_native.py"), "android"])
+    # The editor that exports needs the host library too, or it logs the engine as missing.
+    run([sys.executable, str(ROOT / "tools/build_native.py"), "host", "android"])
     install_template()
     run([godot(), "--headless", "--path", str(ROOT), "--import"], timeout=1800)
     version = project_version()
