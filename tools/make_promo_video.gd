@@ -15,9 +15,9 @@ const SCREEN_RADIUS := 56.0
 const CAPTIONS := {
 	"ru": [
 		["2048 Merge", "Спокойная головоломка слияний"],
-		["Свайп — и плитки скользят", "Плавно, отзывчиво и без рекламы"],
+		["Свайп – и плитки скользят", "Плавно, отзывчиво и без рекламы"],
 		["Праздник на каждой вехе", "128, 256 … 2048 и дальше"],
-		["Подсказка лучшего хода", "Лампочка подскажет, ход — за вами"],
+		["Подсказка лучшего хода", "Лампочка подскажет, ход – за вами"],
 		["Отмена до пяти ходов", "Ход проигрывается назад"],
 		["Светлая и тёмная темы", "Поля от 3×3 до 6×6"],
 	],
@@ -287,6 +287,8 @@ func _load(g: GameScreen, rows: Array, score: int) -> void:
 	for r in rows:
 		flat.append_array(r)
 	g.board.from_dict({"size": rows.size(), "values": flat, "score": score, "moves": 300})
+	# As in a real game, the record is never below the score on the board.
+	app.store.submit_score(score, rows.size())
 	g._pending_over = false
 	g._board_view.show_board(g.board, BoardView.Appear.FADE)
 	g._board_view.hide_hint(true)
