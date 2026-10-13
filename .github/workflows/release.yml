@@ -3,6 +3,8 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # A dry run from any branch: builds the packages and starts them on an emulator; only a tag publishes.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -42,7 +44,12 @@ jobs:
           fetch-depth: 0
 
       - name: Check the tag and the version
-        run: python3 tools/check_version.py --tag "$GITHUB_REF_NAME"
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            python3 tools/check_version.py --tag "$GITHUB_REF_NAME"
+          else
+            python3 tools/check_version.py
+          fi
 
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
@@ -167,11 +174,12 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: tools/emulator_smoke.sh build/2048-Merge-${{ github.ref_name }}-universal.apk
+          script: tools/emulator_smoke.sh build/2048-Merge-v*-universal.apk
 
   publish:
     name: Publish the release
     needs: [build, emulator]
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     permissions:
       contents: write

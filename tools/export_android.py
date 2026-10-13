@@ -92,7 +92,11 @@ def install_template() -> None:
     shutil.rmtree(build, ignore_errors=True)
     build.mkdir(parents=True)
     with zipfile.ZipFile(source) as z:
-        z.extractall(build)
+        for info in z.infolist():
+            path = Path(z.extract(info, build))
+            # zipfile drops Unix modes, and on Linux Godot cannot start a gradlew that lost its x bit.
+            if not info.is_dir() and (info.external_attr >> 16) & 0o111:
+                path.chmod(path.stat().st_mode | 0o111)
     marker.write_text(version + "\n")
     (build / ".gdignore").touch()
     # A lingering Gradle daemon keeps Godot's export process from exiting.
@@ -114,10 +118,12 @@ def export(key: str, version: str) -> Path:
     out.unlink(missing_ok=True)
     # Fresh Gradle intermediates per preset: switching ABIs must not reuse old outputs.
     shutil.rmtree(ROOT / "android/build/build", ignore_errors=True)
-    # Godot exits 0 even when a script fails to parse, so its log decides.
-    log = run([godot(), "--headless", "--path", str(ROOT), "--export-release", preset, str(out)],
-              timeout=1800, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    log = subprocess.run([godot(), "--headless", "--path", str(ROOT), "--export-release", preset, str(out)],
+                         timeout=1800, capture_output=True, text=True, encoding="utf-8", errors="replace")
     print(log.stdout + log.stderr, end="")
+    if log.returncode != 0:
+        sys.exit(f"export of {preset} failed with exit code {log.returncode}")
+    # Godot exits 0 even when a script fails to parse, so its log decides too.
     errors = [l for l in (log.stdout + log.stderr).splitlines() if l.startswith(("ERROR:", "SCRIPT ERROR:"))]
     if errors:
         sys.exit(f"export of {preset} reported errors:\n" + "\n".join(errors[:10]))
