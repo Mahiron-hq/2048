@@ -16,4 +16,6 @@ The game is based on the idea of 2048 by Gabriele Cirulli
 (https://github.com/gabrielecirulli/2048, MIT License). No code from it is used.
 
 The bundled Manrope font is licensed under the SIL Open Font License 1.1
-(assets/fonts/OFL.txt). The music is licensed separately (LICENSE-MUSIC).
+(assets/fonts/OFL.txt). The music is licensed separately (LICENSE-MUSIC), and so is the
+script that builds its game loop, tools/make_game_music.py (PolyForm Noncommercial License
+1.0.0, LICENSE-MUSIC-TOOL.md).

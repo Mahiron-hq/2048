@@ -30,6 +30,7 @@ All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changel
 - **Quicker settings:** switching theme, language or text size updates hidden screens only when they are shown, so quick taps no longer pile up.
 - Accent text keeps 4.5:1 contrast in both themes; the scroll thumb keeps clear of the cards.
 - Interface strings moved to standard translation files with plural forms; the languages of neighbouring countries start in Russian.
+- **License of the music build script:** [`tools/make_game_music.py`](https://github.com/Mahiron-hq/2048/blob/main/tools/make_game_music.py) is now under the PolyForm Noncommercial License 1.0.0 ([LICENSE-MUSIC-TOOL.md](https://github.com/Mahiron-hq/2048/blob/main/LICENSE-MUSIC-TOOL.md)): free for any noncommercial use, commercial use needs the author's permission. The rest of the code stays under Apache 2.0.
 
 #### Fixed
 
@@ -68,6 +69,7 @@ All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changel
 - **Быстрее настройки:** смена темы, языка или размера текста обновляет скрытые экраны только при их показе, поэтому частые нажатия больше не копятся.
 - Акцентный текст держит контраст 4,5:1 в обеих темах; полоса прокрутки не налезает на карточки.
 - Строки интерфейса переехали в стандартные файлы переводов с множественными формами; языки соседних стран запускаются на русском.
+- **Лицензия скрипта сборки музыки:** [`tools/make_game_music.py`](https://github.com/Mahiron-hq/2048/blob/main/tools/make_game_music.py) теперь распространяется по лицензии PolyForm Noncommercial 1.0.0 ([LICENSE-MUSIC-TOOL.md](https://github.com/Mahiron-hq/2048/blob/main/LICENSE-MUSIC-TOOL.md)): свободно для любого некоммерческого использования, коммерческое – только с разрешения автора. Остальной код по-прежнему под Apache 2.0.
 
 #### Исправлено
 
