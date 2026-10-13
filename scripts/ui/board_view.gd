@@ -21,10 +21,12 @@ const UNDO_SLIDE := 0.19
 ## Move hint: lean towards the suggested move, in cells (capped at the grid margin so edge
 ## tiles stay on the board). A long strong push comes first, then a short echo.
 const HINT_PUSH := 0.16
-## How much further the strong push leans than the echo, in units (about 2 px at 1080p).
+## Extra lean of the strong push, in units (about 2 px at 1080p).
 const HINT_STRONG_EXTRA := 1.5
+## Share of the lean the echo goes.
+const HINT_ECHO_REACH := 0.5
 ## Seconds out and back: the strong push, then the echo, about a third as long.
-const HINT_STRONG := Vector2(0.5, 0.65)
+const HINT_STRONG := Vector2(0.43, 0.57)
 const HINT_ECHO := Vector2(0.17, 0.21)
 
 var cell_size := 100.0
@@ -85,7 +87,7 @@ func show_move_hint(dir: Board.Dir) -> void:
 	_hint_glow.setup(dir, board_rect.grow(-gap * 0.5))
 	_hint_tween = create_tween()
 	_push_hint(towards * strong, HINT_STRONG, 0.45)
-	_push_hint(towards * reach, HINT_ECHO, 0.0)
+	_push_hint(towards * reach * HINT_ECHO_REACH, HINT_ECHO, 0.0)
 	_hint_tween.tween_property(_hint_glow, "strength", 0.0, 0.25)
 
 
