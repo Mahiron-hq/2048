@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright 2026 Lev Burmistrov (Mahiron-hq). Not under the repository's Apache License; see LICENSE-MUSIC-TOOL.md.
+
 """Builds the in-game music loop from the lossless master.
 
 The loop keeps the master's exact length and gets a short faded tail past the loop point
