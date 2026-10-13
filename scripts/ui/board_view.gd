@@ -19,10 +19,13 @@ const UNDO_SQUEEZE := 0.07
 const UNDO_SQUEEZE_SCALE := 0.9
 const UNDO_SLIDE := 0.19
 ## Move hint: lean towards the suggested move, in cells (capped at the grid margin so edge
-## tiles stay on the board), and the timing of one push out and back.
+## tiles stay on the board). A long strong push comes first, then a short echo.
 const HINT_PUSH := 0.16
-const HINT_OUT := 0.22
-const HINT_BACK := 0.28
+## How much further the strong push leans than the echo, in units (about 2 px at 1080p).
+const HINT_STRONG_EXTRA := 1.5
+## Seconds out and back: the strong push, then the echo, about a third as long.
+const HINT_STRONG := Vector2(0.5, 0.65)
+const HINT_ECHO := Vector2(0.17, 0.21)
 
 var cell_size := 100.0
 var gap := 12.0
@@ -71,24 +74,32 @@ func is_animating() -> bool:
 	return (_move_tween != null and _move_tween.is_valid()) or _fx_tweens.any(func(t: Tween) -> bool: return t.is_valid())
 
 
-## Suggests a move without making it: the tiles lean towards [param dir] twice and that edge glows.
+## Suggests a move without making it: the tiles lean towards [param dir], strongly and then
+## briefly, and that edge glows.
 func show_move_hint(dir: Board.Dir) -> void:
 	stop_move_hint()
 	# Reduced motion: the tiles stay put and only the edge lights up.
 	var reach := 0.0 if Motion.reduced() else minf(cell_size * HINT_PUSH, gap * 0.85)
-	var off := _dir_vector(dir) * reach
+	var strong := 0.0 if Motion.reduced() else minf(reach + HINT_STRONG_EXTRA, gap * 0.95)
+	var towards := _dir_vector(dir)
 	_hint_glow.setup(dir, board_rect.grow(-gap * 0.5))
 	_hint_tween = create_tween()
-	for push in 2:
-		_hint_tween.tween_property(_layer, "position", off, HINT_OUT).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		_hint_tween.parallel().tween_property(_hint_glow, "strength", 1.0, HINT_OUT).set_trans(Tween.TRANS_SINE)
-		_hint_tween.tween_property(_layer, "position", Vector2.ZERO, HINT_BACK).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		_hint_tween.parallel().tween_property(_hint_glow, "strength", 0.45 if push == 0 else 0.0, HINT_BACK).set_trans(Tween.TRANS_SINE)
+	_push_hint(towards * strong, HINT_STRONG, 0.45)
+	_push_hint(towards * reach, HINT_ECHO, 0.0)
 	_hint_tween.tween_property(_hint_glow, "strength", 0.0, 0.25)
 
 
 func is_showing_move_hint() -> bool:
 	return _hint_tween != null and _hint_tween.is_valid()
+
+
+## Adds one lean of the tiles by [param off] and back, [param timing] seconds out and back, to
+## the move hint; the edge glow peaks with it and settles at [param glow_after].
+func _push_hint(off: Vector2, timing: Vector2, glow_after: float) -> void:
+	_hint_tween.tween_property(_layer, "position", off, timing.x).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_hint_tween.parallel().tween_property(_hint_glow, "strength", 1.0, timing.x).set_trans(Tween.TRANS_SINE)
+	_hint_tween.tween_property(_layer, "position", Vector2.ZERO, timing.y).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_hint_tween.parallel().tween_property(_hint_glow, "strength", glow_after, timing.y).set_trans(Tween.TRANS_SINE)
 
 
 ## Ends a move hint at once, tiles back in place.
