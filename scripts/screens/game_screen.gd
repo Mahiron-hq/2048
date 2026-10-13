@@ -30,7 +30,7 @@ const ABANDON_MIN_MOVES := 10
 ## A second tap on the bulb this soon after the first is taken for a double tap, not a cancel.
 const HINT_CANCEL_GUARD_MS := 350
 ## Holding the bulb this long slides out the hint strengths instead of asking for a hint.
-const HINT_HOLD_SEC := 1.0
+const HINT_HOLD_SEC := 0.45
 ## The hold ring shows only once a press has lasted this long, so a plain tap never flashes it.
 const HINT_HOLD_RING_AFTER := 0.15
 ## Long side over short side of the window below which it counts as a tablet's (4:3 to 16:10;

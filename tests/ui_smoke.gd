@@ -452,7 +452,10 @@ func _hints(app: App) -> void:
 		await _frames(1)
 		leaned = leaned or g._board_view._layer.position.length() > 1.0
 	check(leaned, "the tiles lean towards the suggested move")
-	await _wait(1.6)
+	for i in 60:
+		if not g._board_view.is_showing_move_hint():
+			break
+		await _wait(0.05)
 	check(not g._board_view.is_showing_move_hint() and g._board_view._layer.position == Vector2.ZERO, "the hint ends with every tile back in place")
 	g._idle = GameScreen.HINT_IDLE - 0.05
 	await _wait(0.4)
@@ -484,17 +487,17 @@ func _level_picker(app: App) -> void:
 	await _wait(0.4)
 	var before := app.store.hint_level
 	g._hint_btn.button_down.emit()
-	await _wait(0.3)
+	await _wait(GameScreen.HINT_HOLD_SEC * 0.5)
 	g._hint_btn.button_up.emit()
 	g._hint_btn.pressed.emit()
 	check(not g.is_level_picker_open() and g.is_hint_busy(), "a short press on the bulb asks for a hint")
 	g.cancel_hint()
 	await _wait(0.4)
 	g._hint_btn.button_down.emit()
-	await _wait(0.6)
+	await _wait(GameScreen.HINT_HOLD_SEC * 0.7)
 	check(g._hint_btn.progress > 0.0 and not g.is_level_picker_open(), "holding the bulb fills its ring")
-	await _wait(0.6)
-	check(g.is_level_picker_open(), "a one-second hold slides out the hint strengths")
+	await _wait(GameScreen.HINT_HOLD_SEC * 0.6)
+	check(g.is_level_picker_open(), "a long press slides out the hint strengths")
 	g._hint_btn.button_up.emit()
 	g._hint_btn.pressed.emit()
 	check(not g.is_hint_busy() and g._hint_btn.progress < 0.0, "the release after the hold asks for no hint")
