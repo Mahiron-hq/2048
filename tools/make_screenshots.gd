@@ -11,6 +11,8 @@ const SAVE := "user://screenshots_save.json"
 const MOVE_BUDGET_MS := 15
 ## Statistics show this much play time per move, a calm human pace; the bot itself is faster.
 const SECONDS_PER_MOVE := 1.8
+## Deals the new board under the swipe hint into two corners, clear of its arrows.
+const SWIPE_HINT_SEED := 108
 
 ## [seed, side, stop]: stop is "loss", or a tile value to play up to.
 const GAMES := {
@@ -135,6 +137,7 @@ func _docs_tall() -> void:
 	await _begin("big")
 	_replay(big, big.size())
 	await _capture(dir + "board_6x6.png", 0.5)
+	app._game.board.rng.seed = SWIPE_HINT_SEED
 	app._game.start_new(4, true)
 	await _capture(dir + "swipe_hint.png", 1.0)
 	app._to_menu()
@@ -247,10 +250,10 @@ func _replay(dirs: Array[int], count: int) -> void:
 			continue
 		app.store.record_move(g.board.size)
 		app.store.record_best_tile(g.board.size, g.board.best_tile)
+		app.store.record_longest(g.board.size, g.board.move_count)
 		app.store.submit_score(g.board.score, g.board.size)
 		app.store.submit_clean_score(g.board.score, g.board.size)
 		app.store.add_play_time(g.board.size, SECONDS_PER_MOVE)
-	g._best_at_start = app.store.best_for(g.board.size)
 	g.save_state()
 	_refresh()
 
