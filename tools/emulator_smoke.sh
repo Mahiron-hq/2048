@@ -13,6 +13,8 @@ adb logcat -d > logcat.txt
 grep " godot " logcat.txt || true
 if ! adb shell pidof "$package" > /dev/null; then
   echo "::error::the game is not running 25 seconds after launch"
+  adb logcat -d -b crash || true
+  grep -E "AndroidRuntime|DEBUG|libc|ActivityManager.*$package" logcat.txt | tail -60 || true
   exit 1
 fi
 if ! grep -q "hints on the native engine" logcat.txt; then
