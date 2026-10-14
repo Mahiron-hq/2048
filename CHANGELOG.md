@@ -4,7 +4,7 @@ All notable changes to 2048 Merge. From 1.3.1 on, entries follow [Keep a Changel
 
 ## [Unreleased]
 
-## [1.3.1] - 2026-10-12
+## [1.3.1] - 2026-10-14
 
 ### 🇬🇧 English
 
